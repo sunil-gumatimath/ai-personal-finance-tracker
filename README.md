@@ -32,6 +32,3 @@ A modern personal finance tracker built with React, TypeScript, Vite, and Supaba
    bun run dev
    ```
 
-## License
-
-MIT
