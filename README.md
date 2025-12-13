@@ -20,6 +20,7 @@ A modern personal finance tracker built with React, TypeScript, Vite, and Supaba
 2. **Setup Backend**
    - Create a project at [Supabase](https://supabase.com)
    - Run the contents of `supabase/schema.sql` in the SQL Editor
+   - (Optional) Run `supabase/seed_data.sql` to populate sample data
 
 3. **Configure Environment**
    ```bash
