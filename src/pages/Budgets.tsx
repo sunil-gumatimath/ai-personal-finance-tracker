@@ -204,50 +204,83 @@ export function Budgets() {
 
             {/* Overview Cards */}
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Total Budget
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(totalBudget)}</div>
-                        <p className="text-xs text-muted-foreground">This month</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Total Spent
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(totalSpent)}</div>
-                        <p className="text-xs text-muted-foreground">
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-muted-foreground">Total Budget</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-primary">
+                            <Target className="h-3 w-3" />
+                        </div>
+                    </div>
+                    <div className="relative mb-3">
+                        <span className="text-2xl font-bold tracking-tight text-foreground">
+                            {formatCurrency(totalBudget)}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                        <span>Monthly limit</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground/70">This month</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                </div>
+
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-muted-foreground">Total Spent</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-rose-400">
+                            <span>
+                                {totalBudget > 0 ? `${((totalSpent / totalBudget) * 100).toFixed(0)}%` : '0%'}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="relative mb-3">
+                        <span className="text-2xl font-bold tracking-tight text-foreground">
+                            {formatCurrency(totalSpent)}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-rose-400">
+                        <span>
                             {totalBudget > 0
                                 ? `${((totalSpent / totalBudget) * 100).toFixed(0)}% of budget`
                                 : 'No budgets set'}
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Remaining
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div
-                            className={cn(
-                                'text-2xl font-bold',
-                                totalBudget - totalSpent >= 0 ? 'text-green-500' : 'text-red-500'
-                            )}
-                        >
-                            {formatCurrency(totalBudget - totalSpent)}
+                        </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground/70">Spent this period</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-rose-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                </div>
+
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-muted-foreground">Remaining</span>
+                        <div className={cn(
+                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                            totalBudget - totalSpent >= 0 ? "text-emerald-400" : "text-rose-400"
+                        )}>
+                            <span>{totalBudget - totalSpent >= 0 ? '+' : ''}{((totalBudget - totalSpent) / totalBudget * 100 || 0).toFixed(0)}%</span>
                         </div>
-                        <p className="text-xs text-muted-foreground">Available to spend</p>
-                    </CardContent>
-                </Card>
+                    </div>
+                    <div className="relative mb-3">
+                        <span className={cn(
+                            "text-2xl font-bold tracking-tight",
+                            totalBudget - totalSpent >= 0 ? "text-emerald-400" : "text-rose-400"
+                        )}>
+                            {formatCurrency(totalBudget - totalSpent)}
+                        </span>
+                    </div>
+                    <div className={cn(
+                        "flex items-center gap-1.5 text-sm font-medium",
+                        totalBudget - totalSpent >= 0 ? "text-emerald-400" : "text-rose-400"
+                    )}>
+                        <span>{totalBudget - totalSpent >= 0 ? 'Under budget' : 'Over budget'}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground/70">Available to spend</p>
+                    <div className={cn(
+                        "absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-10 blur-2xl transition-opacity group-hover:opacity-20",
+                        totalBudget - totalSpent >= 0 ? "bg-emerald-500" : "bg-rose-500"
+                    )} />
+                </div>
             </div>
 
             {/* Budget Cards */}

@@ -266,60 +266,90 @@ export function Goals() {
 
             {/* Stats Cards */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
-                            <div className="rounded-full bg-primary/10 p-3">
-                                <Target className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Active Goals</p>
-                                <p className="text-2xl font-bold">{totalGoals - completedGoals}</p>
-                            </div>
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-muted-foreground">Active Goals</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-primary">
+                            <Target className="h-3 w-3" />
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
-                            <div className="rounded-full bg-green-500/10 p-3">
-                                <Trophy className="h-5 w-5 text-green-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Completed</p>
-                                <p className="text-2xl font-bold">{completedGoals}</p>
-                            </div>
+                    </div>
+                    <div className="relative mb-3">
+                        <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                            {totalGoals - completedGoals}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                        <span>In progress</span>
+                        <TrendingUp className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-xs text-muted-foreground/70">Goals to achieve</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                </div>
+
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-muted-foreground">Completed</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-emerald-400">
+                            <Trophy className="h-3 w-3" />
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
-                            <div className="rounded-full bg-blue-500/10 p-3">
-                                <TrendingUp className="h-5 w-5 text-blue-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Total Saved</p>
-                                <p className="text-xl sm:text-2xl font-bold">{formatCurrency(totalSaved)}</p>
-                            </div>
+                    </div>
+                    <div className="relative mb-3">
+                        <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                            {completedGoals}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-400">
+                        <span>Goals achieved</span>
+                        <Trophy className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-xs text-muted-foreground/70">Congratulations!</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-emerald-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                </div>
+
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-muted-foreground">Total Saved</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-blue-400">
+                            <TrendingUp className="h-3 w-3" />
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
-                            <div className="rounded-full bg-purple-500/10 p-3">
-                                <Sparkles className="h-5 w-5 text-purple-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Overall Progress</p>
-                                <p className="text-2xl font-bold">
-                                    {totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0}%
-                                </p>
-                            </div>
+                    </div>
+                    <div className="relative mb-3">
+                        <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                            {formatCurrency(totalSaved)}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-blue-400">
+                        <span>Saved towards goals</span>
+                        <TrendingUp className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-xs text-muted-foreground/70">Across all goals</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-blue-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                </div>
+
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-muted-foreground">Overall Progress</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-purple-400">
+                            <Sparkles className="h-3 w-3" />
+                            <span>{totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0}%</span>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                    <div className="relative mb-3">
+                        <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                            {totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0}%
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-purple-400">
+                        <span>Towards all goals</span>
+                        <Sparkles className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-xs text-muted-foreground/70">Keep it up!</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-purple-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                </div>
             </div>
 
             {/* Goals Grid */}
