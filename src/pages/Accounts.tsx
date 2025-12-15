@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
     Plus,
     Wallet,
@@ -95,11 +95,7 @@ export function Accounts() {
         is_active: true,
     })
 
-    useEffect(() => {
-        fetchAccounts()
-    }, [user])
-
-    async function fetchAccounts() {
+    const fetchAccounts = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
@@ -121,7 +117,11 @@ export function Accounts() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
+
+    useEffect(() => {
+        fetchAccounts()
+    }, [fetchAccounts])
 
     const getAccountIcon = (type: string) => {
         const accountType = ACCOUNT_TYPES.find((t) => t.value === type)

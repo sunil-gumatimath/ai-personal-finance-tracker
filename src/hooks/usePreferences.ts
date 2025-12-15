@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 
 const PREFERENCES_KEY = 'financetrack_preferences'
 
@@ -34,21 +34,21 @@ const currencyLocales: Record<string, string> = {
     JPY: 'ja-JP',
 }
 
-export function usePreferences() {
-    const [preferences, setPreferences] = useState<Preferences>(defaultPreferences)
-
-    // Load preferences from localStorage on mount
-    useEffect(() => {
+const loadInitialPreferences = (): Preferences => {
+    try {
         const saved = localStorage.getItem(PREFERENCES_KEY)
         if (saved) {
-            try {
-                const parsed = JSON.parse(saved)
-                setPreferences(prev => ({ ...prev, ...parsed }))
-            } catch (e) {
-                console.error('Failed to parse preferences:', e)
-            }
+            const parsed = JSON.parse(saved)
+            return { ...defaultPreferences, ...parsed }
         }
-    }, [])
+    } catch {
+        // Failed to parse preferences, using defaults
+    }
+    return defaultPreferences
+}
+
+export function usePreferences() {
+    const [preferences, setPreferences] = useState<Preferences>(loadInitialPreferences)
 
     // Save preferences to localStorage
     const savePreferences = useCallback((newPreferences: Partial<Preferences>) => {

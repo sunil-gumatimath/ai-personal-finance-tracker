@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Tag, Pencil, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -48,11 +48,7 @@ export function Categories() {
         icon: ICONS[0],
     })
 
-    useEffect(() => {
-        fetchCategories()
-    }, [user])
-
-    async function fetchCategories() {
+    const fetchCategories = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
@@ -74,7 +70,11 @@ export function Categories() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
+
+    useEffect(() => {
+        fetchCategories()
+    }, [fetchCategories])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

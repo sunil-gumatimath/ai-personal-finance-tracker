@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
     format,
     startOfMonth,
@@ -36,11 +36,7 @@ export function Calendar() {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-    useEffect(() => {
-        fetchTransactions()
-    }, [user, currentDate])
-
-    async function fetchTransactions() {
+    const fetchTransactions = useCallback(async () => {
         if (!user) return
 
         const start = startOfWeek(startOfMonth(currentDate))
@@ -61,7 +57,11 @@ export function Calendar() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user, currentDate])
+
+    useEffect(() => {
+        fetchTransactions()
+    }, [fetchTransactions])
 
     const { calendarGrid } = useMemo(() => {
         const monthStart = startOfMonth(currentDate)

@@ -5,7 +5,7 @@ import { StatCard, RecentTransactions, SpendingChart, BudgetOverview } from '@/c
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
-import type { Transaction, DashboardStats, SpendingByCategory, MonthlyTrend } from '@/types'
+import type { Transaction, DashboardStats, SpendingByCategory, MonthlyTrend, Category } from '@/types'
 import { Link } from 'react-router-dom'
 
 export function Dashboard() {
@@ -86,8 +86,9 @@ export function Dashboard() {
                     currentMonthData
                         .filter((t) => t.type === 'expense' && t.category)
                         .forEach((t) => {
-                            const catName = (t.category as any)?.name || 'Uncategorized'
-                            const catColor = (t.category as any)?.color || '#94a3b8'
+                            const category = Array.isArray(t.category) ? t.category[0] : t.category
+                            const catName = (category as Category)?.name || 'Uncategorized'
+                            const catColor = (category as Category)?.color || '#94a3b8'
                             const current = categoryMap.get(catName) || { amount: 0, color: catColor }
                             categoryMap.set(catName, {
                                 amount: current.amount + t.amount,
@@ -205,7 +206,7 @@ export function Dashboard() {
                     amount: 45.99,
                     date: new Date().toISOString(),
                     description: 'Grocery Store',
-                    category: { name: 'Food & Dining', color: '#ef4444' }
+                    category: { id: '1', user_id: '', name: 'Food & Dining', type: 'expense', color: '#ef4444', icon: '', parent_id: null, created_at: '' }
                 },
                 {
                     id: '2',
@@ -213,7 +214,7 @@ export function Dashboard() {
                     amount: 2500.00,
                     date: new Date(Date.now() - 86400000).toISOString(),
                     description: 'Freelance Payment',
-                    category: { name: 'Freelance', color: '#10b981' }
+                    category: { id: '2', user_id: '', name: 'Freelance', type: 'income', color: '#10b981', icon: '', parent_id: null, created_at: '' }
                 },
                 {
                     id: '3',
@@ -221,9 +222,9 @@ export function Dashboard() {
                     amount: 120.00,
                     date: new Date(Date.now() - 172800000).toISOString(),
                     description: 'Electric Bill',
-                    category: { name: 'Bills', color: '#f59e0b' }
+                    category: { id: '3', user_id: '', name: 'Bills', type: 'expense', color: '#f59e0b', icon: '', parent_id: null, created_at: '' }
                 },
-            ] as any)
+            ] as Transaction[])
         }
 
         fetchDashboardData()

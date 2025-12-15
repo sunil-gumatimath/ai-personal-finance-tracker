@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { format } from 'date-fns'
 import {
     Plus,
@@ -75,11 +75,7 @@ export function Transactions() {
         recurring_frequency: '' as '' | 'daily' | 'weekly' | 'monthly' | 'yearly',
     })
 
-    useEffect(() => {
-        fetchData()
-    }, [user])
-
-    async function fetchData() {
+    const fetchData = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
@@ -109,7 +105,11 @@ export function Transactions() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
+
+    useEffect(() => {
+        fetchData()
+    }, [fetchData])
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter((t) => {

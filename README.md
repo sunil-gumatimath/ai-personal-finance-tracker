@@ -1,107 +1,86 @@
-# FinanceTrack
+# Personal Finance Tracker
 
-A premium, modern personal finance tracker built with React 19, TypeScript, and Supabase.
+A modern personal finance management application built with React 19, TypeScript, and Supabase.
 
-![FinanceTrack App](https://raw.githubusercontent.com/sunil-gumatimath/Personal-Finance-Tracker/main/public/preview.png)
+## Features
 
-## 🚀 Features
+- Interactive dashboard with real-time financial overview and charts
+- Account management for checking, savings, investment, and credit accounts
+- Transaction tracking with support for income, expenses, and transfers
+- Recurring transaction management
+- Financial calendar with monthly income and expense visualization
+- Budget creation and spending limit tracking
+- Savings goals with progress monitoring
+- Secure authentication powered by Supabase
+- Responsive design with dark mode support
+- CSV export functionality for data portability
+- Progressive Web App (PWA) capabilities
+- Docker containerization for production deployment
 
-- **📊 Interactive Dashboard**: Real-time overview with dynamic charts and statistical summaries.
-- **💼 Smart Accounts Management**: 
-  - Manage checking, savings, investment, and credit accounts.
-  - **New!** Premium separate views for active/inactive accounts.
-  - Visual net worth calculation with assets vs liabilities breakdown.
-- **💳 Advanced Transactions**: 
-  - Track income, expenses, and transfers.
-  - Recurring transaction support.
-  - **CSV Export** functionality for data portability.
-- **📅 Financial Calendar**: Visual monthly view of income and expenses.
-- **🎯 Goals & Budgets**: Set spending limits and track savings milestones.
-- **🔐 Secure Authentication**: Powered by Supabase Auth with robust protection.
-- **🎨 Modern UI/UX**: 
-  - Fully responsive design.
-  - Glassmorphism effects and smooth animations.
-  - **Dark Mode** support (System/Light/Dark).
-- **🐳 Docker Ready**: Production-ready containerization support.
-- **📱 PWA Enabled**: Installable on mobile and desktop devices.
+## Tech Stack
 
-## 🛠️ Tech Stack
-
-- **Core**: React 19, TypeScript, Vite
+- **Frontend**: React 19, TypeScript, Vite
 - **Styling**: Tailwind CSS v4, Shadcn UI, Lucide Icons
-- **Backend & Auth**: Supabase
-- **Visualization**: Recharts
+- **Backend**: Supabase
+- **Charts**: Recharts
 - **Runtime**: Bun
 - **Deployment**: Docker, Nginx
 
-## 🏁 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) (v1.0+)
-- [Docker](https://www.docker.com/) (Optional, for containerization)
-- A [Supabase](https://supabase.com) project
+- Bun (v1.0+)
+- Docker (optional, for containerization)
+- Supabase project
 
-### 💻 Local Development
+### Local Development
 
-1. **Clone & Install**
+1. Clone the repository and install dependencies:
    ```bash
-   git clone https://github.com/yourusername/finance-track.git
-   cd finance-track
+   git clone <repository-url>
+   cd personal-finance-tracker
    bun install
    ```
 
-2. **Environment Setup**
+2. Set up environment variables:
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` and add your Supabase credentials:
+   Configure your Supabase credentials in `.env`:
    ```env
    VITE_SUPABASE_URL=your_project_url
    VITE_SUPABASE_ANON_KEY=your_anon_key
    ```
 
-3. **Database Setup**
-   - Navigate to your Supabase project's SQL Editor.
-   - Run the full schema script provided in `supabase/database.sql`.
-   - This script creates all tables, triggers, policies, and seeds initial demo data.
+3. Initialize the database:
+   - Access your Supabase project's SQL Editor
+   - Execute the schema script in `supabase/database.sql`
 
-4. **Run Dev Server**
+4. Start the development server:
    ```bash
    bun run dev
    ```
-   Access the app at `http://localhost:5173`.
+   Access the application at `http://localhost:5173`
 
-### 🐳 Docker Deployment
+### Docker Deployment
 
-Run the application in a production-ready container using Docker Compose.
-
-1. **Build and Run**
+1. Build and run with Docker Compose:
    ```bash
    docker-compose up --build -d
    ```
 
-2. **Access Application**
-   Open `http://localhost:8080` in your browser.
+2. Access the application at `http://localhost:8080`
 
-3. **Stop Container**
-   ```bash
-   docker-compose down
-   ```
-
-## 📂 Project Structure
+## Project Structure
 
 ```
 src/
-├── components/     # Reusable UI components (buttons, cards, etc.)
-├── contexts/       # React Contexts (Auth, Theme)
-├── hooks/          # Custom hooks (usePreferences, useAuth)
-├── lib/            # Utilities (Supabase client, helpers)
-├── pages/          # Main application pages (Dashboard, Accounts, etc.)
-├── types/          # TypeScript definitions
-└── App.tsx         # Main router and layout configuration
+├── components/     # Reusable UI components
+├── contexts/       # React contexts for state management
+├── hooks/          # Custom React hooks
+├── lib/            # Utility functions and configurations
+├── pages/          # Main application pages
+├── types/          # TypeScript type definitions
+└── App.tsx         # Main application component
 ```
-
-## 📜 License
-
-MIT

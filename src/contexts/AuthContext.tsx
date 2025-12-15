@@ -19,6 +19,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
 
+    const setOfflineDemoUser = () => {
+        setUser({
+            id: 'offline-demo-user',
+            email: 'demo@example.com',
+            app_metadata: {},
+            user_metadata: { full_name: 'Demo User (Offline)', avatar_url: '' },
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+        } as User)
+    }
+
     useEffect(() => {
         // Get initial session
         supabase.auth.getSession()
@@ -54,17 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return () => subscription.unsubscribe()
     }, [])
-
-    const setOfflineDemoUser = () => {
-        setUser({
-            id: 'offline-demo-user',
-            email: 'demo@example.com',
-            app_metadata: {},
-            user_metadata: { full_name: 'Demo User (Offline)', avatar_url: '' },
-            aud: 'authenticated',
-            created_at: new Date().toISOString(),
-        } as User)
-    }
 
 
     const signIn = async (email: string, password: string) => {
@@ -114,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
     const context = useContext(AuthContext)
     if (context === undefined) {

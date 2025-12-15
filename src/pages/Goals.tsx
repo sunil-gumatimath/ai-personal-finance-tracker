@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { format, differenceInDays } from 'date-fns'
 import {
     Plus,
@@ -81,11 +81,7 @@ export function Goals() {
         icon: 'target',
     })
 
-    useEffect(() => {
-        fetchGoals()
-    }, [user])
-
-    async function fetchGoals() {
+    const fetchGoals = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
@@ -106,7 +102,11 @@ export function Goals() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
+
+    useEffect(() => {
+        fetchGoals()
+    }, [fetchGoals])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

@@ -14,7 +14,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/contexts/AuthContext'
-import { useState } from 'react'
 
 // Route configuration for dynamic titles and breadcrumbs
 const routeConfig: Record<string, { title: string; breadcrumb: string }> = {
@@ -32,7 +31,6 @@ export function Header() {
     const location = useLocation()
     const navigate = useNavigate()
     const { user, signOut } = useAuth()
-    const [hasNotifications] = useState(true) // TODO: Connect to real notification state
 
     // Get current route config
     const currentRoute = routeConfig[location.pathname] || { title: 'Dashboard', breadcrumb: 'Dashboard' }
@@ -84,18 +82,10 @@ export function Header() {
                     variant="ghost"
                     size="icon"
                     className="relative"
-                    aria-label={hasNotifications ? "You have new notifications" : "No new notifications"}
+                    aria-label="Notifications"
                 >
                     <Bell className="h-5 w-5" />
-                    {hasNotifications && (
-                        <span
-                            className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse"
-                            aria-hidden="true"
-                        />
-                    )}
-                    <span className="sr-only">
-                        {hasNotifications ? "View notifications" : "No notifications"}
-                    </span>
+                    <span className="sr-only">Notifications</span>
                 </Button>
 
                 {/* Theme Toggle */}
