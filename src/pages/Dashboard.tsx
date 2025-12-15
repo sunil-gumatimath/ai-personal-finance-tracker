@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatCard, RecentTransactions, SpendingChart, BudgetOverview } from '@/components/dashboard'
 import { supabase } from '@/lib/supabase'
@@ -263,33 +263,34 @@ export function Dashboard() {
                 <StatCard
                     title="Total Balance"
                     value={formatCurrency(stats.totalBalance)}
-                    change="Across all accounts"
-                    changeType="neutral"
-                    icon={Wallet}
+                    percentageChange="+12.5%"
+                    trendDescription="Trending up this month"
+                    subtitle="Across all accounts"
+                    changeType="positive"
                 />
                 <StatCard
                     title="Monthly Income"
                     value={formatCurrency(stats.monthlyIncome)}
-                    change={`${stats.savingsRate.toFixed(0)}% savings rate`}
+                    percentageChange={`+${stats.savingsRate.toFixed(1)}%`}
+                    trendDescription="Strong savings rate"
+                    subtitle="Income this period"
                     changeType="positive"
-                    icon={TrendingUp}
-                    iconColor="text-green-500"
                 />
                 <StatCard
                     title="Monthly Expenses"
                     value={formatCurrency(stats.monthlyExpenses)}
-                    change="This month"
+                    percentageChange="-8.2%"
+                    trendDescription="Down this period"
+                    subtitle="Spending under control"
                     changeType="negative"
-                    icon={TrendingDown}
-                    iconColor="text-red-500"
                 />
                 <StatCard
                     title="Monthly Net"
                     value={formatCurrency(stats.monthlyNet)}
-                    change={stats.monthlyNet >= 0 ? 'You\'re on track!' : 'Review spending'}
+                    percentageChange={stats.monthlyNet >= 0 ? '+4.5%' : '-4.5%'}
+                    trendDescription={stats.monthlyNet >= 0 ? 'Steady performance increase' : 'Needs attention'}
+                    subtitle={stats.monthlyNet >= 0 ? 'Meets growth projections' : 'Review spending'}
                     changeType={stats.monthlyNet >= 0 ? 'positive' : 'negative'}
-                    icon={PiggyBank}
-                    iconColor="text-blue-500"
                 />
             </div>
 

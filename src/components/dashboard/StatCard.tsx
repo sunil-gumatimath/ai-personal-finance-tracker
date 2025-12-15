@@ -1,5 +1,4 @@
-import { type LucideIcon } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { type LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface StatCardProps {
@@ -7,7 +6,10 @@ interface StatCardProps {
     value: string
     change?: string
     changeType?: 'positive' | 'negative' | 'neutral'
-    icon: LucideIcon
+    percentageChange?: string
+    trendDescription?: string
+    subtitle?: string
+    icon?: LucideIcon
     iconColor?: string
 }
 
@@ -16,35 +18,76 @@ export function StatCard({
     value,
     change,
     changeType = 'neutral',
-    icon: Icon,
-    iconColor = 'text-primary',
+    percentageChange,
+    trendDescription,
+    subtitle,
 }: StatCardProps) {
+    const TrendIcon = changeType === 'positive'
+        ? TrendingUp
+        : changeType === 'negative'
+            ? TrendingDown
+            : Minus
+
+    const displayPercentage = percentageChange || (change && change.includes('%') ? change.split('%')[0] + '%' : null)
+    const displayTrendDesc = trendDescription || (change && !change.includes('%') ? change : null)
+
     return (
-        <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-            <div className="absolute right-0 top-0 -mr-4 -mt-4 h-24 w-24 rounded-full bg-gradient-to-br from-primary/10 to-transparent" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+        <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+            {/* Subtle gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+
+            {/* Header with title and percentage badge */}
+            <div className="relative flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-muted-foreground">
                     {title}
-                </CardTitle>
-                <div className={cn('rounded-lg bg-primary/10 p-2', iconColor)}>
-                    <Icon className="h-4 w-4" />
-                </div>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
-                {change && (
-                    <p
-                        className={cn(
-                            'mt-1 text-xs',
-                            changeType === 'positive' && 'text-green-500',
-                            changeType === 'negative' && 'text-red-500',
-                            changeType === 'neutral' && 'text-muted-foreground'
-                        )}
-                    >
-                        {change}
-                    </p>
+                </span>
+                {displayPercentage && (
+                    <div className={cn(
+                        "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                        changeType === 'positive' && "text-emerald-400",
+                        changeType === 'negative' && "text-rose-400",
+                        changeType === 'neutral' && "text-muted-foreground"
+                    )}>
+                        <TrendIcon className="h-3 w-3" />
+                        <span>{displayPercentage}</span>
+                    </div>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+
+            {/* Main Value */}
+            <div className="relative mb-3">
+                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                    {value}
+                </span>
+            </div>
+
+            {/* Trend Description */}
+            {displayTrendDesc && (
+                <div className={cn(
+                    "flex items-center gap-1.5 text-sm font-medium mb-1",
+                    changeType === 'positive' && "text-emerald-400",
+                    changeType === 'negative' && "text-rose-400",
+                    changeType === 'neutral' && "text-muted-foreground"
+                )}>
+                    <span>{displayTrendDesc}</span>
+                    <TrendIcon className="h-3.5 w-3.5" />
+                </div>
+            )}
+
+            {/* Subtitle */}
+            {subtitle && (
+                <p className="text-xs text-muted-foreground/70">
+                    {subtitle}
+                </p>
+            )}
+
+            {/* Decorative corner accent */}
+            <div className={cn(
+                "absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-10 blur-2xl transition-opacity group-hover:opacity-20",
+                changeType === 'positive' && "bg-emerald-500",
+                changeType === 'negative' && "bg-rose-500",
+                changeType === 'neutral' && "bg-primary"
+            )} />
+        </div>
     )
 }
