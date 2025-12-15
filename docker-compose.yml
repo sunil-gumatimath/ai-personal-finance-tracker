@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    restart: always
+    environment:
+      # If you have environment variables in your .env file that are needed at BUILD time 
+      # (Vite bakes them in), you might need to pass them as build args in the Dockerfile 
+      # or ensure a .env exists during build.
+      # For runtime env vars (not common for pure client-side apps unless handled via a script), list them here.
+      - NODE_ENV=production
+    container_name: finance-tracker-app
+  # If you wanted to run a local backend or database, you would define it here.
+  # For example, if you wanted a local Postgres (though you are using Supabase):
+  # db:
+  #   image: postgres:15
+  #   ...
