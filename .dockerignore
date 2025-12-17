@@ -1,4 +1,9 @@
 node_modules
 dist
 .git
+.env
+README.md
+HowToUse.md
+supabase
+.cursor
 

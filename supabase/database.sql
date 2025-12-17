@@ -31,6 +31,7 @@ DROP FUNCTION IF EXISTS handle_new_user();
 DROP FUNCTION IF EXISTS seed_my_data();
 DROP FUNCTION IF EXISTS seed_my_data_advanced();
 DROP FUNCTION IF EXISTS update_updated_at_column();
+DROP FUNCTION IF EXISTS update_account_balance();
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -85,7 +86,7 @@ CREATE TABLE categories (
 CREATE TABLE transactions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE NOT NULL,
+  account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT NOT NULL,
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer')),
   amount DECIMAL(15, 2) NOT NULL,
@@ -97,6 +98,58 @@ CREATE TABLE transactions (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- =====================================================
+-- FUNCTION: Auto-update account balance on transaction change
+-- =====================================================
+CREATE OR REPLACE FUNCTION update_account_balance()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Handle DELETE: reverse the old transaction
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.type = 'income' THEN
+      UPDATE accounts SET balance = balance - OLD.amount WHERE id = OLD.account_id;
+    ELSIF OLD.type = 'expense' THEN
+      UPDATE accounts SET balance = balance + OLD.amount WHERE id = OLD.account_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+
+  -- Handle INSERT: apply the new transaction
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.type = 'income' THEN
+      UPDATE accounts SET balance = balance + NEW.amount WHERE id = NEW.account_id;
+    ELSIF NEW.type = 'expense' THEN
+      UPDATE accounts SET balance = balance - NEW.amount WHERE id = NEW.account_id;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  -- Handle UPDATE: reverse old, apply new
+  IF TG_OP = 'UPDATE' THEN
+    -- Reverse old transaction
+    IF OLD.type = 'income' THEN
+      UPDATE accounts SET balance = balance - OLD.amount WHERE id = OLD.account_id;
+    ELSIF OLD.type = 'expense' THEN
+      UPDATE accounts SET balance = balance + OLD.amount WHERE id = OLD.account_id;
+    END IF;
+    
+    -- Apply new transaction
+    IF NEW.type = 'income' THEN
+      UPDATE accounts SET balance = balance + NEW.amount WHERE id = NEW.account_id;
+    ELSIF NEW.type = 'expense' THEN
+      UPDATE accounts SET balance = balance - NEW.amount WHERE id = NEW.account_id;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_account_balance
+  AFTER INSERT OR UPDATE OR DELETE ON transactions
+  FOR EACH ROW EXECUTE FUNCTION update_account_balance();
 
 -- =====================================================
 -- TABLE: budgets

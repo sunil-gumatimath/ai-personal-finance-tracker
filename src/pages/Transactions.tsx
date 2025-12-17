@@ -202,18 +202,33 @@ export function Transactions() {
     }
 
     const handleExport = () => {
+        // Helper function to properly escape CSV fields according to RFC 4180
+        const escapeCSVField = (field: string | number | null | undefined): string => {
+            if (field === null || field === undefined) return ''
+            const str = String(field)
+            // If field contains comma, newline, or quote, wrap in quotes and escape internal quotes
+            if (str.includes(',') || str.includes('\n') || str.includes('\r') || str.includes('"')) {
+                return `"${str.replace(/"/g, '""')}"`
+            }
+            return str
+        }
+
         const headers = ['Type', 'Description', 'Category', 'Account', 'Date', 'Amount']
-        const csvContent = [
+        const csvRows = [
             headers.join(','),
             ...filteredTransactions.map(t => [
-                t.type,
-                `"${(t.description || '').replace(/"/g, '""')}"`,
-                `"${(t.category?.name || '').replace(/"/g, '""')}"`,
-                `"${(t.account?.name || '').replace(/"/g, '""')}"`,
-                t.date,
-                t.amount
+                escapeCSVField(t.type),
+                escapeCSVField(t.description),
+                escapeCSVField(t.category?.name),
+                escapeCSVField(t.account?.name),
+                escapeCSVField(t.date),
+                escapeCSVField(t.amount)
             ].join(','))
-        ].join('\n')
+        ]
+
+        // Add BOM for Excel UTF-8 compatibility
+        const BOM = '\uFEFF'
+        const csvContent = BOM + csvRows.join('\r\n')
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
         const link = document.createElement('a')
@@ -225,6 +240,7 @@ export function Transactions() {
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
+            URL.revokeObjectURL(url) // Clean up the URL object
         }
     }
 

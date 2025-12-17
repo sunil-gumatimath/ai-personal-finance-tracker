@@ -8,16 +8,28 @@ import { usePreferences } from '@/hooks/usePreferences'
 import type { Transaction, DashboardStats, SpendingByCategory, MonthlyTrend, Category } from '@/types'
 import { Link } from 'react-router-dom'
 
+// Extended stats to include last month for comparisons
+interface ExtendedDashboardStats extends DashboardStats {
+    lastMonthIncome: number
+    lastMonthExpenses: number
+    incomeChange: number
+    expensesChange: number
+}
+
 export function Dashboard() {
     const { user } = useAuth()
     const { formatCurrency } = usePreferences()
     const [loading, setLoading] = useState(true)
-    const [stats, setStats] = useState<DashboardStats>({
+    const [stats, setStats] = useState<ExtendedDashboardStats>({
         totalBalance: 0,
         monthlyIncome: 0,
         monthlyExpenses: 0,
         monthlyNet: 0,
         savingsRate: 0,
+        lastMonthIncome: 0,
+        lastMonthExpenses: 0,
+        incomeChange: 0,
+        expensesChange: 0,
     })
     const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
     const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([])
@@ -31,9 +43,23 @@ export function Dashboard() {
             }
 
             try {
+                // Helper to get local date string (YYYY-MM-DD) to avoid timezone issues
+                const getLocalDateString = (date: Date): string => {
+                    const year = date.getFullYear()
+                    const month = String(date.getMonth() + 1).padStart(2, '0')
+                    const day = String(date.getDate()).padStart(2, '0')
+                    return `${year}-${month}-${day}`
+                }
+
                 const now = new Date()
                 const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+                const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
                 const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+
+                // Use local date strings to avoid timezone issues
+                const startOfMonthStr = getLocalDateString(startOfMonth)
+                const startOfLastMonthStr = getLocalDateString(startOfLastMonth)
+                const sixMonthsAgoStr = getLocalDateString(sixMonthsAgo)
 
                 // 1. Fetch recent transactions with expanded details
                 const { data: transactions } = await supabase
@@ -51,19 +77,24 @@ export function Dashboard() {
                     setRecentTransactions(transactions as Transaction[])
                 }
 
-                // 2. Fetch monthly data for stats and category breakdown
-                const { data: currentMonthData } = await supabase
+                // 2. Fetch both current and last month data for comparison
+                const { data: twoMonthData } = await supabase
                     .from('transactions')
                     .select(`
                         type,
                         amount,
+                        date,
                         category:categories(name, color)
                     `)
                     .eq('user_id', user.id)
-                    .gte('date', startOfMonth.toISOString())
+                    .gte('date', startOfLastMonthStr)
 
-                if (currentMonthData) {
-                    // Calculate Stats
+                if (twoMonthData) {
+                    // Split into current and last month
+                    const currentMonthData = twoMonthData.filter(t => t.date >= startOfMonthStr)
+                    const lastMonthData = twoMonthData.filter(t => t.date >= startOfLastMonthStr && t.date < startOfMonthStr)
+
+                    // Calculate current month stats
                     const income = currentMonthData
                         .filter((t) => t.type === 'income')
                         .reduce((sum, t) => sum + t.amount, 0)
@@ -71,12 +102,32 @@ export function Dashboard() {
                         .filter((t) => t.type === 'expense')
                         .reduce((sum, t) => sum + t.amount, 0)
 
+                    // Calculate last month stats for comparison
+                    const lastMonthIncome = lastMonthData
+                        .filter((t) => t.type === 'income')
+                        .reduce((sum, t) => sum + t.amount, 0)
+                    const lastMonthExpenses = lastMonthData
+                        .filter((t) => t.type === 'expense')
+                        .reduce((sum, t) => sum + t.amount, 0)
+
+                    // Calculate percentage changes
+                    const incomeChange = lastMonthIncome > 0
+                        ? ((income - lastMonthIncome) / lastMonthIncome) * 100
+                        : (income > 0 ? 100 : 0)
+                    const expensesChange = lastMonthExpenses > 0
+                        ? ((expenses - lastMonthExpenses) / lastMonthExpenses) * 100
+                        : (expenses > 0 ? 100 : 0)
+
                     setStats({
                         totalBalance: 0, // Will be updated by accounts fetch
                         monthlyIncome: income,
                         monthlyExpenses: expenses,
                         monthlyNet: income - expenses,
                         savingsRate: income > 0 ? ((income - expenses) / income) * 100 : 0,
+                        lastMonthIncome,
+                        lastMonthExpenses,
+                        incomeChange,
+                        expensesChange,
                     })
 
                     // Calculate Spending by Category
@@ -113,7 +164,7 @@ export function Dashboard() {
                     .from('transactions')
                     .select('type, amount, date')
                     .eq('user_id', user.id)
-                    .gte('date', sixMonthsAgo.toISOString())
+                    .gte('date', sixMonthsAgoStr)
                     .order('date', { ascending: true })
 
                 if (trendData) {
@@ -181,6 +232,10 @@ export function Dashboard() {
                 monthlyExpenses: 2150.00,
                 monthlyNet: 2350.00,
                 savingsRate: 52,
+                lastMonthIncome: 4200.00,
+                lastMonthExpenses: 2300.00,
+                incomeChange: 7.1,
+                expensesChange: -6.5,
             })
 
             setMonthlyTrends([
@@ -263,33 +318,32 @@ export function Dashboard() {
                 <StatCard
                     title="Total Balance"
                     value={formatCurrency(stats.totalBalance)}
-                    percentageChange="+12.5%"
-                    trendDescription="Trending up this month"
+                    trendDescription={stats.totalBalance >= 0 ? "Net worth positive" : "Building up"}
                     subtitle="Across all accounts"
-                    changeType="positive"
+                    changeType={stats.totalBalance >= 0 ? "positive" : "neutral"}
                 />
                 <StatCard
                     title="Monthly Income"
                     value={formatCurrency(stats.monthlyIncome)}
-                    percentageChange={`+${stats.savingsRate.toFixed(1)}%`}
-                    trendDescription="Strong savings rate"
+                    percentageChange={`${stats.incomeChange >= 0 ? '+' : ''}${stats.incomeChange.toFixed(1)}%`}
+                    trendDescription={stats.incomeChange >= 0 ? "Up from last month" : "Down from last month"}
                     subtitle="Income this period"
-                    changeType="positive"
+                    changeType={stats.incomeChange >= 0 ? "positive" : "negative"}
                 />
                 <StatCard
                     title="Monthly Expenses"
                     value={formatCurrency(stats.monthlyExpenses)}
-                    percentageChange="-8.2%"
-                    trendDescription="Down this period"
-                    subtitle="Spending under control"
-                    changeType="negative"
+                    percentageChange={`${stats.expensesChange >= 0 ? '+' : ''}${stats.expensesChange.toFixed(1)}%`}
+                    trendDescription={stats.expensesChange <= 0 ? "Down from last month" : "Up from last month"}
+                    subtitle={stats.expensesChange <= 0 ? "Spending under control" : "Review spending"}
+                    changeType={stats.expensesChange <= 0 ? "positive" : "negative"}
                 />
                 <StatCard
                     title="Monthly Net"
                     value={formatCurrency(stats.monthlyNet)}
-                    percentageChange={stats.monthlyNet >= 0 ? '+4.5%' : '-4.5%'}
-                    trendDescription={stats.monthlyNet >= 0 ? 'Steady performance increase' : 'Needs attention'}
-                    subtitle={stats.monthlyNet >= 0 ? 'Meets growth projections' : 'Review spending'}
+                    percentageChange={`${stats.savingsRate >= 0 ? '+' : ''}${stats.savingsRate.toFixed(1)}%`}
+                    trendDescription={stats.monthlyNet >= 0 ? 'Savings rate' : 'Needs attention'}
+                    subtitle={stats.monthlyNet >= 0 ? 'Income saved' : 'Review spending'}
                     changeType={stats.monthlyNet >= 0 ? 'positive' : 'negative'}
                 />
             </div>

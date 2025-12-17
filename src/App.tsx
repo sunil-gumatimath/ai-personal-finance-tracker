@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { PreferencesProvider } from '@/contexts/PreferencesContext'
 import { ThemeProvider } from '@/components/ui/theme-provider'
 import { MainLayout } from '@/components/layout'
 import {
@@ -104,10 +105,12 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <div className="min-h-screen font-sans antialiased">
-            <AppRoutes />
-            <Toaster />
-          </div>
+          <PreferencesProvider>
+            <div className="min-h-screen font-sans antialiased">
+              <AppRoutes />
+              <Toaster />
+            </div>
+          </PreferencesProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -49,44 +49,72 @@ export function Budgets() {
         }
 
         try {
-            const [budgetsRes, categoriesRes] = await Promise.all([
+            // Helper to get local date string (YYYY-MM-DD) to avoid timezone issues
+            const getLocalDateString = (date: Date): string => {
+                const year = date.getFullYear()
+                const month = String(date.getMonth() + 1).padStart(2, '0')
+                const day = String(date.getDate()).padStart(2, '0')
+                return `${year}-${month}-${day}`
+            }
+
+            // Calculate period start dates using local time
+            const now = new Date()
+            const startOfWeek = new Date(now)
+            startOfWeek.setDate(now.getDate() - now.getDay())
+            startOfWeek.setHours(0, 0, 0, 0)
+
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+            const startOfYear = new Date(now.getFullYear(), 0, 1)
+
+            // Get the earliest possible start date (start of year) for a single query
+            const earliestStartDate = getLocalDateString(startOfYear)
+
+            const [budgetsRes, categoriesRes, transactionsRes] = await Promise.all([
                 supabase
                     .from('budgets')
                     .select(`*, category:categories(*)`)
                     .eq('user_id', user.id),
                 supabase.from('categories').select('*').eq('user_id', user.id).eq('type', 'expense'),
+                // Single query for all expense transactions from start of year
+                supabase
+                    .from('transactions')
+                    .select('amount, category_id, date')
+                    .eq('user_id', user.id)
+                    .eq('type', 'expense')
+                    .gte('date', earliestStartDate),
             ])
 
-            if (budgetsRes.data) {
-                // Calculate spent amount for each budget
-                const budgetsWithSpent = await Promise.all(
-                    budgetsRes.data.map(async (budget) => {
-                        const now = new Date()
-                        let startDate: Date
+            if (budgetsRes.data && transactionsRes.data) {
+                // Group transactions by category for efficient lookup
+                const transactionsByCategory = new Map<string, { amount: number; date: string }[]>()
+                for (const t of transactionsRes.data) {
+                    if (!t.category_id) continue
+                    const existing = transactionsByCategory.get(t.category_id) || []
+                    existing.push({ amount: t.amount, date: t.date })
+                    transactionsByCategory.set(t.category_id, existing)
+                }
 
-                        switch (budget.period) {
-                            case 'weekly':
-                                startDate = new Date(now.setDate(now.getDate() - now.getDay()))
-                                break
-                            case 'yearly':
-                                startDate = new Date(now.getFullYear(), 0, 1)
-                                break
-                            default: // monthly
-                                startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-                        }
+                // Calculate spent for each budget using in-memory data
+                const budgetsWithSpent = budgetsRes.data.map((budget) => {
+                    let startDateStr: string
+                    switch (budget.period) {
+                        case 'weekly':
+                            startDateStr = getLocalDateString(startOfWeek)
+                            break
+                        case 'yearly':
+                            startDateStr = getLocalDateString(startOfYear)
+                            break
+                        default: // monthly
+                            startDateStr = getLocalDateString(startOfMonth)
+                    }
 
-                        const { data: transactions } = await supabase
-                            .from('transactions')
-                            .select('amount')
-                            .eq('user_id', user.id)
-                            .eq('category_id', budget.category_id)
-                            .eq('type', 'expense')
-                            .gte('date', startDate.toISOString())
+                    const categoryTransactions = transactionsByCategory.get(budget.category_id) || []
+                    const spent = categoryTransactions
+                        .filter(t => t.date >= startDateStr)
+                        .reduce((sum, t) => sum + t.amount, 0)
 
-                        const spent = transactions?.reduce((sum, t) => sum + t.amount, 0) || 0
-                        return { ...budget, spent }
-                    })
-                )
+                    return { ...budget, spent }
+                })
 
                 setBudgets(budgetsWithSpent as Budget[])
             }

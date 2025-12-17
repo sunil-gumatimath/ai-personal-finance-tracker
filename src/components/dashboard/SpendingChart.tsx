@@ -1,7 +1,15 @@
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePreferences } from '@/hooks/usePreferences'
 import { TrendingUp, TrendingDown, BarChart3 } from 'lucide-react'
+import {
+    type ChartConfig,
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+    ChartLegend,
+    ChartLegendContent,
+} from '@/components/ui/chart'
 
 interface MonthlyTrend {
     month: string
@@ -13,6 +21,17 @@ interface SpendingChartProps {
     data: MonthlyTrend[]
 }
 
+const chartConfig = {
+    income: {
+        label: 'Income',
+        color: 'oklch(0.646 0.222 153.212)', // var(--income) emerald-500 equivalent
+    },
+    expenses: {
+        label: 'Expenses',
+        color: 'oklch(0.577 0.245 27.325)', // var(--expense) rose-500 equivalent
+    },
+} satisfies ChartConfig
+
 export function SpendingChart({ data }: SpendingChartProps) {
     const { formatCurrency } = usePreferences()
 
@@ -22,251 +41,167 @@ export function SpendingChart({ data }: SpendingChartProps) {
     const netFlow = totalIncome - totalExpenses
     const savingsRate = totalIncome > 0 ? ((netFlow / totalIncome) * 100).toFixed(0) : '0'
 
-    // Custom tooltip component
-    const CustomTooltip = ({ active, payload, label }: {
-        active?: boolean
-        payload?: Array<{ value: number; dataKey: string; color: string }>
-        label?: string
-    }) => {
-        if (!active || !payload) return null
-
-        const income = payload.find(p => p.dataKey === 'income')?.value || 0
-        const expenses = payload.find(p => p.dataKey === 'expenses')?.value || 0
-        const net = income - expenses
-
-        return (
-            <div className="rounded-2xl border border-white/10 bg-background/95 backdrop-blur-xl px-4 py-3 shadow-2xl min-w-[180px]">
-                <p className="font-bold text-foreground text-base mb-3 pb-2 border-b border-border/50">{label}</p>
-                {payload.map((entry, index) => (
-                    <div key={index} className="flex items-center justify-between gap-4 py-1">
-                        <div className="flex items-center gap-2">
-                            <div
-                                className="w-2.5 h-2.5 rounded-full shadow-lg"
-                                style={{
-                                    backgroundColor: entry.color,
-                                    boxShadow: `0 0 8px ${entry.color}60`
-                                }}
-                            />
-                            <span className="text-sm text-muted-foreground">
-                                {entry.dataKey === 'income' ? 'Income' : 'Expenses'}
-                            </span>
-                        </div>
-                        <span className={`font-semibold text-sm ${entry.dataKey === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {formatCurrency(entry.value)}
-                        </span>
-                    </div>
-                ))}
-                <div className="flex items-center justify-between gap-4 pt-2 mt-2 border-t border-border/50">
-                    <span className="text-sm text-muted-foreground">Net</span>
-                    <span className={`font-bold text-sm ${net >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {net >= 0 ? '+' : ''}{formatCurrency(net)}
-                    </span>
-                </div>
-            </div>
-        )
-    }
-
-    // Custom legend with enhanced styling
-    const CustomLegend = () => (
-        <div className="flex items-center justify-center gap-8 mt-4">
-            <div className="flex items-center gap-2.5 group cursor-default">
-                <div className="relative">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/40 group-hover:scale-125 transition-transform" />
-                    <div className="absolute inset-0 w-3 h-3 rounded-full bg-emerald-500 animate-ping opacity-20" />
-                </div>
-                <span className="text-sm text-muted-foreground font-medium group-hover:text-foreground transition-colors">Income</span>
-            </div>
-            <div className="flex items-center gap-2.5 group cursor-default">
-                <div className="relative">
-                    <div className="w-3 h-3 rounded-full bg-rose-500 shadow-lg shadow-rose-500/40 group-hover:scale-125 transition-transform" />
-                    <div className="absolute inset-0 w-3 h-3 rounded-full bg-rose-500 animate-ping opacity-20" />
-                </div>
-                <span className="text-sm text-muted-foreground font-medium group-hover:text-foreground transition-colors">Expenses</span>
-            </div>
-        </div>
-    )
-
     return (
-        <Card className="relative border border-border/50 bg-gradient-to-br from-card via-card to-card/80 backdrop-blur-sm shadow-xl overflow-hidden h-full">
-            {/* Background decoration */}
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.02] via-transparent to-rose-500/[0.02]" />
-            <div className="absolute -top-32 -right-32 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl" />
-            <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl" />
+        <Card className="relative border border-border/50 bg-card/50 backdrop-blur-xl shadow-xl overflow-hidden h-full flex flex-col group/chart">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.03] via-transparent to-rose-500/[0.03] pointer-events-none opacity-50 group-hover/chart:opacity-100 transition-opacity duration-700" />
+            <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/[0.05] rounded-full blur-[100px] pointer-events-none animate-pulse" />
+            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-rose-500/[0.05] rounded-full blur-[100px] pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
 
-            <CardHeader className="relative pb-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 text-primary shadow-lg shadow-primary/10">
-                            <BarChart3 className="h-5 w-5" />
+            <CardHeader className="relative pb-2 shrink-0 border-b border-border/10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-primary/10 blur-lg rounded-xl" />
+                            <div className="relative p-2.5 rounded-xl bg-primary/10 text-primary border border-border/50 shadow-sm">
+                                <BarChart3 className="h-5 w-5" />
+                            </div>
                         </div>
                         <div>
-                            <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                            <CardTitle className="text-xl font-black tracking-tight text-foreground">
                                 Income vs Expenses
                             </CardTitle>
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                                Last 6 months financial flow
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/80">
+                                    Last 6 months
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Stats badges */}
                     <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${netFlow >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                            {netFlow >= 0 ? (
-                                <TrendingUp className="h-4 w-4" />
-                            ) : (
-                                <TrendingDown className="h-4 w-4" />
-                            )}
-                            <span className="font-bold text-sm">{formatCurrency(Math.abs(netFlow))}</span>
+                        <div className={`group/stat flex items-center gap-2 px-4 py-2 rounded-xl border backdrop-blur-md transition-all duration-300 ${netFlow >= 0
+                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                            : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400 shadow-sm'}`}>
+                            {netFlow >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                            <span className="font-black text-sm tabular-nums tracking-tighter">{formatCurrency(Math.abs(netFlow))}</span>
                         </div>
-                        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary">
-                            <span className="text-xs font-medium">Savings</span>
-                            <span className="font-bold text-sm">{savingsRate}%</span>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border/50 bg-secondary/30 backdrop-blur-md text-primary shadow-sm">
+                            <span className="text-[10px] uppercase font-black tracking-widest opacity-60">Savings</span>
+                            <span className="font-black text-sm tabular-nums">{savingsRate}%</span>
                         </div>
                     </div>
                 </div>
             </CardHeader>
 
-            <CardContent className="relative pt-2">
-                <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                            data={data}
-                            margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
-                        >
-                            <defs>
-                                {/* Income gradient - more vibrant */}
-                                <linearGradient id="incomeGradientEnhanced" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.5} />
-                                    <stop offset="40%" stopColor="#10b981" stopOpacity={0.2} />
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                                </linearGradient>
-                                {/* Expenses gradient - more vibrant */}
-                                <linearGradient id="expenseGradientEnhanced" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.4} />
-                                    <stop offset="40%" stopColor="#f43f5e" stopOpacity={0.15} />
-                                    <stop offset="100%" stopColor="#f43f5e" stopOpacity={0} />
-                                </linearGradient>
+            <CardContent className="relative flex-1 flex flex-col min-h-0 pt-4 pb-4">
+                <ChartContainer config={chartConfig} className="w-full aspect-auto h-[250px]">
+                    <AreaChart
+                        data={data}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                        <defs>
+                            <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="var(--color-income)" stopOpacity={0.4} />
+                                <stop offset="50%" stopColor="var(--color-income)" stopOpacity={0.1} />
+                                <stop offset="100%" stopColor="var(--color-income)" stopOpacity={0} />
+                            </linearGradient>
+                            <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="var(--color-expenses)" stopOpacity={0.3} />
+                                <stop offset="50%" stopColor="var(--color-expenses)" stopOpacity={0.05} />
+                                <stop offset="100%" stopColor="var(--color-expenses)" stopOpacity={0} />
+                            </linearGradient>
 
-                                {/* Enhanced glow filters */}
-                                <filter id="incomeGlowEnhanced" x="-100%" y="-100%" width="300%" height="300%">
-                                    <feGaussianBlur stdDeviation="4" result="blur" />
-                                    <feFlood floodColor="#10b981" floodOpacity="0.4" />
-                                    <feComposite in2="blur" operator="in" />
-                                    <feMerge>
-                                        <feMergeNode />
-                                        <feMergeNode in="SourceGraphic" />
-                                    </feMerge>
-                                </filter>
-                                <filter id="expenseGlowEnhanced" x="-100%" y="-100%" width="300%" height="300%">
-                                    <feGaussianBlur stdDeviation="4" result="blur" />
-                                    <feFlood floodColor="#f43f5e" floodOpacity="0.4" />
-                                    <feComposite in2="blur" operator="in" />
-                                    <feMerge>
-                                        <feMergeNode />
-                                        <feMergeNode in="SourceGraphic" />
-                                    </feMerge>
-                                </filter>
+                            <filter id="incomeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="5" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                            <filter id="expenseGlow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="5" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
 
-                                {/* Drop shadow for lines */}
-                                <filter id="lineShadow" x="-20%" y="-20%" width="140%" height="140%">
-                                    <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3" />
-                                </filter>
-                            </defs>
+                        <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            opacity={0.3}
+                            className="stroke-border"
+                        />
 
-                            {/* Grid with enhanced styling */}
-                            <CartesianGrid
-                                strokeDasharray="4 4"
-                                stroke="hsl(var(--border))"
-                                strokeOpacity={0.4}
-                                vertical={false}
-                            />
+                        <XAxis
+                            dataKey="month"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{
+                                fill: 'hsl(var(--muted-foreground))',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                letterSpacing: '0.05em'
+                            }}
+                            padding={{ left: 20, right: 20 }}
+                            dy={15}
+                        />
+                        <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{
+                                fill: 'hsl(var(--muted-foreground))',
+                                fontSize: 11,
+                                fontWeight: 600
+                            }}
+                            tickFormatter={(value) => {
+                                if (value === 0) return '0'
+                                if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}k`
+                                return value.toString()
+                            }}
+                            width={60}
+                        />
 
-                            {/* Axes with enhanced styling */}
-                            <XAxis
-                                dataKey="month"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{
-                                    fill: 'hsl(var(--muted-foreground))',
-                                    fontSize: 12,
-                                    fontWeight: 600
-                                }}
-                                dy={12}
-                            />
-                            <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{
-                                    fill: 'hsl(var(--muted-foreground))',
-                                    fontSize: 11,
-                                    fontWeight: 500
-                                }}
-                                tickFormatter={(value) => {
-                                    if (value >= 1000) return `${(value / 1000).toFixed(0)}k`
-                                    return value.toString()
-                                }}
-                                width={50}
-                            />
 
-                            {/* Enhanced Tooltip */}
-                            <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                        <ChartTooltip
+                            content={<ChartTooltipContent
+                                indicator="line"
+                                labelFormatter={(label) => <span className="font-black uppercase tracking-widest">{label}</span>}
+                                formatter={(value, name) => (
+                                    <div className="flex items-center justify-between w-full">
+                                        <span className="text-muted-foreground mr-6 uppercase text-[10px] font-bold tracking-wider">{name}</span>
+                                        <span className={name === 'Income' ? 'text-emerald-500 font-black' : 'text-rose-500 font-black'}>
+                                            {formatCurrency(Number(value))}
+                                        </span>
+                                    </div>
+                                )}
+                            />}
+                        />
 
-                            {/* Income Area - Enhanced */}
-                            <Area
-                                type="monotone"
-                                dataKey="income"
-                                stroke="#10b981"
-                                strokeWidth={3}
-                                fill="url(#incomeGradientEnhanced)"
-                                style={{ filter: 'url(#lineShadow)' }}
-                                dot={{
-                                    fill: '#10b981',
-                                    stroke: '#ffffff',
-                                    strokeWidth: 2.5,
-                                    r: 5,
-                                    filter: 'url(#incomeGlowEnhanced)'
-                                }}
-                                activeDot={{
-                                    fill: '#10b981',
-                                    stroke: '#ffffff',
-                                    strokeWidth: 3,
-                                    r: 8,
-                                    filter: 'url(#incomeGlowEnhanced)',
-                                    className: 'animate-pulse'
-                                }}
-                            />
+                        <Area
+                            type="monotone"
+                            dataKey="income"
+                            stroke="var(--color-income)"
+                            strokeWidth={3}
+                            fillOpacity={1}
+                            fill="url(#incomeGradient)"
+                            activeDot={{
+                                r: 6,
+                                strokeWidth: 2,
+                                stroke: 'hsl(var(--background))',
+                                fill: 'var(--color-income)',
+                                style: { filter: 'url(#incomeGlow)' }
+                            }}
+                            className="drop-shadow-[0_0_8px_rgba(16,185,129,0.2)]"
+                            animationDuration={2000}
+                        />
 
-                            {/* Expenses Area - Enhanced */}
-                            <Area
-                                type="monotone"
-                                dataKey="expenses"
-                                stroke="#f43f5e"
-                                strokeWidth={2.5}
-                                fill="url(#expenseGradientEnhanced)"
-                                style={{ filter: 'url(#lineShadow)' }}
-                                dot={{
-                                    fill: '#f43f5e',
-                                    stroke: '#ffffff',
-                                    strokeWidth: 2,
-                                    r: 4,
-                                    filter: 'url(#expenseGlowEnhanced)'
-                                }}
-                                activeDot={{
-                                    fill: '#f43f5e',
-                                    stroke: '#ffffff',
-                                    strokeWidth: 3,
-                                    r: 7,
-                                    filter: 'url(#expenseGlowEnhanced)',
-                                    className: 'animate-pulse'
-                                }}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-
-                {/* Enhanced Custom Legend */}
-                <CustomLegend />
+                        <Area
+                            type="monotone"
+                            dataKey="expenses"
+                            stroke="var(--color-expenses)"
+                            strokeWidth={3}
+                            fillOpacity={1}
+                            fill="url(#expenseGradient)"
+                            activeDot={{
+                                r: 6,
+                                strokeWidth: 2,
+                                stroke: 'hsl(var(--background))',
+                                fill: 'var(--color-expenses)',
+                                style: { filter: 'url(#expenseGlow)' }
+                            }}
+                            className="drop-shadow-[0_0_8px_rgba(244,63,94,0.2)]"
+                            animationDuration={2000}
+                        />
+                        <ChartLegend content={<ChartLegendContent className="mt-8" />} />
+                    </AreaChart>
+                </ChartContainer>
             </CardContent>
         </Card>
     )

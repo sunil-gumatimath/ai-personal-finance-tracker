@@ -45,6 +45,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -74,10 +76,7 @@ const COLORS = [
     { value: '#6366f1', name: 'Indigo', gradient: 'from-indigo-500 to-purple-500' },
 ]
 
-const getGradientForColor = (color: string) => {
-    const found = COLORS.find(c => c.value === color)
-    return found?.gradient || 'from-slate-500 to-slate-600'
-}
+
 
 export function Accounts() {
     const { user } = useAuth()
@@ -197,30 +196,20 @@ export function Accounts() {
     const totalLiabilities = Math.abs(activeAccounts.filter(a => a.balance < 0).reduce((sum, a) => sum + a.balance, 0))
 
     if (loading) {
-        return (
-            <div className="flex h-full items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
-                    <p className="text-sm text-muted-foreground animate-pulse">Loading your accounts...</p>
-                </div>
-            </div>
-        )
+        return <LoadingSkeleton />
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-in fade-in duration-700">
             {/* Header Section */}
             <div className="flex flex-col gap-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/25">
-                                <Wallet className="h-5 w-5 text-primary-foreground" />
-                            </div>
                             <div>
-                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Accounts</h1>
-                                <p className="text-sm sm:text-base text-muted-foreground">
-                                    Manage your financial accounts in one place
+                                <h1 className="text-3xl font-black tracking-tight tracking-tighter sm:text-4xl">Accounts</h1>
+                                <p className="text-sm font-medium text-muted-foreground">
+                                    Manage your unified financial portfolio
                                 </p>
                             </div>
                         </div>
@@ -230,7 +219,7 @@ export function Accounts() {
                             variant="outline"
                             size="icon"
                             onClick={() => setShowBalances(!showBalances)}
-                            className="h-10 w-10"
+                            className="h-11 w-11 rounded-xl bg-background/50 backdrop-blur-sm border-border/50"
                         >
                             {showBalances ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                         </Button>
@@ -239,7 +228,7 @@ export function Accounts() {
                                 resetForm()
                                 setIsDialogOpen(true)
                             }}
-                            className="gap-2 bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300"
+                            className="h-11 rounded-xl px-6 gap-2 bg-primary shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all font-bold"
                         >
                             <Plus className="h-4 w-4" />
                             Add Account
@@ -249,133 +238,114 @@ export function Accounts() {
             </div>
 
             {/* Financial Overview Cards */}
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                {/* Net Worth Card */}
-                <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-xl sm:col-span-2">
-                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-                    <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-white/5 blur-3xl" />
-                    <div className="absolute -left-20 -bottom-20 h-60 w-60 rounded-full bg-primary/10 blur-3xl" />
-                    <CardHeader className="relative pb-2">
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-xl shadow-2xl sm:col-span-2 group border-primary/20">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-[80px] group-hover:bg-primary/20 transition-colors duration-1000" />
+                    <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg font-medium text-white/80">Net Worth</CardTitle>
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+                            <div className="flex items-center gap-2">
                                 <Sparkles className="h-4 w-4 text-amber-400" />
+                                <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Total Net Worth</CardTitle>
                             </div>
+                            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 py-1 font-bold">
+                                {activeAccounts.length} ACTIVE
+                            </Badge>
                         </div>
                     </CardHeader>
-                    <CardContent className="relative">
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-bold tracking-tight">
+                    <CardContent className="pt-4">
+                        <div className="flex flex-col gap-1">
+                            <h2 className="text-4xl sm:text-5xl font-black tracking-tighter tabular-nums bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
                                 {showBalances ? formatCurrency(totalBalance) : '••••••'}
-                            </span>
-                        </div>
-                        <div className="mt-3 flex items-center gap-4 text-sm">
-                            <span className="text-white/60">
-                                {activeAccounts.length} active account{activeAccounts.length !== 1 ? 's' : ''}
-                            </span>
-                            {totalBalance >= 0 ? (
-                                <span className="flex items-center gap-1 text-emerald-400">
-                                    <TrendingUp className="h-3 w-3" />
-                                    Positive
-                                </span>
-                            ) : (
-                                <span className="flex items-center gap-1 text-rose-400">
-                                    <TrendingDown className="h-3 w-3" />
-                                    Negative
-                                </span>
-                            )}
+                            </h2>
+                            <div className="flex items-center gap-2 mt-2">
+                                {totalBalance >= 0 ? (
+                                    <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 px-2 py-0.5 pointer-events-none font-bold">
+                                        <TrendingUp className="h-3 w-3 mr-1" />
+                                        SURPLUS
+                                    </Badge>
+                                ) : (
+                                    <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20 px-2 py-0.5 pointer-events-none font-bold">
+                                        <TrendingDown className="h-3 w-3 mr-1" />
+                                        DEFICIT
+                                    </Badge>
+                                )}
+                                <span className="text-xs font-medium text-muted-foreground">Total across all active units</span>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Assets Card */}
-                <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 shadow-lg">
-                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl" />
+                <Card className="relative overflow-hidden border-border/50 bg-emerald-500/[0.03] backdrop-blur-md shadow-xl group border-emerald-500/20">
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl group-hover:scale-125 transition-transform" />
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Assets</CardTitle>
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20">
-                                <ArrowUpRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            <CardTitle className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70">Total Assets</CardTitle>
+                            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                <ArrowUpRight className="h-3.5 w-3.5" />
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    <CardContent className="pt-4">
+                        <div className="text-2xl font-black tabular-nums text-emerald-500 tracking-tight">
                             {showBalances ? formatCurrency(totalAssets) : '••••••'}
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Positive balance accounts
-                        </p>
                     </CardContent>
                 </Card>
 
-                {/* Liabilities Card */}
-                <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-rose-500/10 to-rose-500/5 shadow-lg">
-                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-500/10 blur-2xl" />
+                <Card className="relative overflow-hidden border-border/50 bg-rose-500/[0.03] backdrop-blur-md shadow-xl group border-rose-500/20">
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-rose-500/10 blur-3xl group-hover:scale-125 transition-transform" />
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Liabilities</CardTitle>
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/20">
-                                <ArrowDownRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                            <CardTitle className="text-[10px] font-black uppercase tracking-widest text-rose-500/70">Liabilities</CardTitle>
+                            <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                                <ArrowDownRight className="h-3.5 w-3.5" />
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                    <CardContent className="pt-4">
+                        <div className="text-2xl font-black tabular-nums text-rose-500 tracking-tight">
                             {showBalances ? formatCurrency(totalLiabilities) : '••••••'}
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Credit & negative balances
-                        </p>
                     </CardContent>
                 </Card>
             </div>
 
             {/* Active Accounts Section */}
             {activeAccounts.length > 0 && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold">Active Accounts</h2>
-                        <span className="text-sm text-muted-foreground">{activeAccounts.length} accounts</span>
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-border/50 pb-4">
+                        <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/80">Active Accounts</h2>
+                        <span className="text-xs font-bold text-muted-foreground">{activeAccounts.length} TOTAL</span>
                     </div>
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {activeAccounts.map((account) => {
                             const Icon = getAccountIcon(account.type)
-                            const gradient = getGradientForColor(account.color)
+                            const color = account.color
                             return (
                                 <Card
                                     key={account.id}
-                                    className={cn(
-                                        "group relative overflow-hidden border-0 transition-all duration-300",
-                                        "hover:shadow-xl hover:-translate-y-1"
-                                    )}
+                                    className="group relative overflow-hidden border-border/50 bg-card/30 backdrop-blur-xl transition-all duration-300 hover:border-border hover:shadow-2xl hover:-translate-y-1 flex flex-col"
                                 >
-                                    {/* Gradient Header */}
-                                    <div className={cn(
-                                        "absolute inset-x-0 top-0 h-24 bg-gradient-to-br opacity-90",
-                                        gradient
-                                    )} />
-                                    <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-t from-background/80 to-transparent" />
+                                    <div
+                                        className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-[50px] opacity-10 transition-opacity group-hover:opacity-20 pointer-events-none"
+                                        style={{ backgroundColor: color }}
+                                    />
 
-                                    {/* Decorative elements */}
-                                    <div className="absolute right-4 top-4 h-16 w-16 rounded-full bg-white/10 blur-2xl transition-all group-hover:bg-white/20" />
-
-                                    <CardHeader className="relative pb-12 pt-4">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shadow-lg">
-                                                <Icon className="h-6 w-6 text-white" />
+                                    <CardHeader className="pb-6">
+                                        <div className="flex items-center justify-between">
+                                            <div
+                                                className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/50 border border-border/50 shadow-inner group-hover:scale-110 transition-transform"
+                                            >
+                                                <Icon className="h-6 w-6" style={{ color }} />
                                             </div>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-white/80 hover:bg-white/20 hover:text-white"
-                                                    >
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9 opacity-50 hover:opacity-100 rounded-lg">
                                                         <MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
+                                                <DropdownMenuContent align="end" className="w-48 rounded-xl ring-1 ring-border border-0 shadow-2xl">
                                                     <DropdownMenuItem onClick={() => {
                                                         setEditingAccount(account)
                                                         setFormData({
@@ -387,11 +357,11 @@ export function Accounts() {
                                                         })
                                                         setIsDialogOpen(true)
                                                     }}>
-                                                        <Pencil className="mr-2 h-4 w-4" /> Edit Account
+                                                        <Pencil className="mr-2 h-4 w-4 opacity-70" /> Edit Details
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem
-                                                        className="text-destructive focus:text-destructive"
+                                                        className="text-rose-500 focus:text-rose-500"
                                                         onClick={() => handleDelete(account.id)}
                                                     >
                                                         <Trash2 className="mr-2 h-4 w-4" /> Delete Account
@@ -401,27 +371,27 @@ export function Accounts() {
                                         </div>
                                     </CardHeader>
 
-                                    <CardContent className="relative space-y-4 pt-0">
+                                    <CardContent className="flex-1 space-y-6">
                                         <div>
-                                            <p className="text-sm font-medium text-muted-foreground">Current Balance</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Current Balance</p>
                                             <h3 className={cn(
-                                                "text-2xl font-bold tracking-tight",
+                                                "text-3xl font-black tabular-nums tracking-tighter transition-all group-hover:scale-105 origin-left",
                                                 account.balance >= 0 ? "text-foreground" : "text-rose-500"
                                             )}>
                                                 {showBalances ? formatCurrency(account.balance) : '••••••'}
                                             </h3>
                                         </div>
 
-                                        <div className="flex items-end justify-between border-t pt-4">
-                                            <div>
-                                                <p className="font-semibold text-foreground">{account.name}</p>
-                                                <p className="text-sm text-muted-foreground capitalize">
+                                        <div className="flex items-center justify-between pt-6 border-t border-border/30">
+                                            <div className="min-w-0">
+                                                <CardTitle className="text-base font-bold truncate text-foreground">{account.name}</CardTitle>
+                                                <Badge variant="secondary" className="mt-1 text-[9px] font-black tracking-widest uppercase py-0 px-1.5 h-4 border-0">
                                                     {account.type.replace('_', ' ')}
-                                                </p>
+                                                </Badge>
                                             </div>
                                             <div
-                                                className="h-3 w-3 rounded-full ring-2 ring-offset-2 ring-offset-background"
-                                                style={{ backgroundColor: account.color }}
+                                                className="h-8 w-8 rounded-full border-2 border-background shadow-xl ring-1 ring-border/50"
+                                                style={{ backgroundColor: color }}
                                             />
                                         </div>
                                     </CardContent>
@@ -432,33 +402,31 @@ export function Accounts() {
                 </div>
             )}
 
-            {/* Inactive Accounts Section */}
             {inactiveAccounts.length > 0 && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-muted-foreground">Inactive Accounts</h2>
-                        <span className="text-sm text-muted-foreground">{inactiveAccounts.length} accounts</span>
+                <div className="space-y-6 pt-6">
+                    <div className="flex items-center justify-between border-b border-border/50 pb-4">
+                        <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">Inactive Accounts</h2>
                     </div>
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {inactiveAccounts.map((account) => {
                             const Icon = getAccountIcon(account.type)
                             return (
                                 <Card
                                     key={account.id}
-                                    className="group relative overflow-hidden border-dashed opacity-60 transition-all duration-300 hover:opacity-80"
+                                    className="group relative overflow-hidden border-dashed opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all border-border/50 bg-background/20"
                                 >
                                     <CardHeader className="pb-2">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 border border-border/50">
                                                 <Icon className="h-5 w-5 text-muted-foreground" />
                                             </div>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                                                         <MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
+                                                <DropdownMenuContent align="end" className="w-48 rounded-xl">
                                                     <DropdownMenuItem onClick={() => {
                                                         setEditingAccount(account)
                                                         setFormData({
@@ -483,20 +451,15 @@ export function Accounts() {
                                             </DropdownMenu>
                                         </div>
                                     </CardHeader>
-                                    <CardContent className="space-y-2">
+                                    <CardContent className="space-y-4 pt-4">
                                         <div>
-                                            <p className="text-xs text-muted-foreground">Balance</p>
-                                            <h3 className="text-xl font-semibold text-muted-foreground">
+                                            <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-1">Archived Balance</p>
+                                            <h3 className="text-xl font-black text-muted-foreground/80 tracking-tighter">
                                                 {showBalances ? formatCurrency(account.balance) : '••••••'}
                                             </h3>
                                         </div>
-                                        <div className="flex items-center justify-between pt-2">
-                                            <div>
-                                                <p className="font-medium">{account.name}</p>
-                                                <p className="text-xs text-muted-foreground capitalize">
-                                                    {account.type.replace('_', ' ')} • Inactive
-                                                </p>
-                                            </div>
+                                        <div className="pt-4 border-t border-border/30">
+                                            <CardTitle className="text-sm font-bold text-muted-foreground">{account.name}</CardTitle>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -508,43 +471,45 @@ export function Accounts() {
 
             {/* Empty State / Add New Account Card */}
             {accounts.length === 0 && (
-                <Card className="border-2 border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center py-16">
-                        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5">
-                            <Wallet className="h-10 w-10 text-primary" />
+                <Card className="border-2 border-dashed border-border/50 bg-background/50 rounded-3xl overflow-hidden group">
+                    <CardContent className="flex flex-col items-center justify-center py-24 text-center">
+                        <div className="relative mb-8">
+                            <div className="absolute inset-0 bg-primary/20 blur-[40px] rounded-full scale-150 group-hover:bg-primary/30 transition-colors" />
+                            <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-secondary text-primary border border-primary/20 shadow-2xl">
+                                <Wallet className="h-10 w-10" />
+                            </div>
                         </div>
-                        <h3 className="mt-6 text-xl font-semibold">No accounts yet</h3>
-                        <p className="mt-2 text-center text-muted-foreground max-w-sm">
-                            Add your first account to start tracking your finances. You can add bank accounts, credit cards, investments, and more.
+                        <h3 className="text-2xl font-black tracking-tight mb-2">Build your portfolio</h3>
+                        <p className="text-muted-foreground max-w-sm mb-10 font-medium">
+                            Synthesize your finances by adding your first account. Connect banks, wallets, or crypto.
                         </p>
                         <Button
                             onClick={() => {
                                 resetForm()
                                 setIsDialogOpen(true)
                             }}
-                            className="mt-6 gap-2"
+                            className="h-12 px-10 rounded-2xl gap-2 bg-primary shadow-xl shadow-primary/20 font-black tracking-wide"
                         >
-                            <Plus className="h-4 w-4" />
-                            Add Your First Account
+                            <Plus className="h-5 w-5" />
+                            DEPLOY NEW ACCOUNT
                         </Button>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Quick Add Card - Only show when there are existing accounts */}
             {accounts.length > 0 && (
                 <button
                     onClick={() => {
                         resetForm()
                         setIsDialogOpen(true)
                     }}
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30 p-8 transition-all duration-300 hover:border-primary/50 hover:bg-primary/5 group"
+                    className="flex w-full items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-border/50 bg-card/20 p-12 transition-all hover:border-primary/50 hover:bg-primary/5 group"
                 >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
-                        <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary border border-border/50 shadow-sm transition-all group-hover:scale-110 group-hover:border-primary/30">
+                        <Plus className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
-                    <span className="font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                        Add Another Account
+                    <span className="font-black text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-[0.2em] text-xs">
+                        Add Another Financial Unit
                     </span>
                 </button>
             )}
@@ -677,6 +642,42 @@ export function Accounts() {
                     </form>
                 </DialogContent>
             </Dialog>
+        </div>
+    )
+}
+
+function LoadingSkeleton() {
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="space-y-2">
+                            <Skeleton className="h-8 w-48" />
+                            <Skeleton className="h-4 w-64" />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="h-11 w-11 rounded-xl" />
+                        <Skeleton className="h-11 w-32 rounded-xl" />
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-48 rounded-3xl sm:col-span-2" />
+                <Skeleton className="h-48 rounded-3xl" />
+                <Skeleton className="h-48 rounded-3xl" />
+            </div>
+
+            <div className="space-y-6">
+                <Skeleton className="h-6 w-32" />
+                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-64 rounded-3xl" />
+                    ))}
+                </div>
+            </div>
         </div>
     )
 }

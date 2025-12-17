@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { TrendingUp, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,8 +40,12 @@ export function Login() {
             <div className="w-full max-w-md space-y-8">
                 {/* Logo */}
                 <div className="flex flex-col items-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-lg">
-                        <TrendingUp className="h-8 w-8" />
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-foreground text-background shadow-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" className="h-10 w-10">
+                            <rect width="256" height="256" fill="none"></rect>
+                            <line x1="208" y1="128" x2="128" y2="208" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"></line>
+                            <line x1="192" y1="40" x2="40" y2="192" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"></line>
+                        </svg>
                     </div>
                     <h1 className="mt-4 text-2xl font-bold">FinanceTrack</h1>
                     <p className="text-muted-foreground">Your personal finance companion</p>
