@@ -5,12 +5,14 @@ import { cn } from '@/lib/utils'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { Transaction } from '@/types'
 import { Link } from 'react-router-dom'
+import type { Insight } from '@/hooks/useAIInsights'
 
 interface RecentTransactionsProps {
     transactions: Transaction[]
+    anomalies?: Insight[]
 }
 
-export function RecentTransactions({ transactions }: RecentTransactionsProps) {
+export function RecentTransactions({ transactions, anomalies = [] }: RecentTransactionsProps) {
     const { formatCurrency } = usePreferences()
 
     if (transactions.length === 0) {
@@ -76,56 +78,72 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
 
             {/* Transactions List */}
             <div className="relative space-y-3">
-                {transactions.slice(0, 5).map((transaction) => (
-                    <div
-                        key={transaction.id}
-                        className="flex items-center justify-between rounded-xl border border-border/30 bg-background/30 p-3 transition-all duration-200 hover:bg-background/50 hover:border-border/50"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div
-                                className={cn(
-                                    'flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200',
-                                    transaction.type === 'income'
-                                        ? 'bg-emerald-500/10 text-emerald-400'
-                                        : 'bg-rose-500/10 text-rose-400'
-                                )}
-                            >
-                                {transaction.type === 'income' ? (
-                                    <ArrowDownLeft className="h-5 w-5" />
-                                ) : (
-                                    <ArrowUpRight className="h-5 w-5" />
-                                )}
-                            </div>
-                            <div>
-                                <p className="font-medium text-sm">
-                                    {transaction.description || transaction.category?.name || 'Transaction'}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {format(new Date(transaction.date), 'MMM d, yyyy')}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <p
-                                className={cn(
-                                    'font-semibold text-sm',
-                                    transaction.type === 'income' ? 'text-emerald-400' : 'text-rose-400'
-                                )}
-                            >
-                                {transaction.type === 'income' ? '+' : '-'}
-                                {formatCurrency(Math.abs(transaction.amount))}
-                            </p>
-                            {transaction.category && (
-                                <Badge
-                                    variant="secondary"
-                                    className="mt-1 text-[10px] bg-muted/50 border-border/50"
-                                >
-                                    {transaction.category.name}
-                                </Badge>
+                {transactions.slice(0, 5).map((transaction) => {
+                    const isAnomaly = anomalies.some(a => a.id === `anomaly-${transaction.id}`)
+
+                    return (
+                        <div
+                            key={transaction.id}
+                            className={cn(
+                                'flex items-center justify-between rounded-xl border p-3 transition-all duration-200',
+                                isAnomaly
+                                    ? 'border-rose-500/50 bg-rose-500/[0.03] shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+                                    : 'border-border/30 bg-background/30 hover:bg-background/50 hover:border-border/50'
                             )}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div
+                                    className={cn(
+                                        'flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200',
+                                        transaction.type === 'income'
+                                            ? 'bg-emerald-500/10 text-emerald-400'
+                                            : 'bg-rose-500/10 text-rose-400'
+                                    )}
+                                >
+                                    {transaction.type === 'income' ? (
+                                        <ArrowDownLeft className="h-5 w-5" />
+                                    ) : (
+                                        <ArrowUpRight className="h-5 w-5" />
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-medium text-sm">
+                                            {transaction.description || transaction.category?.name || 'Transaction'}
+                                        </p>
+                                        {isAnomaly && (
+                                            <Badge variant="destructive" className="h-4 px-1 text-[8px] font-black uppercase tracking-tighter animate-pulse">
+                                                Anomaly
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p
+                                    className={cn(
+                                        'font-semibold text-sm',
+                                        transaction.type === 'income' ? 'text-emerald-400' : 'text-rose-400'
+                                    )}
+                                >
+                                    {transaction.type === 'income' ? '+' : '-'}
+                                    {formatCurrency(Math.abs(transaction.amount))}
+                                </p>
+                                {transaction.category && (
+                                    <Badge
+                                        variant="secondary"
+                                        className="mt-1 text-[10px] bg-muted/50 border-border/50"
+                                    >
+                                        {transaction.category.name}
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    )
+                })}
             </div>
 
             {/* Footer hint */}

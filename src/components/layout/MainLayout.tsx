@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from './AppSidebar'
 import { Header } from './Header'
+import { AIAgentChat } from '@/components/dashboard'
 
 export function MainLayout() {
     return (
@@ -14,6 +15,7 @@ export function MainLayout() {
                         <Outlet />
                     </main>
                 </SidebarInset>
+                <AIAgentChat />
             </div>
         </SidebarProvider>
     )

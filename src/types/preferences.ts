@@ -4,6 +4,7 @@ export interface Preferences {
     notifications: boolean
     emailAlerts: boolean
     budgetAlerts: boolean
+    geminiApiKey?: string
 }
 
 export const PREFERENCES_KEY = 'financetrack_preferences'
@@ -14,6 +15,7 @@ export const defaultPreferences: Preferences = {
     notifications: true,
     emailAlerts: true,
     budgetAlerts: true,
+    geminiApiKey: '',
 }
 
 export const currencySymbols: Record<string, string> = {
