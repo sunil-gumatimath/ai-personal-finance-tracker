@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { StatCard, RecentTransactions, SpendingChart, BudgetOverview } from '@/components/dashboard'
+import { StatCard, RecentTransactions, SpendingChart, BudgetOverview, AICoach } from '@/components/dashboard'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { Transaction, DashboardStats, SpendingByCategory, MonthlyTrend, Category } from '@/types'
 import { Link } from 'react-router-dom'
+import { useAIInsights, type Insight } from '@/hooks/useAIInsights'
 
 // Extended stats to include last month for comparisons
 interface ExtendedDashboardStats extends DashboardStats {
@@ -285,6 +286,9 @@ export function Dashboard() {
         fetchDashboardData()
     }, [user])
 
+    const { insights } = useAIInsights()
+    const anomalies: Insight[] = insights.filter(i => i.type === 'anomaly')
+
     if (loading) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -312,6 +316,9 @@ export function Dashboard() {
                     </Button>
                 </div>
             </div>
+
+            {/* AI Coaching Section */}
+            <AICoach />
 
             {/* Stats Cards */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -355,7 +362,7 @@ export function Dashboard() {
             </div>
 
             {/* Recent Transactions */}
-            <RecentTransactions transactions={recentTransactions} />
+            <RecentTransactions transactions={recentTransactions} anomalies={anomalies} />
         </div>
     )
 }

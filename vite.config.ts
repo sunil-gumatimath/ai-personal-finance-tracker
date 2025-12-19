@@ -41,13 +41,43 @@ export default defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['@radix-ui/react-avatar', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-label', '@radix-ui/react-progress', '@radix-ui/react-select', '@radix-ui/react-separator', '@radix-ui/react-slot', '@radix-ui/react-switch', '@radix-ui/react-tabs', '@radix-ui/react-tooltip', 'lucide-react', 'class-variance-authority', 'clsx', 'tailwind-merge', 'sonner'],
-          'charts-vendor': ['recharts'],
-          'supabase-vendor': ['@supabase/supabase-js'],
+        manualChunks(id) {
+          // React core
+          if (id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react-router')) {
+            return 'react-vendor';
+          }
+          // Supabase
+          if (id.includes('@supabase')) {
+            return 'supabase-vendor';
+          }
+          // Charts (recharts is large)
+          if (id.includes('recharts') || id.includes('d3-')) {
+            return 'charts-vendor';
+          }
+          // Google AI
+          if (id.includes('@google/generative-ai')) {
+            return 'ai-vendor';
+          }
+          // Date utilities
+          if (id.includes('date-fns')) {
+            return 'date-vendor';
+          }
+          // UI components (Radix)
+          if (id.includes('@radix-ui')) {
+            return 'ui-vendor';
+          }
+          // Other common utilities
+          if (id.includes('lucide-react') ||
+            id.includes('class-variance-authority') ||
+            id.includes('clsx') ||
+            id.includes('tailwind-merge')) {
+            return 'utils-vendor';
+          }
         },
       },
     },

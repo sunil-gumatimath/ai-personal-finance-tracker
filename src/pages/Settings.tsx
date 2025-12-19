@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import { User, Bell, Shield, Palette, LogOut, Moon, Sun, Monitor } from 'lucide-react'
+import { User, Bell, Shield, Palette, LogOut, Moon, Sun, Monitor, Brain, ChevronRight, Globe, Sparkles, Key, Layout } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
     Select,
@@ -21,7 +19,6 @@ import { usePreferences } from '@/hooks/usePreferences'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
-// Theme Selector Component
 function ThemeSelector() {
     const { theme, setTheme } = useTheme()
 
@@ -39,14 +36,14 @@ function ThemeSelector() {
                     type="button"
                     onClick={() => setTheme(value)}
                     className={cn(
-                        'flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all hover:bg-muted',
+                        'flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all hover:bg-muted/50',
                         theme === value
                             ? 'border-primary bg-primary/5'
-                            : 'border-transparent bg-muted/50'
+                            : 'border-border/50'
                     )}
                 >
-                    <Icon className={cn('h-5 w-5', theme === value ? 'text-primary' : 'text-muted-foreground')} />
-                    <span className={cn('text-xs font-medium', theme === value ? 'text-primary' : 'text-muted-foreground')}>
+                    <Icon className={cn('h-4 w-4', theme === value ? 'text-primary' : 'text-muted-foreground')} />
+                    <span className={cn('text-xs', theme === value ? 'text-primary font-medium' : 'text-muted-foreground')}>
                         {label}
                     </span>
                 </button>
@@ -95,231 +92,216 @@ export function Settings() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="max-w-3xl space-y-5">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-                <p className="text-muted-foreground">
-                    Manage your account settings and preferences
+                <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+                <p className="text-sm text-muted-foreground">
+                    Manage your account and preferences
                 </p>
             </div>
 
-            <Tabs defaultValue="profile" className="space-y-6">
-                <TabsList className="flex w-full overflow-x-auto scrollbar-hide gap-1 sm:gap-0 sm:grid sm:grid-cols-4 h-auto p-1">
-                    <TabsTrigger value="profile" className="gap-2 flex-shrink-0 px-3 py-2">
-                        <User className="h-4 w-4" />
-                        <span className="hidden sm:inline">Profile</span>
+            <Tabs defaultValue="profile" className="space-y-4">
+                <TabsList className="h-9 rounded-lg bg-muted/50 p-1">
+                    <TabsTrigger value="profile" className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5">
+                        <User className="h-3.5 w-3.5" /> Profile
                     </TabsTrigger>
-                    <TabsTrigger value="preferences" className="gap-2 flex-shrink-0 px-3 py-2">
-                        <Palette className="h-4 w-4" />
-                        <span className="hidden sm:inline">Preferences</span>
+                    <TabsTrigger value="preferences" className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5">
+                        <Palette className="h-3.5 w-3.5" /> Preferences
                     </TabsTrigger>
-                    <TabsTrigger value="notifications" className="gap-2 flex-shrink-0 px-3 py-2">
-                        <Bell className="h-4 w-4" />
-                        <span className="hidden sm:inline">Notifications</span>
+                    <TabsTrigger value="notifications" className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5">
+                        <Bell className="h-3.5 w-3.5" /> Alerts
                     </TabsTrigger>
-                    <TabsTrigger value="security" className="gap-2 flex-shrink-0 px-3 py-2">
-                        <Shield className="h-4 w-4" />
-                        <span className="hidden sm:inline">Security</span>
+                    <TabsTrigger value="security" className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5">
+                        <Shield className="h-3.5 w-3.5" /> Security
                     </TabsTrigger>
                 </TabsList>
 
                 {/* Profile Tab */}
-                <TabsContent value="profile" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Profile Information</CardTitle>
-                            <CardDescription>
-                                Update your personal information
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="fullName">Full Name</Label>
-                                <Input
-                                    id="fullName"
-                                    value={profileData.fullName}
-                                    onChange={(e) =>
-                                        setProfileData({ ...profileData, fullName: e.target.value })
-                                    }
-                                />
+                <TabsContent value="profile" className="space-y-4">
+                    <div className="rounded-lg border border-border/50 bg-card/50">
+                        <div className="px-4 py-3 border-b border-border/50">
+                            <h3 className="text-sm font-medium">Account Details</h3>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="fullName" className="text-xs">Full Name</Label>
+                                    <Input
+                                        id="fullName"
+                                        value={profileData.fullName}
+                                        onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                                        className="h-9 text-sm"
+                                        placeholder="Enter your name"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="email" className="text-xs">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={profileData.email}
+                                        disabled
+                                        className="h-9 text-sm bg-muted/30"
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={profileData.email}
-                                    disabled
-                                    className="bg-muted"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Email cannot be changed
-                                </p>
-                            </div>
-                            <Button onClick={handleProfileUpdate} disabled={loading}>
+                            <Button onClick={handleProfileUpdate} disabled={loading} size="sm" className="h-8">
                                 {loading ? 'Saving...' : 'Save Changes'}
                             </Button>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </TabsContent>
 
                 {/* Preferences Tab */}
-                <TabsContent value="preferences" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Display Preferences</CardTitle>
-                            <CardDescription>
-                                Customize how information is displayed
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
+                <TabsContent value="preferences" className="space-y-4">
+                    {/* Interface */}
+                    <div className="rounded-lg border border-border/50 bg-card/50">
+                        <div className="px-4 py-3 border-b border-border/50">
+                            <h3 className="text-sm font-medium">Interface</h3>
+                        </div>
+                        <div className="p-4 space-y-4">
                             <div className="space-y-2">
-                                <Label>Theme</Label>
+                                <Label className="text-xs text-muted-foreground">Theme</Label>
                                 <ThemeSelector />
                             </div>
-                            <Separator />
-                            <div className="space-y-2">
-                                <Label>Currency</Label>
-                                <Select
-                                    value={preferences.currency}
-                                    onValueChange={(value) =>
-                                        savePreferences({ currency: value })
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="USD">USD ($)</SelectItem>
-                                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                                        <SelectItem value="INR">INR (₹)</SelectItem>
-                                        <SelectItem value="JPY">JPY (¥)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Currency</Label>
+                                    <Select value={preferences.currency} onValueChange={(v) => savePreferences({ currency: v })}>
+                                        <SelectTrigger className="h-9 text-sm">
+                                            <Globe className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="USD">USD ($)</SelectItem>
+                                            <SelectItem value="EUR">EUR (€)</SelectItem>
+                                            <SelectItem value="GBP">GBP (£)</SelectItem>
+                                            <SelectItem value="INR">INR (₹)</SelectItem>
+                                            <SelectItem value="JPY">JPY (¥)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Date Format</Label>
+                                    <Select value={preferences.dateFormat} onValueChange={(v) => savePreferences({ dateFormat: v })}>
+                                        <SelectTrigger className="h-9 text-sm">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="MM/dd/yyyy">MM/DD/YYYY</SelectItem>
+                                            <SelectItem value="dd/MM/yyyy">DD/MM/YYYY</SelectItem>
+                                            <SelectItem value="yyyy-MM-dd">YYYY-MM-DD</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Date Format</Label>
-                                <Select
-                                    value={preferences.dateFormat}
-                                    onValueChange={(value) =>
-                                        savePreferences({ dateFormat: value })
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="MM/dd/yyyy">MM/DD/YYYY</SelectItem>
-                                        <SelectItem value="dd/MM/yyyy">DD/MM/YYYY</SelectItem>
-                                        <SelectItem value="yyyy-MM-dd">YYYY-MM-DD</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                        </div>
+                    </div>
+
+                    {/* AI Integration */}
+                    <div className="rounded-lg border border-primary/20 bg-primary/[0.02]">
+                        <div className="px-4 py-3 border-b border-primary/10 flex items-center gap-2">
+                            <Brain className="h-4 w-4 text-primary" />
+                            <h3 className="text-sm font-medium">AI Integration</h3>
+                        </div>
+                        <div className="p-4">
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="geminiApiKey" className="text-xs flex items-center gap-1.5">
+                                        <Key className="h-3 w-3" /> API Key
+                                    </Label>
+                                    <Input
+                                        id="geminiApiKey"
+                                        type="password"
+                                        placeholder="Enter your Gemini API key"
+                                        value={preferences.geminiApiKey}
+                                        onChange={(e) => savePreferences({ geminiApiKey: e.target.value })}
+                                        className="h-9 text-sm font-mono"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs flex items-center gap-1.5">
+                                        <Layout className="h-3 w-3" /> Model
+                                    </Label>
+                                    <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted/50 text-sm text-muted-foreground">
+                                        <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" />
+                                        Gemini 3 Flash (Latest)
+                                    </div>
+                                </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                Preferences are saved automatically
-                            </p>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </TabsContent>
 
                 {/* Notifications Tab */}
-                <TabsContent value="notifications" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Notification Settings</CardTitle>
-                            <CardDescription>
-                                Configure how you receive notifications
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Push Notifications</Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Receive notifications in your browser
-                                    </p>
+                <TabsContent value="notifications" className="space-y-4">
+                    <div className="rounded-lg border border-border/50 bg-card/50">
+                        <div className="px-4 py-3 border-b border-border/50">
+                            <h3 className="text-sm font-medium">Notification Preferences</h3>
+                        </div>
+                        <div>
+                            {[
+                                { id: 'notifications', label: 'Push Notifications', desc: 'Real-time alerts for important events' },
+                                { id: 'emailAlerts', label: 'Email Summaries', desc: 'Weekly digest emails' },
+                                { id: 'budgetAlerts', label: 'Budget Alerts', desc: 'Alerts when spending exceeds limits' }
+                            ].map((item, i, arr) => (
+                                <div key={item.id} className={cn(
+                                    "flex items-center justify-between px-4 py-3",
+                                    i !== arr.length - 1 && "border-b border-border/30"
+                                )}>
+                                    <div className="space-y-0.5">
+                                        <Label className="text-sm cursor-pointer" onClick={() => savePreferences({ [item.id]: !preferences[item.id as keyof typeof preferences] })}>
+                                            {item.label}
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                                    </div>
+                                    <Switch
+                                        checked={preferences[item.id as keyof typeof preferences] as boolean}
+                                        onCheckedChange={(checked) => savePreferences({ [item.id]: checked })}
+                                    />
                                 </div>
-                                <Switch
-                                    checked={preferences.notifications}
-                                    onCheckedChange={(checked) =>
-                                        savePreferences({ notifications: checked })
-                                    }
-                                />
-                            </div>
-                            <Separator />
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Email Alerts</Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Receive weekly summary emails
-                                    </p>
-                                </div>
-                                <Switch
-                                    checked={preferences.emailAlerts}
-                                    onCheckedChange={(checked) =>
-                                        savePreferences({ emailAlerts: checked })
-                                    }
-                                />
-                            </div>
-                            <Separator />
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Budget Alerts</Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Get notified when you exceed budgets
-                                    </p>
-                                </div>
-                                <Switch
-                                    checked={preferences.budgetAlerts}
-                                    onCheckedChange={(checked) =>
-                                        savePreferences({ budgetAlerts: checked })
-                                    }
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                            ))}
+                        </div>
+                    </div>
                 </TabsContent>
 
                 {/* Security Tab */}
-                <TabsContent value="security" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Password</CardTitle>
-                            <CardDescription>
-                                Update your password to keep your account secure
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Button variant="outline" onClick={handlePasswordReset}>
-                                Send Password Reset Email
-                            </Button>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-destructive/50">
-                        <CardHeader>
-                            <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                            <CardDescription>
-                                Irreversible account actions
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
+                <TabsContent value="security" className="space-y-4">
+                    <div className="rounded-lg border border-border/50 bg-card/50">
+                        <div className="px-4 py-3 border-b border-border/50">
+                            <h3 className="text-sm font-medium">Password</h3>
+                        </div>
+                        <div className="p-4">
+                            <div className="flex items-center justify-between gap-4">
                                 <div>
-                                    <p className="font-medium">Sign Out</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Sign out of your account on this device
-                                    </p>
+                                    <p className="text-sm font-medium">Reset Password</p>
+                                    <p className="text-xs text-muted-foreground">Send a reset link to your email</p>
                                 </div>
-                                <Button variant="outline" onClick={signOut}>
-                                    <LogOut className="mr-2 h-4 w-4" />
-                                    Sign Out
+                                <Button variant="outline" size="sm" onClick={handlePasswordReset} className="h-8">
+                                    Send Link <ChevronRight className="ml-1 h-3.5 w-3.5" />
                                 </Button>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/[0.02]">
+                        <div className="px-4 py-3 border-b border-destructive/10">
+                            <h3 className="text-xs font-medium text-destructive uppercase tracking-wide">Danger Zone</h3>
+                        </div>
+                        <div className="p-4">
+                            <div className="flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="text-sm font-medium">Sign Out</p>
+                                    <p className="text-xs text-muted-foreground">End your current session</p>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={signOut} className="h-8 border-destructive/30 text-destructive hover:bg-destructive hover:text-white">
+                                    <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign Out
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </TabsContent>
             </Tabs>
         </div>

@@ -22,7 +22,16 @@ const loadInitialPreferences = (): Preferences => {
         const saved = localStorage.getItem(PREFERENCES_KEY)
         if (saved) {
             const parsed = JSON.parse(saved)
-            return { ...defaultPreferences, ...parsed }
+            const preferences = { ...defaultPreferences, ...parsed }
+
+            // Migration: Update old Gemini 3 model strings to correct preview strings
+            if (preferences.geminiModel === 'gemini-3-flash') {
+                preferences.geminiModel = 'gemini-3-flash-preview'
+            } else if (preferences.geminiModel === 'gemini-3-pro') {
+                preferences.geminiModel = 'gemini-3-pro-preview'
+            }
+
+            return preferences
         }
     } catch {
         // Failed to parse preferences, using defaults
