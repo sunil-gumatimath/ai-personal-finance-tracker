@@ -15,12 +15,18 @@ interface BudgetOverviewProps {
 }
 
 const COLORS = [
-    'hsl(220 13% 13%)',      // Dark charcoal (like in image)
-    'hsl(220 10% 35%)',      // Medium gray
-    'hsl(220 8% 50%)',       // Light gray
+    'hsl(220 13% 13%)',       // Dark charcoal
+    'hsl(220 10% 35%)',       // Medium gray
+    'hsl(220 8% 50%)',        // Light gray
     'hsl(346.8 77.2% 49.8%)', // Rose
     'hsl(142.1 76.2% 36.3%)', // Green
     'hsl(221.2 83.2% 53.3%)', // Blue
+    'hsl(262.1 83.3% 57.8%)', // Purple
+    'hsl(24.6 95% 53.1%)',    // Orange
+    'hsl(47.9 95.8% 53.1%)',  // Yellow
+    'hsl(173.4 80.4% 40%)',   // Teal
+    'hsl(280 65.3% 60%)',     // Violet
+    'hsl(340 75.5% 55%)',     // Pink
 ]
 
 export function BudgetOverview({ spendingByCategory }: BudgetOverviewProps) {
@@ -30,7 +36,8 @@ export function BudgetOverview({ spendingByCategory }: BudgetOverviewProps) {
     const topCategory = spendingByCategory[0]
     const topPercentage = topCategory ? Math.round(topCategory.percentage) : 0
 
-    const chartData = spendingByCategory.slice(0, 5).map((cat, index) => ({
+    // Show all categories in the pie chart
+    const chartData = spendingByCategory.map((cat, index) => ({
         category: cat.category,
         amount: cat.amount,
         fill: cat.color || COLORS[index % COLORS.length],
@@ -127,7 +134,7 @@ export function BudgetOverview({ spendingByCategory }: BudgetOverviewProps) {
                     Total spent: {formatCurrency(totalSpending)}
                 </div>
                 <div className="leading-none text-muted-foreground">
-                    Showing top {chartData.length} categories
+                    Showing all {chartData.length} categories
                 </div>
             </CardFooter>
         </Card>
