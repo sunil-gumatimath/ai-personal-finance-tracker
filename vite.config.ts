@@ -60,40 +60,7 @@ export default defineConfig({
     ],
   },
   build: {
-    chunkSizeWarningLimit: 600,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          // React core
-          if (id.includes('node_modules/react/') ||
-            id.includes('node_modules/react-dom/') ||
-            id.includes('node_modules/react-router')) {
-            return 'react-vendor';
-          }
-          // Supabase
-          if (id.includes('@supabase')) {
-            return 'supabase-vendor';
-          }
-          // Charts (recharts is large)
-          if (id.includes('recharts') || id.includes('d3-')) {
-            return 'charts-vendor';
-          }
-          // Google AI
-          if (id.includes('@google/generative-ai')) {
-            return 'ai-vendor';
-          }
-          // Date utilities
-          if (id.includes('date-fns')) {
-            return 'date-vendor';
-          }
-          // UI components (Radix) - keep separate from utils
-          if (id.includes('@radix-ui')) {
-            return 'ui-vendor';
-          }
-          // Note: Removed utils-vendor to prevent bundling issues
-          // lucide-react and other utils will be in the main bundle
-        },
-      },
-    },
+    chunkSizeWarningLimit: 1000,
+    // Let Vite handle chunking automatically to avoid circular dependency issues
   },
 })
