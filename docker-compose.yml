@@ -4,21 +4,45 @@ services:
   app:
     build:
       context: .
+      dockerfile: Dockerfile
       args:
         - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
         - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}
     ports:
       - "8080:80"
-    restart: always
-    environment:
-      # If you have environment variables in your .env file that are needed at BUILD time 
-      # (Vite bakes them in), you might need to pass them as build args in the Dockerfile 
-      # or ensure a .env exists during build.
-      # For runtime env vars (not common for pure client-side apps unless handled via a script), list them here.
-      - NODE_ENV=production
+    restart: unless-stopped
     container_name: finance-tracker-app
-  # If you wanted to run a local backend or database, you would define it here.
-  # For example, if you wanted a local Postgres (though you are using Supabase):
-  # db:
-  #   image: postgres:15
-  #   ...
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - finance-network
+
+networks:
+  finance-network:
+    driver: bridge
+
+# =============================================
+# USAGE:
+# =============================================
+# 
+# 1. Create a .env file with your environment variables:
+#    VITE_SUPABASE_URL=your_supabase_url
+#    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+#    VITE_GEMINI_API_KEY=your_gemini_api_key (optional)
+#
+# 2. Build and run:
+#    docker-compose up --build
+#
+# 3. Access the app at:
+#    http://localhost:8080
+#
+# 4. Stop the app:
+#    docker-compose down
+# =============================================
