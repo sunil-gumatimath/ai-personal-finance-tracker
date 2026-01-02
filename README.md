@@ -5,7 +5,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
 ## Features
 
 ### AI-Powered Intelligence
-- AI Financial Coach: Real-time personalized insights powered by Google Gemini 3 Flash, providing spending alerts, kudos for achievements, and actionable coaching tips.
+- AI Financial Coach: Real-time personalized insights powered by Google Gemini 1.5 Flash, providing spending alerts, kudos for achievements, and actionable coaching tips.
 - Interactive AI Chat: Natural language conversations about your finances with context-aware responses and smart recommendations.
 - Anomaly Detection: Automatic identification of unusual spending patterns and financial outliers.
 
@@ -27,7 +27,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
 
 ### Premium User Experience
 - Eye Protection Light Mode: Specialized warm-ivory theme designed to reduce blue light strain and provide a comfortable reading experience.
-- Dark Mode Excellence: Sophisticated dark theme with OKLCH color model and glassmorphism effects.
+- Dark Mode Excellence: Sophisticated dark theme with OKLCH color model and refined UI elements.
 - Responsive Design: Fully mobile-responsive interface optimized for all screen sizes.
 - PWA Ready: Progressive Web App capabilities for native-like performance and offline access.
 - Global Preferences: Multi-currency support (USD, INR, EUR, GBP, JPY), regional date formats, and customizable settings.
@@ -41,22 +41,22 @@ A premium, AI-powered personal finance management platform designed for clarity 
 | State Management | React Context API |
 | Routing | React Router DOM 7 |
 | Charts | Shadcn UI Charts (Recharts) |
-| AI Integration | Google Gemini 3 Flash, React Markdown |
+| AI Integration | Google Gemini 1.5 Flash, React Markdown |
 | Backend | Supabase (PostgreSQL, Auth, RLS) |
 | Icons | Lucide React |
 | Runtime | Bun |
 | PWA | Vite PWA Plugin |
-| Aesthetics | OKLCH Color Model, Glassmorphism, Custom Filters |
+| Aesthetics | OKLCH Color Model, Refined Cards, Custom Filters |
 
 ## Key Highlights
 
 ### Recent Improvements
-- Enhanced Dashboard Charts: Migrated to Shadcn UI components with smooth animations, interactive tooltips, and premium styling.
+- Accounts Page Redesign: Migrated to a clean Shadcn-based design with improved header, search, filtering, and sorting capabilities.
+- Enhanced Dashboard Charts: Updated components with smooth animations, interactive tooltips, and premium styling.
 - Refined Settings UI: Horizontal tabs layout with consistent rounded corners and cohesive design language.
 - Mobile Responsive: Fully optimized for all screen sizes with adaptive layouts.
-- AI Integration: Powered by Gemini 3 Flash for intelligent financial insights.
+- AI Integration: Powered by Gemini 1.5 Flash for intelligent financial insights.
 - Improved Logo Design: Modern finance-themed logo with emerald/teal gradient and abstract growth arrow.
-- Advanced Visualizations: Area charts for income/expenses trends and pie charts for spending breakdown.
 - Bun Optimization: Fully transitioned to Bun for faster development and consistent environment.
 
 ## Prerequisites
@@ -88,7 +88,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
     - Visit Google AI Studio.
     - Sign in with your Google account.
     - Create an API Key and copy it.
-    - Add it in Settings > Preferences > AI Integration within the application.
+    - Add it in Settings > AI Integration within the application.
 
 5. Database Initialization:
     - Execute supabase/database.sql in your Supabase SQL Editor.
@@ -102,7 +102,7 @@ bun run dev
 
 ## AI Features
 
-The application includes powerful AI-driven insights powered by Google Gemini 3 Flash:
+The application includes powerful AI-driven insights powered by Google Gemini 1.5 Flash:
 
 ### AI Financial Coach
 - Appears on the dashboard with real-time insights.
@@ -110,7 +110,7 @@ The application includes powerful AI-driven insights powered by Google Gemini 3 
 - Automatically rotates through multiple insights.
 - Click Chat to open the full AI Assistant.
 
-### AI Chat Assistant
+### AI Assistant
 - Natural language conversations about your finances.
 - Context-aware responses based on your actual financial data.
 - Ask questions like:
@@ -119,7 +119,7 @@ The application includes powerful AI-driven insights powered by Google Gemini 3 
   - "Give me tips to save more money."
   - "Am I on track with my budget?"
 
-Note: AI features require a Gemini API key. Add it in Settings > Preferences > AI Integration.
+Note: AI features require a Gemini API key. Add it in Settings > AI Integration.
 
 ## Deployment
 

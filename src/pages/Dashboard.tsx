@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { StatCard, RecentTransactions, SpendingChart, BudgetOverview, AICoach } from '@/components/dashboard'
+import {
+    StatCard,
+    RecentTransactions,
+    SpendingChart,
+    BudgetOverview,
+    AICoach,
+    FinancialHealthScore,
+    BadgesGrid
+} from '@/components/dashboard'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { Transaction, DashboardStats, SpendingByCategory, MonthlyTrend, Category } from '@/types'
 import { Link } from 'react-router-dom'
 import { useAIInsights, type Insight } from '@/hooks/useAIInsights'
+import { useFinancialHealth } from '@/hooks/useFinancialHealth'
 
 // Extended stats to include last month for comparisons
 interface ExtendedDashboardStats extends DashboardStats {
@@ -36,6 +45,7 @@ export function Dashboard() {
     const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([])
     const [spendingByCategory, setSpendingByCategory] = useState<SpendingByCategory[]>([])
 
+    const { data: healthData, loading: healthLoading } = useFinancialHealth()
     useEffect(() => {
         async function fetchDashboardData() {
             if (!user) {
@@ -353,6 +363,12 @@ export function Dashboard() {
                     subtitle={stats.monthlyNet >= 0 ? 'Income saved' : 'Review spending'}
                     changeType={stats.monthlyNet >= 0 ? 'positive' : 'negative'}
                 />
+            </div>
+
+            {/* Financial Health & Gamification Row */}
+            <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-[3fr_7fr]">
+                <FinancialHealthScore data={healthData} loading={healthLoading} />
+                <BadgesGrid badges={healthData?.badges || []} />
             </div>
 
             {/* Charts Row - 70/30 Split */}
