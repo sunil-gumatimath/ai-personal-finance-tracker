@@ -1,9 +1,32 @@
+# Dependencies (rebuilt in container)
 node_modules
+
+# Build output
 dist
+dist-ssr
+
+# Version control
 .git
+.gitignore
+
+# Environment files (passed via build args)
 .env
+.env.*
+!.env.example
+
+# Documentation
 README.md
 HowToUse.md
-supabase
-.cursor
 
+# Supabase local config
+supabase
+
+# IDEs and editors
+.cursor
+.vscode
+.idea
+
+# Lock files (except bun.lock which is needed)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

@@ -2,9 +2,15 @@
 logs
 *.log
 bun-debug.log*
+bun.lockb
 
 # Dependencies
 node_modules
+
+# Lock files (using bun.lock)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Build
 dist
