@@ -1,6 +1,19 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
-import type { User, Session } from '@supabase/supabase-js'
+
+// Define replacement types for Supabase types
+type User = {
+    id: string;
+    email?: string;
+    user_metadata: { [key: string]: any };
+    app_metadata: { [key: string]: any };
+    aud: string;
+    created_at: string;
+}
+
+type Session = {
+    user: User;
+    access_token: string;
+}
 
 interface AuthContextType {
     user: User | null
@@ -10,103 +23,107 @@ interface AuthContextType {
     signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
     signOut: () => Promise<void>
     resetPassword: (email: string) => Promise<{ error: Error | null }>
+    updateProfile: (data: { full_name?: string; avatar_url?: string }) => Promise<{ error: Error | null }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+
     const [user, setUser] = useState<User | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
 
-    const setOfflineDemoUser = () => {
-        setUser({
-            id: 'offline-demo-user',
-            email: 'demo@example.com',
-            app_metadata: {},
-            user_metadata: { full_name: 'Demo User (Offline)', avatar_url: '' },
-            aud: 'authenticated',
-            created_at: new Date().toISOString(),
-        } as User)
-    }
-
     useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession()
-            .then(async ({ data: { session } }) => {
-                setSession(session)
-
-                if (session?.user) {
-                    setUser(session.user)
-                    setLoading(false)
-                } else {
-                    // Removed auto-login to allow testing of Sign Up / Login pages
-                    // if (import.meta.env.DEV) { ... }
-                    setUser(null)
-                    setLoading(false)
-                }
-            })
-            .catch((err) => {
-                console.warn('Supabase connection failed, using offline demo user:', err)
-                if (import.meta.env.DEV) {
-                    setOfflineDemoUser()
-                }
-                setLoading(false)
-            })
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                setSession(session)
-                setUser(session?.user ?? null)
-                setLoading(false)
+        // Check for existing user in local storage
+        const storedUser = localStorage.getItem('finance_user');
+        if (storedUser) {
+            try {
+                const parsedUser = JSON.parse(storedUser);
+                setUser(parsedUser);
+                setSession({ user: parsedUser, access_token: 'demo-token' });
+            } catch (e) {
+                console.error('Failed to parse stored user', e);
             }
-        )
-
-        return () => subscription.unsubscribe()
+        }
+        setLoading(false);
     }, [])
 
 
-    const signIn = async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({
+
+    const signIn = async (email: string, _password: string) => {
+        // Simulation of sign in
+        const newUser = {
+            id: 'demo-user-' + Math.random().toString(36).substr(2, 9),
             email,
-            password,
-        })
-        return { error: error as Error | null }
+            app_metadata: {},
+            user_metadata: { full_name: email.split('@')[0], avatar_url: '' },
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+        };
+        setUser(newUser);
+        setSession({ user: newUser, access_token: 'mock-token' });
+        localStorage.setItem('finance_user', JSON.stringify(newUser));
+
+        return { error: null }
     }
 
-    const signUp = async (email: string, password: string, fullName: string) => {
-        const { error } = await supabase.auth.signUp({
+    const signUp = async (email: string, _password: string, fullName: string) => {
+        // Simulation of sign up
+        const newUser = {
+            id: 'demo-user-' + Math.random().toString(36).substr(2, 9),
             email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName,
-                },
-            },
-        })
-        return { error: error as Error | null }
+            app_metadata: {},
+            user_metadata: { full_name: fullName, avatar_url: '' },
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+        };
+        setUser(newUser);
+        setSession({ user: newUser, access_token: 'mock-token' });
+        localStorage.setItem('finance_user', JSON.stringify(newUser));
+
+        return { error: null }
     }
 
     const signOut = async () => {
-        await supabase.auth.signOut()
+        setUser(null)
+        setSession(null)
+        localStorage.removeItem('finance_user');
     }
 
-    const resetPassword = async (email: string) => {
-        const { error } = await supabase.auth.resetPasswordForEmail(email)
-        return { error: error as Error | null }
+    const resetPassword = async (_email: string) => {
+        return { error: null }
+    }
+
+    const updateProfile = async (data: { full_name?: string; avatar_url?: string }) => {
+        if (!user) return { error: new Error('No user logged in') }
+
+        const updatedUser = {
+            ...user,
+            user_metadata: {
+                ...user.user_metadata,
+                ...data
+            }
+        }
+
+        setUser(updatedUser)
+        setSession(prev => prev ? { ...prev, user: updatedUser } : null)
+        localStorage.setItem('finance_user', JSON.stringify(updatedUser))
+
+        return { error: null }
     }
 
     return (
         <AuthContext.Provider
             value={{
-                user,
+                user: user as any, // Cast to any to satisfy existing types if strictly typed elsewhere
                 session,
                 loading,
                 signIn,
                 signUp,
                 signOut,
                 resetPassword,
+                updateProfile,
             }}
         >
             {children}
