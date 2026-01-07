@@ -41,19 +41,29 @@ export function Calendar() {
         const start = startOfWeek(startOfMonth(currentDate))
         const end = endOfWeek(endOfMonth(currentDate))
 
+        // Format dates as YYYY-MM-DD to avoid timezone issues with PostgreSQL DATE type
+        const formatDateStr = (date: Date): string => {
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            const day = String(date.getDate()).padStart(2, '0')
+            return `${year}-${month}-${day}`
+        }
+
         try {
             const { rows } = await query<Transaction>(`
-                SELECT 
-                    t.*, 
-                    row_to_json(c.*) as category, 
-                    row_to_json(a.*) as account
+                SELECT
+                    t.*,
+                    row_to_json(c.*) as category,
+                    row_to_json(a.*) as account,
+                    row_to_json(ta.*) as to_account
                 FROM transactions t
                 LEFT JOIN categories c ON t.category_id = c.id
                 LEFT JOIN accounts a ON t.account_id = a.id
+                LEFT JOIN accounts ta ON t.to_account_id = ta.id
                 WHERE t.user_id = $1
                 AND t.date >= $2
                 AND t.date <= $3
-            `, [user.id, start.toISOString(), end.toISOString()])
+            `, [user.id, formatDateStr(start), formatDateStr(end)])
 
             if (rows) setTransactions(rows)
         } catch (error) {

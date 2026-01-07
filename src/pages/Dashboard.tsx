@@ -74,13 +74,15 @@ export function Dashboard() {
 
                 // 1. Fetch recent transactions with expanded details
                 const { rows: transactions } = await query<Transaction>(`
-                    SELECT 
+                    SELECT
                         t.*,
                         row_to_json(c.*) as category,
-                        row_to_json(a.*) as account
+                        row_to_json(a.*) as account,
+                        row_to_json(ta.*) as to_account
                     FROM transactions t
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN accounts a ON t.account_id = a.id
+                    LEFT JOIN accounts ta ON t.to_account_id = ta.id
                     WHERE t.user_id = $1
                     ORDER BY t.date DESC
                     LIMIT 10
@@ -104,25 +106,36 @@ export function Dashboard() {
                 `, [user.id, startOfLastMonthStr])
 
                 if (twoMonthData) {
+                    // Helper to normalize date to YYYY-MM-DD (PostgreSQL may return Date objects or ISO strings)
+                    const normalizeDate = (dateVal: string | Date): string => {
+                        if (dateVal instanceof Date) {
+                            const year = dateVal.getFullYear()
+                            const month = String(dateVal.getMonth() + 1).padStart(2, '0')
+                            const day = String(dateVal.getDate()).padStart(2, '0')
+                            return `${year}-${month}-${day}`
+                        }
+                        // If it's a string, strip time portion if present
+                        return String(dateVal).split('T')[0]
+                    }
+
                     // Split into current and last month
-                    const currentMonthData = twoMonthData.filter((t) => t.date >= startOfMonthStr)
-                    const lastMonthData = twoMonthData.filter((t) => t.date >= startOfLastMonthStr && t.date < startOfMonthStr)
+                    const currentMonthData = twoMonthData.filter((t) => normalizeDate(t.date) >= startOfMonthStr)
+                    const lastMonthData = twoMonthData.filter((t) => normalizeDate(t.date) >= startOfLastMonthStr && normalizeDate(t.date) < startOfMonthStr)
 
                     // Calculate current month stats
                     const income = currentMonthData
-                        .filter((t) => t.type === 'income')
-                        .reduce((sum: number, t) => sum + t.amount, 0)
+                        .filter((t: any) => t.type === 'income')
+                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
                     const expenses = currentMonthData
-                        .filter((t) => t.type === 'expense')
-                        .reduce((sum: number, t) => sum + t.amount, 0)
+                        .filter((t: any) => t.type === 'expense')
+                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
 
-                    // Calculate last month stats for comparison
                     const lastMonthIncome = lastMonthData
-                        .filter((t) => t.type === 'income')
-                        .reduce((sum: number, t) => sum + t.amount, 0)
+                        .filter((t: any) => t.type === 'income')
+                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
                     const lastMonthExpenses = lastMonthData
-                        .filter((t) => t.type === 'expense')
-                        .reduce((sum: number, t) => sum + t.amount, 0)
+                        .filter((t: any) => t.type === 'expense')
+                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
 
                     // Calculate percentage changes
                     const incomeChange = lastMonthIncome > 0
@@ -156,7 +169,7 @@ export function Dashboard() {
                             const catColor = category?.color || '#94a3b8'
                             const current = categoryMap.get(catName) || { amount: 0, color: catColor }
                             categoryMap.set(catName, {
-                                amount: current.amount + t.amount,
+                                amount: current.amount + Number(t.amount || 0),
                                 color: catColor
                             })
                         })
@@ -197,8 +210,8 @@ export function Dashboard() {
                         const monthKey = d.toLocaleString('default', { month: 'short' })
                         if (monthsMap.has(monthKey)) {
                             const current = monthsMap.get(monthKey)!
-                            if (t.type === 'income') current.income += t.amount
-                            if (t.type === 'expense') current.expenses += t.amount
+                            if (t.type === 'income') current.income += Number(t.amount || 0)
+                            if (t.type === 'expense') current.expenses += Number(t.amount || 0)
                         }
                     })
 
@@ -222,79 +235,25 @@ export function Dashboard() {
                 }
 
                 // 4. Fetch accounts for total balance
-                const { rows: accounts } = await query<{ balance: number }>(
+                const { rows: accounts } = await query<{ balance: string | number }>(
                     'SELECT balance FROM accounts WHERE user_id = $1 AND is_active = true',
                     [user.id]
                 )
 
                 if (accounts) {
-                    const totalBalance = accounts.reduce((sum: number, a) => sum + parseFloat(a.balance as any), 0)
+                    // Handle PostgreSQL DECIMAL type which may come as string
+                    const totalBalance = accounts.reduce((sum: number, a) => {
+                        const balance = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance
+                        return sum + (isNaN(balance) ? 0 : balance)
+                    }, 0)
                     setStats((prev) => ({ ...prev, totalBalance }))
                 }
             } catch (error) {
-                console.error('Error fetching dashboard data, falling back to mock data:', error)
-                loadMockData()
+                console.error('Error fetching dashboard data:', error)
+                // No mock data fallback - show empty state with zeros
             } finally {
                 setLoading(false)
             }
-        }
-
-        const loadMockData = () => {
-            // Mock Data for Offline/Error State
-            setStats({
-                totalBalance: 12450.00,
-                monthlyIncome: 4500.00,
-                monthlyExpenses: 2150.00,
-                monthlyNet: 2350.00,
-                savingsRate: 52,
-                lastMonthIncome: 4200.00,
-                lastMonthExpenses: 2300.00,
-                incomeChange: 7.1,
-                expensesChange: -6.5,
-            })
-
-            setMonthlyTrends([
-                { month: 'Jan', income: 4000, expenses: 2400 },
-                { month: 'Feb', income: 3000, expenses: 1398 },
-                { month: 'Mar', income: 2000, expenses: 9800 },
-                { month: 'Apr', income: 2780, expenses: 3908 },
-                { month: 'May', income: 1890, expenses: 4800 },
-                { month: 'Jun', income: 2390, expenses: 3800 },
-            ])
-
-            setSpendingByCategory([
-                { category: 'Food & Dining', amount: 850, percentage: 35, color: '#ef4444' },
-                { category: 'Transportation', amount: 350, percentage: 15, color: '#f97316' },
-                { category: 'Bills', amount: 550, percentage: 25, color: '#f59e0b' },
-                { category: 'Entertainment', amount: 400, percentage: 25, color: '#8b5cf6' },
-            ])
-
-            setRecentTransactions([
-                {
-                    id: '1',
-                    type: 'expense',
-                    amount: 45.99,
-                    date: new Date().toISOString(),
-                    description: 'Grocery Store',
-                    category: { id: '1', user_id: '', name: 'Food & Dining', type: 'expense', color: '#ef4444', icon: '', parent_id: null, created_at: '' }
-                },
-                {
-                    id: '2',
-                    type: 'income',
-                    amount: 2500.00,
-                    date: new Date(Date.now() - 86400000).toISOString(),
-                    description: 'Freelance Payment',
-                    category: { id: '2', user_id: '', name: 'Freelance', type: 'income', color: '#10b981', icon: '', parent_id: null, created_at: '' }
-                },
-                {
-                    id: '3',
-                    type: 'expense',
-                    amount: 120.00,
-                    date: new Date(Date.now() - 172800000).toISOString(),
-                    description: 'Electric Bill',
-                    category: { id: '3', user_id: '', name: 'Bills', type: 'expense', color: '#f59e0b', icon: '', parent_id: null, created_at: '' }
-                },
-            ] as Transaction[])
         }
 
         fetchDashboardData()

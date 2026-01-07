@@ -144,15 +144,30 @@ export function Goals() {
         if (!selectedGoal) return
 
         try {
-            const newAmount = selectedGoal.current_amount + parseFloat(contributeAmount)
+            const contributionAmount = parseFloat(contributeAmount)
+            const remaining = selectedGoal.target_amount - selectedGoal.current_amount
+
+            // Cap contribution at the remaining amount to prevent exceeding target
+            const actualContribution = Math.min(contributionAmount, remaining)
+            const newAmount = selectedGoal.current_amount + actualContribution
+
             await updateRecord('goals', selectedGoal.id, { current_amount: newAmount })
 
             const isCompleted = newAmount >= selectedGoal.target_amount
-            toast.success(
-                isCompleted
-                    ? '🎉 Congratulations! Goal completed!'
-                    : `Added ${formatCurrency(parseFloat(contributeAmount))} to your goal!`
-            )
+
+            if (contributionAmount > remaining) {
+                toast.success(
+                    isCompleted
+                        ? `🎉 Goal completed! Added ${formatCurrency(actualContribution)} (capped at remaining amount)`
+                        : `Added ${formatCurrency(actualContribution)} to your goal!`
+                )
+            } else {
+                toast.success(
+                    isCompleted
+                        ? '🎉 Congratulations! Goal completed!'
+                        : `Added ${formatCurrency(actualContribution)} to your goal!`
+                )
+            }
 
             setIsContributeDialogOpen(false)
             setContributeAmount('')

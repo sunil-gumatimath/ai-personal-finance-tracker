@@ -179,8 +179,9 @@ export function Accounts() {
         setAccountToDelete(account)
 
         try {
+            // Check for transactions where this account is used as source OR destination
             const { rows } = await query<{ count: string }>(
-                'SELECT COUNT(*) as count FROM transactions WHERE account_id = $1',
+                'SELECT COUNT(*) as count FROM transactions WHERE account_id = $1 OR to_account_id = $1',
                 [account.id]
             )
             setLinkedTransactionsCount(parseInt(rows[0]?.count || '0', 10))
@@ -200,8 +201,8 @@ export function Accounts() {
         try {
             // If there are linked transactions, we need to handle them
             if (linkedTransactionsCount > 0) {
-                // Delete associated transactions first
-                await query('DELETE FROM transactions WHERE account_id = $1', [accountToDelete.id])
+                // Delete associated transactions (both as source and destination)
+                await query('DELETE FROM transactions WHERE account_id = $1 OR to_account_id = $1', [accountToDelete.id])
             }
 
             await deleteRecord('accounts', accountToDelete.id)
@@ -254,9 +255,9 @@ export function Accounts() {
 
     const activeAccounts = sortedAccounts.filter((a) => a.is_active)
     const inactiveAccounts = sortedAccounts.filter((a) => !a.is_active)
-    const totalBalance = accounts.filter((a) => a.is_active).reduce((sum, a) => sum + a.balance, 0)
-    const totalAssets = accounts.filter(a => a.is_active && a.balance > 0).reduce((sum, a) => sum + a.balance, 0)
-    const totalLiabilities = Math.abs(accounts.filter(a => a.is_active && a.balance < 0).reduce((sum, a) => sum + a.balance, 0))
+    const totalBalance = accounts.filter((a) => a.is_active).reduce((sum, a) => sum + Number(a.balance || 0), 0)
+    const totalAssets = accounts.filter(a => a.is_active && Number(a.balance || 0) > 0).reduce((sum, a) => sum + Number(a.balance || 0), 0)
+    const totalLiabilities = Math.abs(accounts.filter(a => a.is_active && Number(a.balance || 0) < 0).reduce((sum, a) => sum + Number(a.balance || 0), 0))
 
     if (loading) {
         return <LoadingSkeleton />

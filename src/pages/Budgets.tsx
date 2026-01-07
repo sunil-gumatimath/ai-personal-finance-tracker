@@ -151,12 +151,16 @@ export function Budgets() {
 
         try {
             const now = new Date()
+            // Format date as YYYY-MM-DD to avoid timezone issues with PostgreSQL DATE type
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+            const startDateStr = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}-01`
+
             const budgetData = {
                 user_id: user.id,
                 category_id: formData.category_id,
                 amount: parseFloat(formData.amount),
                 period: formData.period,
-                start_date: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+                start_date: startDateStr,
             }
 
             if (editingBudget) {

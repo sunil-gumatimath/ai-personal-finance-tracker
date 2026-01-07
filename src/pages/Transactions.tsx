@@ -69,6 +69,7 @@ export function Transactions() {
         description: '',
         category_id: '',
         account_id: '',
+        to_account_id: '', // For transfer transactions
         date: format(new Date(), 'yyyy-MM-dd'),
         is_recurring: false,
         recurring_frequency: '' as '' | 'daily' | 'weekly' | 'monthly' | 'yearly',
@@ -83,13 +84,15 @@ export function Transactions() {
         try {
             const [transactionsRes, categoriesRes, accountsRes] = await Promise.all([
                 query<Transaction>(`
-                    SELECT 
-                        t.*, 
-                        row_to_json(c.*) as category, 
-                        row_to_json(a.*) as account 
+                    SELECT
+                        t.*,
+                        row_to_json(c.*) as category,
+                        row_to_json(a.*) as account,
+                        row_to_json(ta.*) as to_account
                     FROM transactions t
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN accounts a ON t.account_id = a.id
+                    LEFT JOIN accounts ta ON t.to_account_id = ta.id
                     WHERE t.user_id = $1
                     ORDER BY t.date DESC
                 `, [user.id]),
@@ -127,7 +130,7 @@ export function Transactions() {
         if (!user) return
 
         try {
-            const transactionData = {
+            const transactionData: Record<string, unknown> = {
                 user_id: user.id,
                 type: formData.type,
                 amount: parseFloat(formData.amount),
@@ -137,6 +140,11 @@ export function Transactions() {
                 date: formData.date,
                 is_recurring: formData.is_recurring,
                 recurring_frequency: formData.is_recurring ? formData.recurring_frequency || null : null,
+            }
+
+            // Add to_account_id for transfer transactions
+            if (formData.type === 'transfer') {
+                transactionData.to_account_id = formData.to_account_id || null
             }
 
             if (editingTransaction) {
@@ -175,6 +183,7 @@ export function Transactions() {
             description: transaction.description || '',
             category_id: transaction.category_id || '',
             account_id: transaction.account_id,
+            to_account_id: transaction.to_account_id || '',
             date: transaction.date,
             is_recurring: transaction.is_recurring || false,
             recurring_frequency: transaction.recurring_frequency || '',
@@ -190,6 +199,7 @@ export function Transactions() {
             description: '',
             category_id: '',
             account_id: accounts[0]?.id || '',
+            to_account_id: '',
             date: format(new Date(), 'yyyy-MM-dd'),
             is_recurring: false,
             recurring_frequency: '',
@@ -590,7 +600,7 @@ export function Transactions() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Account</Label>
+                            <Label>{formData.type === 'transfer' ? 'From Account' : 'Account'}</Label>
                             <Select
                                 value={formData.account_id}
                                 onValueChange={(value) => setFormData({ ...formData, account_id: value })}
@@ -608,6 +618,31 @@ export function Transactions() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* Show To Account field for transfers */}
+                        {formData.type === 'transfer' && (
+                            <div className="space-y-2">
+                                <Label>To Account</Label>
+                                <Select
+                                    value={formData.to_account_id}
+                                    onValueChange={(value) => setFormData({ ...formData, to_account_id: value })}
+                                    required
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select destination account" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {accounts
+                                            .filter((account) => account.id !== formData.account_id)
+                                            .map((account) => (
+                                                <SelectItem key={account.id} value={account.id}>
+                                                    {account.name}
+                                                </SelectItem>
+                                            ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label htmlFor="date">Date</Label>
