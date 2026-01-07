@@ -7,20 +7,14 @@ A premium, AI-powered personal finance management platform designed for clarity 
 ## Features
 
 ### AI-Powered Intelligence
-- AI Financial Coach: Real-time personalized insights powered by Google Gemini 1.5 Flash, providing spending alerts, kudos for achievements, and actionable coaching tips.
+- AI Financial Coach: Real-time personalized insights powered by Google Gemini 1.5 Flash, providing spending alerts and actionable coaching tips.
 - Interactive AI Chat: Natural language conversations about your finances with context-aware responses and smart recommendations.
 - Anomaly Detection: Automatic identification of unusual spending patterns and financial outliers.
 
-### Financial Health Monitoring
-- Health Score Dashboard: Comprehensive scoring system (0-100) based on savings rate, budget adherence, and emergency fund progress.
-- Visual Gauge Display: Animated circular gauge showing overall financial health with color-coded status indicators.
-- Key Metrics Tracking: Real-time monitoring of savings rate percentage, budget adherence rate, and emergency fund progress.
-- Personalized Action Plan: AI-generated recommendations for improving financial health with specific, actionable steps.
-
-### Achievement System
-- Badge Collection: Four achievement badges (Frugal King, Goal Crusher, Debt Slayer, Savings Star) with unlock criteria.
-- Progress Tracking: Visual progress bars showing completion status for each badge.
-- Gamification: Unlock badges by meeting financial milestones to stay motivated.
+### Dashboard Excellence
+- Side-by-Side Analytics: Balanced layout featuring Financial Health Score and Spending Flow (Budget Overview) in a unified view.
+- Real-time Monitoring: Instant updates to savings rate, budget adherence, and emergency fund progress.
+- Actionable Intelligence: AI-generated next steps for improving financial health, now with full currency support.
 
 ### Advanced Analytics
 - Intelligence Dashboard: Comprehensive financial overview with interactive Shadcn UI charts including:
@@ -69,20 +63,12 @@ A premium, AI-powered personal finance management platform designed for clarity 
 - Detailed breakdown modal with actionable improvement steps.
 - Status indicators: Excellent (80+), Good (60-79), Average (40-59), Needs Attention (below 40).
 
-### Achievement Badges System
-- Frugal King: Awarded for staying 20% under total budget with progress tracking.
-- Goal Crusher: Unlocked when any savings goal reaches 100% completion.
-- Debt Slayer: Earned by maintaining zero credit card debt.
-- Savings Star: Granted for achieving 30% or higher savings rate.
-- Visual progress indicators for locked badges with completion percentages.
+
 
 ### Recent Improvements
-- **Persistent AI Insights**: Migrated from just-in-time generation to database-backed storage for financial insights, ensuring your financial history remains accessible.
-- **Preference Persistence**: User settings (currency, API keys, notifications) are now securely synced to the Neon database JSONB storage.
-- **Data Stability**: Fixed numerical precision issues (NaN) in Financial Health Score and Spending Analytics across all currency formats.
-- **Horizontal Settings UI**: Streamlined preferences management with a clean, tabbed interface for profile, account, and AI settings.
-- **Neon Database Migration**: Fully transitioned from Supabase to Neon for improved serverless database performance and lower latency.
-- **Badges Grid**: Implemented a comprehensive achievement system with dynamic progress tracking and unlock status indicators.
+- **Balanced Analytics UI**: Redesigned the Dashboard to place Health Score and Spending Flow side-by-side for a more efficient financial overview.
+- **Global Health Metrics**: Fixed currency formatting in Health Score action steps to respect user preferences (INR, USD, etc.).
+- **Streamlined Experience**: Removed gamification elements (Achievements/Badges) to focus on core financial data and AI-driven coaching.
 - **Improved Logo & Branding**: Refined visual identity with a modern, emerald-themed growth-arrow logo and polished typography.
 - **Bun Execution**: Optimized development workflow and build processes using the Bun runtime for sub-second hot-reloads.
 
@@ -167,7 +153,7 @@ The application includes powerful AI-driven insights powered by Google Gemini 1.
 
 ### AI Financial Coach
 - Appears on the dashboard with real-time insights.
-- Provides spending alerts, achievements, and coaching tips.
+- Provides spending alerts and coaching tips.
 - Automatically rotates through multiple insights.
 - Click Chat to open the full AI Assistant.
 

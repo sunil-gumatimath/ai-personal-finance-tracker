@@ -1,18 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { query } from '@/lib/database'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePreferences } from '@/hooks/usePreferences'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
-import type { Transaction, Budget, Goal, Account } from '@/types'
+import type { Transaction, Budget, Account } from '@/types'
 
-export interface Badge {
-    id: string
-    name: string
-    description: string
-    icon: string
-    unlocked: boolean
-    progress: number // 0 to 100
-    targetDisplay?: string // e.g., "Hit 30%"
-}
+
 
 export interface FinancialHealth {
     score: number
@@ -27,12 +20,12 @@ export interface FinancialHealth {
         targetEmergencyFund: number
         currentEmergencyFund: number
     }
-    badges: Badge[]
     nextSteps: string[]
 }
 
 export function useFinancialHealth() {
     const { user } = useAuth()
+    const { formatCurrency } = usePreferences()
     const [data, setData] = useState<FinancialHealth | null>(null)
     const [loading, setLoading] = useState(true)
 
@@ -52,7 +45,6 @@ export function useFinancialHealth() {
             const [
                 { rows: transactions },
                 { rows: budgets },
-                { rows: goals },
                 { rows: accounts }
             ] = await Promise.all([
                 query<Transaction>(`
@@ -73,13 +65,11 @@ export function useFinancialHealth() {
                     LEFT JOIN categories c ON b.category_id = c.id
                     WHERE b.user_id = $1
                 `, [user.id]),
-                query<Goal>(`SELECT * FROM goals WHERE user_id = $1`, [user.id]),
                 query<Account>(`SELECT * FROM accounts WHERE user_id = $1`, [user.id])
             ])
 
             const typedTransactions = (transactions || []) as Transaction[]
             const typedBudgets = (budgets || []) as (Budget & { category: { name: string } })[]
-            const typedGoals = (goals || []) as Goal[]
             const typedAccounts = (accounts || []) as Account[]
 
             // Helper to safely parse number from PostgreSQL DECIMAL (which may come as string)
@@ -147,82 +137,19 @@ export function useFinancialHealth() {
             const rawScore = (savingsScore * 0.4) + (budgetScore * 0.3) + (efScore * 0.3)
             const finalScore = Math.round(rawScore)
 
-            // 5. Badges Logic with Progress
-            // Frugal King: Stay 20% under budget
-            const targetExpenseParams = totalBudgeted * 0.8
-            const isFrugalUnlocked = totalBudgeted > 0 && expenses <= targetExpenseParams
-            const frugalProgress = totalBudgeted > 0
-                ? Math.min(100, Math.max(0, ((totalBudgeted - expenses) / (totalBudgeted - targetExpenseParams)) * 100))
-                : 0
-
-            // Goal Crusher: Any goal reached?
-            // Progress = max % of any single goal
-            const maxGoalProgress = typedGoals.reduce((max, g) => {
-                const targetAmt = toNumber(g.target_amount)
-                const currentAmt = toNumber(g.current_amount)
-                const prog = targetAmt > 0 ? (currentAmt / targetAmt) * 100 : 0
-                return Math.max(max, prog)
-            }, 0)
-            const isGoalUnlocked = typedGoals.some(g => toNumber(g.current_amount) >= toNumber(g.target_amount))
-
-            // Debt Slayer: No negative credit balance
-            // Progress: Based on how much debt is paid off vs total credit limit? Hard to say without limit.
-            // Simplified: If credit balance < 0, progress is 0. If >= 0, 100.
+            // Check if user has debt (for next steps)
             const hasDebt = typedAccounts.some(a => a.type === 'credit' && toNumber(a.balance) < 0)
-
-            // Savings Star: >30% savings rate
-            const isSavingsUnlocked = savingsRate >= 0.3
-            const savingsProgress = Math.min(100, (savingsRate / 0.3) * 100)
-
-            const badges: Badge[] = [
-                {
-                    id: 'frugal-king',
-                    name: 'Frugal King',
-                    description: 'Stay 20% under total budget',
-                    icon: 'Crown',
-                    unlocked: isFrugalUnlocked,
-                    progress: isFrugalUnlocked ? 100 : frugalProgress,
-                    targetDisplay: '20% Under'
-                },
-                {
-                    id: 'goal-crusher',
-                    name: 'Goal Crusher',
-                    description: 'Reach a savings goal',
-                    icon: 'Target',
-                    unlocked: isGoalUnlocked,
-                    progress: Math.min(100, maxGoalProgress),
-                    targetDisplay: '100% Goal'
-                },
-                {
-                    id: 'debt-slayer',
-                    name: 'Debt Slayer',
-                    description: 'Be debt-free on credit cards',
-                    icon: 'Sword',
-                    unlocked: !hasDebt,
-                    progress: !hasDebt ? 100 : 0, // Binary for now
-                    targetDisplay: '0 Debt'
-                },
-                {
-                    id: 'savings-star',
-                    name: 'Savings Star',
-                    description: 'Achieve 30% savings rate',
-                    icon: 'Star',
-                    unlocked: isSavingsUnlocked,
-                    progress: savingsProgress,
-                    targetDisplay: '30% Rate'
-                }
-            ]
 
             // 6. Generate Next Steps (Actionable Advice)
             const nextSteps: string[] = []
             if (savingsRate < 0.2) {
-                nextSteps.push(`Increase monthly savings by $${Math.round(income * 0.1)} to boost your score.`)
+                nextSteps.push(`Increase monthly savings by ${formatCurrency(Math.round(income * 0.1))} to boost your score.`)
             }
             if (budgetAdherence < 0.8) {
                 nextSteps.push('Review categories that are over budget and adjust spending.')
             }
             if (emergencyFundProgress < 0.5) {
-                nextSteps.push(`Add $${Math.round(targetEmergencyFund * 0.1)} to your emergency fund.`)
+                nextSteps.push(`Add ${formatCurrency(Math.round(targetEmergencyFund * 0.1))} to your emergency fund.`)
             }
             if (hasDebt) {
                 nextSteps.push('Prioritize paying off high-interest credit card debt.')
@@ -244,7 +171,6 @@ export function useFinancialHealth() {
                     targetEmergencyFund,
                     currentEmergencyFund
                 },
-                badges,
                 nextSteps: nextSteps.slice(0, 2) // Top 2 recommendations
             })
 
@@ -253,7 +179,7 @@ export function useFinancialHealth() {
         } finally {
             setLoading(false)
         }
-    }, [user])
+    }, [user, formatCurrency])
 
     useEffect(() => {
         calculateHealth()
