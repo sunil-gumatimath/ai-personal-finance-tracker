@@ -106,7 +106,7 @@ export function Header() {
                         >
                             <Avatar className="h-9 w-9">
                                 <AvatarImage
-                                    src={user?.user_metadata?.avatar_url}
+                                    src={user?.user_metadata?.avatar_url || undefined}
                                     alt={user?.user_metadata?.full_name || 'User avatar'}
                                 />
                                 <AvatarFallback className="bg-primary/10 text-primary font-medium">

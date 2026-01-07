@@ -110,7 +110,7 @@ export function AppSidebar() {
             <SidebarFooter className="border-t border-border/50 p-4">
                 <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9">
-                        <AvatarImage src={user?.user_metadata?.avatar_url} />
+                        <AvatarImage src={user?.user_metadata?.avatar_url || undefined} />
                         <AvatarFallback className="bg-primary/10 text-primary">
                             {getInitials(user?.user_metadata?.full_name || user?.email)}
                         </AvatarFallback>
