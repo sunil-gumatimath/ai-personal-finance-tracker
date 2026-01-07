@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
-import { supabase } from '@/lib/supabase'
+
 import { cn } from '@/lib/utils'
 
 function ThemeSelector() {
@@ -53,7 +53,7 @@ function ThemeSelector() {
 }
 
 export function Settings() {
-    const { user, signOut } = useAuth()
+    const { user, signOut, updateProfile, resetPassword } = useAuth()
     const { preferences, savePreferences } = usePreferences()
     const [loading, setLoading] = useState(false)
     const [profileData, setProfileData] = useState({
@@ -64,8 +64,8 @@ export function Settings() {
     const handleProfileUpdate = async () => {
         setLoading(true)
         try {
-            const { error } = await supabase.auth.updateUser({
-                data: { full_name: profileData.fullName },
+            const { error } = await updateProfile({
+                full_name: profileData.fullName,
             })
 
             if (error) throw error
@@ -82,7 +82,7 @@ export function Settings() {
         if (!user?.email) return
 
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(user.email)
+            const { error } = await resetPassword(user.email)
             if (error) throw error
             toast.success('Password reset email sent')
         } catch (error) {
