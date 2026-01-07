@@ -46,7 +46,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -82,22 +82,24 @@ export function Transactions() {
 
         try {
             const [transactionsRes, categoriesRes, accountsRes] = await Promise.all([
-                supabase
-                    .from('transactions')
-                    .select(`
-            *,
-            category:categories(*),
-            account:accounts(*)
-          `)
-                    .eq('user_id', user.id)
-                    .order('date', { ascending: false }),
-                supabase.from('categories').select('*').eq('user_id', user.id),
-                supabase.from('accounts').select('*').eq('user_id', user.id).eq('is_active', true),
+                query<Transaction>(`
+                    SELECT 
+                        t.*, 
+                        row_to_json(c.*) as category, 
+                        row_to_json(a.*) as account 
+                    FROM transactions t
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    LEFT JOIN accounts a ON t.account_id = a.id
+                    WHERE t.user_id = $1
+                    ORDER BY t.date DESC
+                `, [user.id]),
+                query<Category>('SELECT * FROM categories WHERE user_id = $1', [user.id]),
+                query<Account>('SELECT * FROM accounts WHERE user_id = $1 AND is_active = true', [user.id]),
             ])
 
-            if (transactionsRes.data) setTransactions(transactionsRes.data as Transaction[])
-            if (categoriesRes.data) setCategories(categoriesRes.data)
-            if (accountsRes.data) setAccounts(accountsRes.data)
+            setTransactions(transactionsRes.rows || [])
+            setCategories(categoriesRes.rows || [])
+            setAccounts(accountsRes.rows || [])
         } catch (error) {
             console.error('Error fetching data:', error)
             toast.error('Failed to load transactions')
@@ -113,8 +115,8 @@ export function Transactions() {
     const filteredTransactions = useMemo(() => {
         return transactions.filter((t) => {
             const matchesSearch =
-                t.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                t.category?.name.toLowerCase().includes(searchQuery.toLowerCase())
+                (t.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+                (t.category?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
             const matchesType = filterType === 'all' || t.type === filterType
             return matchesSearch && matchesType
         })
@@ -138,16 +140,10 @@ export function Transactions() {
             }
 
             if (editingTransaction) {
-                const { error } = await supabase
-                    .from('transactions')
-                    .update(transactionData)
-                    .eq('id', editingTransaction.id)
-
-                if (error) throw error
+                await updateRecord('transactions', editingTransaction.id, transactionData)
                 toast.success('Transaction updated successfully')
             } else {
-                const { error } = await supabase.from('transactions').insert(transactionData)
-                if (error) throw error
+                await insertRecord('transactions', transactionData)
                 toast.success('Transaction added successfully')
             }
 
@@ -162,8 +158,7 @@ export function Transactions() {
 
     const handleDelete = async (id: string) => {
         try {
-            const { error } = await supabase.from('transactions').delete().eq('id', id)
-            if (error) throw error
+            await deleteRecord('transactions', id)
             toast.success('Transaction deleted')
             fetchData()
         } catch (error) {
