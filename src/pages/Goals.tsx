@@ -39,7 +39,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -88,14 +88,13 @@ export function Goals() {
         }
 
         try {
-            const { data, error } = await supabase
-                .from('goals')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
+            const { rows } = await query<Goal>(`
+                SELECT * FROM goals 
+                WHERE user_id = $1 
+                ORDER BY created_at DESC
+            `, [user.id])
 
-            if (error) throw error
-            setGoals(data || [])
+            setGoals(rows || [])
         } catch (error) {
             console.error('Error fetching goals:', error)
             toast.error('Failed to load goals')
@@ -124,16 +123,10 @@ export function Goals() {
             }
 
             if (editingGoal) {
-                const { error } = await supabase
-                    .from('goals')
-                    .update(goalData)
-                    .eq('id', editingGoal.id)
-
-                if (error) throw error
+                await updateRecord('goals', editingGoal.id, goalData)
                 toast.success('Goal updated successfully')
             } else {
-                const { error } = await supabase.from('goals').insert(goalData)
-                if (error) throw error
+                await insertRecord('goals', goalData)
                 toast.success('Goal created successfully! 🎯')
             }
 
@@ -152,12 +145,7 @@ export function Goals() {
 
         try {
             const newAmount = selectedGoal.current_amount + parseFloat(contributeAmount)
-            const { error } = await supabase
-                .from('goals')
-                .update({ current_amount: newAmount })
-                .eq('id', selectedGoal.id)
-
-            if (error) throw error
+            await updateRecord('goals', selectedGoal.id, { current_amount: newAmount })
 
             const isCompleted = newAmount >= selectedGoal.target_amount
             toast.success(
@@ -178,8 +166,7 @@ export function Goals() {
 
     const handleDelete = async (id: string) => {
         try {
-            const { error } = await supabase.from('goals').delete().eq('id', id)
-            if (error) throw error
+            await deleteRecord('goals', id)
             toast.success('Goal deleted')
             fetchGoals()
         } catch (error) {
