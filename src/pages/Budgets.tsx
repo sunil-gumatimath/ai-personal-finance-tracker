@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -70,24 +70,30 @@ export function Budgets() {
             const earliestStartDate = getLocalDateString(startOfYear)
 
             const [budgetsRes, categoriesRes, transactionsRes] = await Promise.all([
-                supabase
-                    .from('budgets')
-                    .select(`*, category:categories(*)`)
-                    .eq('user_id', user.id),
-                supabase.from('categories').select('*').eq('user_id', user.id).eq('type', 'expense'),
+                query<Budget>(`
+                    SELECT b.*, row_to_json(c.*) as category
+                    FROM budgets b
+                    LEFT JOIN categories c ON b.category_id = c.id
+                    WHERE b.user_id = $1
+                `, [user.id]),
+                query<Category>(
+                    `SELECT * FROM categories WHERE user_id = $1 AND type = 'expense'`,
+                    [user.id]
+                ),
                 // Single query for all expense transactions from start of year
-                supabase
-                    .from('transactions')
-                    .select('amount, category_id, date')
-                    .eq('user_id', user.id)
-                    .eq('type', 'expense')
-                    .gte('date', earliestStartDate),
+                query<{ amount: number; category_id: string; date: string }>(`
+                    SELECT amount, category_id, date
+                    FROM transactions
+                    WHERE user_id = $1 
+                    AND type = 'expense'
+                    AND date >= $2
+                `, [user.id, earliestStartDate])
             ])
 
-            if (budgetsRes.data && transactionsRes.data) {
+            if (budgetsRes.rows && transactionsRes.rows) {
                 // Group transactions by category for efficient lookup
                 const transactionsByCategory = new Map<string, { amount: number; date: string }[]>()
-                for (const t of transactionsRes.data) {
+                for (const t of transactionsRes.rows) {
                     if (!t.category_id) continue
                     const existing = transactionsByCategory.get(t.category_id) || []
                     existing.push({ amount: t.amount, date: t.date })
@@ -95,7 +101,7 @@ export function Budgets() {
                 }
 
                 // Calculate spent for each budget using in-memory data
-                const budgetsWithSpent = budgetsRes.data.map((budget) => {
+                const budgetsWithSpent = budgetsRes.rows.map((budget) => {
                     let startDateStr: string
                     switch (budget.period) {
                         case 'weekly':
@@ -119,7 +125,7 @@ export function Budgets() {
                 setBudgets(budgetsWithSpent as Budget[])
             }
 
-            if (categoriesRes.data) setCategories(categoriesRes.data)
+            if (categoriesRes.rows) setCategories(categoriesRes.rows)
         } catch (error) {
             console.error('Error fetching data:', error)
             toast.error('Failed to load budgets')
@@ -154,16 +160,10 @@ export function Budgets() {
             }
 
             if (editingBudget) {
-                const { error } = await supabase
-                    .from('budgets')
-                    .update(budgetData)
-                    .eq('id', editingBudget.id)
-
-                if (error) throw error
+                await updateRecord('budgets', editingBudget.id, budgetData)
                 toast.success('Budget updated successfully')
             } else {
-                const { error } = await supabase.from('budgets').insert(budgetData)
-                if (error) throw error
+                await insertRecord('budgets', budgetData)
                 toast.success('Budget created successfully')
             }
 
@@ -178,8 +178,7 @@ export function Budgets() {
 
     const handleDelete = async (id: string) => {
         try {
-            const { error } = await supabase.from('budgets').delete().eq('id', id)
-            if (error) throw error
+            await deleteRecord('budgets', id)
             toast.success('Budget deleted')
             fetchData()
         } catch (error) {
