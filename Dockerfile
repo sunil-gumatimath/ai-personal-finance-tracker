@@ -9,13 +9,13 @@ FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
 # Add build-time arguments for environment variables
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_NEON_DATABASE_URL
+ARG VITE_USE_NEON
 ARG VITE_GEMINI_API_KEY
 
 # Set them as environment variables so Vite can pick them up during build
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_NEON_DATABASE_URL=$VITE_NEON_DATABASE_URL
+ENV VITE_USE_NEON=$VITE_USE_NEON
 ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
 
 # Copy package files first (for better layer caching)
@@ -40,7 +40,7 @@ FROM nginxinc/nginx-unprivileged:alpine AS production
 # Add labels for container identification
 LABEL maintainer="Personal Finance Tracker"
 LABEL version="1.0"
-LABEL description="Personal Finance Tracker - React + Vite + Supabase"
+LABEL description="Personal Finance Tracker - React + Vite + Neon"
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
