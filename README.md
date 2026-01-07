@@ -53,9 +53,8 @@ A premium, AI-powered personal finance management platform designed for clarity 
 | AI Integration | Google Gemini 1.5 Flash, React Markdown |
 | Charts | Shadcn UI Charts (Recharts) |
 | Icons | Hugeicons React, Lucide React |
-| Runtime | Bun 1.x |
+| Runtime | Bun 1.3.x |
 | Deployment | Vercel, Docker & Nginx |
-| Color Model | OKLCH (Modern CSS) |
 
 ## Key Highlights
 
@@ -66,18 +65,18 @@ A premium, AI-powered personal finance management platform designed for clarity 
 - Action Plan: prioritized, actionable steps to improve financial standing, localized to user currency.
 
 ### Recent Improvements
-- **Enhanced Financial Health Score**: Redesigned with animated ring progress, interactive metric cards, score history trends, and a detailed breakdown visualization with tooltips.
-- **Advanced Spending Flow**: Implemented interactive legends, category-specific details on hover, animated entry sequences, and budget progress indicators.
-- **Database-Stored AI Insights**: Financial coaching insights are now persisted in the Neon database, ensuring persistence and improved context for growth tips.
-- **Side-by-Side Dashboard**: Refined layout placing Health Score and Spending Flow side-by-side for a more efficient and balanced financial overview.
-- **Global Preference Integration**: Deep integration of currency and regional settings across all analytics and AI insights.
-- **Refined Branding & UX**: Polished typography, emerald-themed visual identity, and removal of gamification elements (badges) to focus on core data.
-- **Clean Documentation**: Updated project documentation to follow a professional, emoji-free standard.
-- **Bun Runtime Optimization**: Fully optimized for Bun, delivering sub-second hot-reloads and efficient build processes.
+- Enhanced Financial Health Score: Redesigned with animated ring progress, interactive metric cards, score history trends, and a detailed breakdown visualization with tooltips.
+- Advanced Spending Flow: Implemented interactive legends, category-specific details on hover, animated entry sequences, and budget progress indicators.
+- Database-Stored AI Insights: Financial coaching insights are now persisted in the Neon database, ensuring persistence and improved context for growth tips.
+- Side-by-Side Dashboard: Refined layout placing Health Score and Spending Flow side-by-side for a more efficient and balanced financial overview.
+- Global Preference Integration: Deep integration of currency and regional settings across all analytics and AI insights.
+- Refined Branding & UX: Polished typography, emerald-themed visual identity, and removal of gamification elements (badges) to focus on core data.
+- Clean Documentation: Updated project documentation with professional formatting.
+- Bun Runtime Optimization: Fully optimized for Bun, delivering sub-second hot-reloads and efficient build processes.
 
 ## Prerequisites
 
-- Bun (Latest version)
+- Bun 1.3.x or later
 - A Neon account
 
 ## Quick Start
@@ -102,21 +101,9 @@ A premium, AI-powered personal finance management platform designed for clarity 
    ```
 
 4. **Database Setup:**
-   - Create a new project in [Neon](https://neon.tech)
-   - Run the setup script to get your connection string:
-     ```bash
-     ./scripts/setup-neon-project.sh
-     ```
-   - Execute `database/database-neon.sql` in your Neon SQL Editor
-   - After your first login, run `SELECT seed_my_data();` to populate demo data
-
-   **For existing Supabase users migrating to Neon:**
-   - Keep your existing Supabase credentials temporarily
-   - Set up Neon as described above
-   - Run the migration script:
-     ```bash
-     bun run scripts/migrate-to-neon.ts
-     ```
+    - Create a new project in [Neon](https://neon.tech)
+    - Execute the SQL statements in `database/database-neon.sql` in your Neon SQL Editor
+    - After your first login, run `SELECT seed_my_data();` to populate demo data
 
 5. **AI Integration (Optional):**
    - Visit [Google AI Studio](https://aistudio.google.com)
