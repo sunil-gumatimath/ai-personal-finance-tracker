@@ -15,15 +15,8 @@ export interface Insight {
     amount?: number
     impact?: number
     date?: string
-}
-
-const INSIGHTS_CACHE_KEY = 'financetrack_ai_insights'
-const INSIGHTS_CACHE_TTL = 1000 * 60 * 30 // 30 minutes
-
-interface CachedInsights {
-    insights: Insight[]
-    timestamp: number
-    userId: string
+    is_dismissed?: boolean
+    created_at?: string
 }
 
 export function useAIInsights() {
@@ -32,28 +25,44 @@ export function useAIInsights() {
     const [insights, setInsights] = useState<Insight[]>([])
     const [loading, setLoading] = useState(true)
 
+    const fetchInsights = useCallback(async () => {
+        if (!user) return
+
+        try {
+            setLoading(true)
+            // Fetch non-dismissed insights from the last 7 days
+            const { rows } = await query<Insight>(`
+                SELECT * FROM ai_insights 
+                WHERE user_id = $1 
+                AND is_dismissed = false 
+                AND created_at > NOW() - INTERVAL '7 days'
+                ORDER BY created_at DESC
+            `, [user.id])
+
+            if (rows.length > 0) {
+                setInsights(rows)
+                setLoading(false)
+                return rows
+            }
+            return []
+        } catch (error) {
+            console.error('Error fetching insights:', error)
+            return []
+        } finally {
+            setLoading(false)
+        }
+    }, [user])
+
     const generateInsights = useCallback(async (forceRefresh = false) => {
         if (!user) {
             setLoading(false)
             return
         }
 
-        // Check cache first (unless force refresh)
+        // 1. Try to fetch existing insights first (if not forcing refresh)
         if (!forceRefresh) {
-            try {
-                const cached = localStorage.getItem(INSIGHTS_CACHE_KEY)
-                if (cached) {
-                    const { insights: cachedInsights, timestamp, userId }: CachedInsights = JSON.parse(cached)
-                    const isValid = Date.now() - timestamp < INSIGHTS_CACHE_TTL && userId === user.id
-                    if (isValid && cachedInsights.length > 0) {
-                        setInsights(cachedInsights)
-                        setLoading(false)
-                        return
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to load cached insights:', e)
-            }
+            const existing = await fetchInsights()
+            if (existing && existing.length > 0) return
         }
 
         try {
@@ -71,9 +80,9 @@ export function useAIInsights() {
             `, [user.id, sixMonthsAgoStr])
 
             const typedTransactions = (transactions || []) as Transaction[]
-            const newInsights: Insight[] = []
+            const newInsights: Omit<Insight, 'id'>[] = []
 
-            // 1. Rule-based Anomaly Detection
+            // 2. Rule-based Anomaly Detection
             const categoryStats = new Map<string, { total: number; count: number; transactions: Transaction[] }>()
 
             typedTransactions.forEach(t => {
@@ -93,7 +102,6 @@ export function useAIInsights() {
                 recentTransactions.forEach(t => {
                     if (t.amount > average * 1.8 && t.amount > 50) {
                         newInsights.push({
-                            id: `anomaly-${t.id}`,
                             type: 'anomaly',
                             title: 'Unusual Spending',
                             description: `You spent ${formatCurrency(t.amount)} on ${t.description || catName}, which is higher than your typical ${formatCurrency(average)} average.`,
@@ -105,7 +113,7 @@ export function useAIInsights() {
                 })
             })
 
-            // 2. Gemini-powered Personalized Coaching (only if API key available)
+            // 3. Gemini-powered Personalized Coaching (only if API key available)
             const hasApiKey = !!preferences.geminiApiKey
 
             if (hasApiKey && typedTransactions.length > 0) {
@@ -142,10 +150,10 @@ export function useAIInsights() {
                     if (aiResponse) {
                         const cleaned = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim()
                         const aiInsights = JSON.parse(cleaned) as Array<{ type: 'coaching' | 'kudo'; title: string; description: string }>
-                        aiInsights.forEach((insight, index) => {
+                        aiInsights.forEach((insight) => {
                             newInsights.push({
-                                id: `ai-${index}-${Date.now()}`,
-                                ...insight
+                                ...insight,
+                                type: insight.type as 'coaching' | 'kudo'
                             })
                         })
                     }
@@ -157,36 +165,65 @@ export function useAIInsights() {
             // Fallback if no insights generated
             if (newInsights.length === 0) {
                 newInsights.push({
-                    id: 'general-1',
                     type: 'coaching',
                     title: 'Financial Health Tip',
                     description: 'Try the 50/30/20 rule: 50% for needs, 30% for wants, and 20% for savings.'
                 })
             }
 
-            // Cache the results
-            try {
-                const cacheData: CachedInsights = {
-                    insights: newInsights,
-                    timestamp: Date.now(),
-                    userId: user.id
+            // 4. Save to Database
+            // First, clear old insights to avoid duplicates (optional strategy) or just append?
+            // Let's append but maybe we should check duplicates. For simplicity, just inserting.
+            const savedInsights: Insight[] = []
+
+            for (const insight of newInsights) {
+                try {
+                    const { rows } = await query<Insight>(`
+                        INSERT INTO ai_insights (user_id, type, title, description, category, amount, date)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        RETURNING *
+                    `, [
+                        user.id,
+                        insight.type,
+                        insight.title,
+                        insight.description,
+                        insight.category || null,
+                        insight.amount || null,
+                        insight.date || null
+                    ])
+                    if (rows[0]) savedInsights.push(rows[0])
+                } catch (e) {
+                    console.error('Failed to save insight:', e)
                 }
-                localStorage.setItem(INSIGHTS_CACHE_KEY, JSON.stringify(cacheData))
-            } catch (e) {
-                console.warn('Failed to cache insights:', e)
             }
 
-            setInsights(newInsights)
+            setInsights(savedInsights)
         } catch (error) {
             console.error('Error generating insights:', error)
         } finally {
             setLoading(false)
         }
-    }, [user, preferences.currency, preferences.geminiApiKey, formatCurrency])
+    }, [user, preferences.currency, preferences.geminiApiKey, formatCurrency, fetchInsights])
+
+    const dismissInsight = useCallback(async (id: string) => {
+        if (!user) return
+        try {
+            await query('UPDATE ai_insights SET is_dismissed = true WHERE id = $1 AND user_id = $2', [id, user.id])
+            setInsights(prev => prev.filter(i => i.id !== id))
+        } catch (error) {
+            console.error('Error dismissing insight:', error)
+        }
+    }, [user])
 
     useEffect(() => {
-        generateInsights()
-    }, [generateInsights])
+        // Initial load
+        fetchInsights()
+    }, [fetchInsights])
 
-    return { insights, loading, refresh: () => generateInsights(true) }
+    return {
+        insights,
+        loading,
+        refresh: () => generateInsights(true),
+        dismissInsight
+    }
 }

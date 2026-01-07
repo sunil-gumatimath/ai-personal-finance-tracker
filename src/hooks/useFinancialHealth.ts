@@ -82,24 +82,34 @@ export function useFinancialHealth() {
             const typedGoals = (goals || []) as Goal[]
             const typedAccounts = (accounts || []) as Account[]
 
+            // Helper to safely parse number from PostgreSQL DECIMAL (which may come as string)
+            const toNumber = (val: unknown): number => {
+                if (typeof val === 'number') return isNaN(val) ? 0 : val
+                if (typeof val === 'string') {
+                    const parsed = parseFloat(val)
+                    return isNaN(parsed) ? 0 : parsed
+                }
+                return 0
+            }
+
             // 1. Savings Rate Calculation
-            const income = typedTransactions.filter(t => t.type === 'income').reduce((sum: number, t) => sum + t.amount, 0)
-            const expenses = typedTransactions.filter(t => t.type === 'expense').reduce((sum: number, t) => sum + t.amount, 0)
+            const income = typedTransactions.filter(t => t.type === 'income').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
+            const expenses = typedTransactions.filter(t => t.type === 'expense').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
             const savingsRate = income > 0 ? Math.max(0, (income - expenses) / income) : 0
 
             // 2. Budget Adherence
             const spendingByCategory = new Map<string, number>()
             typedTransactions.filter(t => t.type === 'expense').forEach(t => {
                 const catId = t.category_id || 'uncategorized'
-                spendingByCategory.set(catId, (spendingByCategory.get(catId) || 0) + t.amount)
+                spendingByCategory.set(catId, (spendingByCategory.get(catId) || 0) + toNumber(t.amount))
             })
 
             let totalBudgeted = 0
             let categoriesOnTrack = 0
             typedBudgets.forEach(b => {
-                totalBudgeted += b.amount
+                totalBudgeted += toNumber(b.amount)
                 const spent = spendingByCategory.get(b.category_id) || 0
-                if (spent <= b.amount) {
+                if (spent <= toNumber(b.amount)) {
                     categoriesOnTrack++
                 }
             })
@@ -107,7 +117,11 @@ export function useFinancialHealth() {
 
             // 3. Emergency Fund Progress
             const savingsAccounts = typedAccounts.filter(a => a.type === 'savings' || a.name.toLowerCase().includes('emergency'))
-            const currentEmergencyFund = savingsAccounts.reduce((sum, a) => sum + a.balance, 0)
+            // Handle PostgreSQL DECIMAL type which may come as string
+            const currentEmergencyFund = savingsAccounts.reduce((sum, a) => {
+                const balance = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance
+                return sum + (isNaN(balance) ? 0 : balance)
+            }, 0)
 
             // Fetch last 3 months expenses to average
             const threeMonthsAgo = format(subMonths(startOfMonth(now), 3), 'yyyy-MM-dd')
@@ -120,7 +134,7 @@ export function useFinancialHealth() {
                 AND date < $3
             `, [user.id, threeMonthsAgo, startOfCurrMonth])
 
-            const pastExpenses = (pastTransactions || []).reduce((sum, t) => sum + t.amount, 0)
+            const pastExpenses = (pastTransactions || []).reduce((sum, t) => sum + toNumber(t.amount), 0)
             const avgMonthlyExpenses = pastExpenses > 0 ? pastExpenses / 3 : (expenses > 0 ? expenses : 2000)
             const targetEmergencyFund = avgMonthlyExpenses * 6
             const emergencyFundProgress = Math.min(1, currentEmergencyFund / targetEmergencyFund)
@@ -144,15 +158,17 @@ export function useFinancialHealth() {
             // Goal Crusher: Any goal reached?
             // Progress = max % of any single goal
             const maxGoalProgress = typedGoals.reduce((max, g) => {
-                const prog = g.target_amount > 0 ? (g.current_amount / g.target_amount) * 100 : 0
+                const targetAmt = toNumber(g.target_amount)
+                const currentAmt = toNumber(g.current_amount)
+                const prog = targetAmt > 0 ? (currentAmt / targetAmt) * 100 : 0
                 return Math.max(max, prog)
             }, 0)
-            const isGoalUnlocked = typedGoals.some(g => g.current_amount >= g.target_amount)
+            const isGoalUnlocked = typedGoals.some(g => toNumber(g.current_amount) >= toNumber(g.target_amount))
 
             // Debt Slayer: No negative credit balance
             // Progress: Based on how much debt is paid off vs total credit limit? Hard to say without limit.
             // Simplified: If credit balance < 0, progress is 0. If >= 0, 100.
-            const hasDebt = typedAccounts.some(a => a.type === 'credit' && a.balance < 0)
+            const hasDebt = typedAccounts.some(a => a.type === 'credit' && toNumber(a.balance) < 0)
 
             // Savings Star: >30% savings rate
             const isSavingsUnlocked = savingsRate >= 0.3
