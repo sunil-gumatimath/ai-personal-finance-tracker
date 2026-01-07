@@ -6,6 +6,8 @@ import {
     currencySymbols,
     currencyLocales
 } from '@/types/preferences'
+import { useAuth } from '@/contexts/AuthContext'
+import { query } from '@/lib/database'
 
 interface PreferencesContextType {
     preferences: Preferences
@@ -31,7 +33,34 @@ const loadInitialPreferences = (): Preferences => {
 }
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
+    const { user } = useAuth()
     const [preferences, setPreferences] = useState<Preferences>(loadInitialPreferences)
+
+    // Sync from Database on Load
+    useEffect(() => {
+        const fetchPreferences = async () => {
+            if (!user) return
+            try {
+                const { rows } = await query<{ preferences: Preferences, currency: string }>(
+                    'SELECT preferences, currency FROM profiles WHERE user_id = $1',
+                    [user.id]
+                )
+                if (rows.length > 0) {
+                    const dbPrefs = rows[0].preferences || {}
+                    // Ensure currency matches the explicit column if different
+                    if (rows[0].currency && rows[0].currency !== dbPrefs.currency) {
+                        dbPrefs.currency = rows[0].currency
+                    }
+                    const merged = { ...defaultPreferences, ...dbPrefs }
+                    setPreferences(merged)
+                    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(merged))
+                }
+            } catch (error) {
+                console.error('Failed to fetch preferences:', error)
+            }
+        }
+        fetchPreferences()
+    }, [user])
 
     // Sync preferences across tabs
     useEffect(() => {
@@ -49,14 +78,39 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         return () => window.removeEventListener('storage', handleStorageChange)
     }, [])
 
-    // Save preferences to localStorage
-    const savePreferences = useCallback((newPreferences: Partial<Preferences>) => {
+    // Save preferences to localStorage and Database
+    const savePreferences = useCallback(async (newPreferences: Partial<Preferences>) => {
         setPreferences(prev => {
             const updated = { ...prev, ...newPreferences }
             localStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated))
             return updated
         })
-    }, [])
+
+        if (user) {
+            try {
+                // Get current state to merge - we rely on the state update inside setPreferences 
+                // but since it's async, we reconstruct the expected state here for the DB call.
+                // Best effort sync.
+                const currentState = { ...preferences, ...newPreferences }
+
+                // Update JSONB column
+                await query(
+                    'UPDATE profiles SET preferences = $1, updated_at = NOW() WHERE user_id = $2',
+                    [JSON.stringify(currentState), user.id]
+                )
+
+                // If currency changed, also update the explicit currency column
+                if (newPreferences.currency) {
+                    await query(
+                        'UPDATE profiles SET currency = $1 WHERE user_id = $2',
+                        [newPreferences.currency, user.id]
+                    )
+                }
+            } catch (error) {
+                console.error('Failed to save preferences to DB:', error)
+            }
+        }
+    }, [user, preferences])
 
     // Format currency based on user preference
     const formatCurrency = useCallback((amount: number) => {
