@@ -1,4 +1,4 @@
-import { Pool, neon, neonConfig } from '@neondatabase/serverless';
+import { Pool, neon, neonConfig, type PoolClient } from '@neondatabase/serverless';
 import ws from 'ws';
 
 // Configure WebSocket for Node.js environment
@@ -7,7 +7,10 @@ if (typeof globalThis.WebSocket === 'undefined') {
 }
 
 // Get connection string from environment
-const connectionString = import.meta.env.VITE_NEON_DATABASE_URL;
+// Support both Vite (import.meta.env) and Bun/Node (process.env)
+const connectionString =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_NEON_DATABASE_URL) ||
+  (typeof process !== 'undefined' && process.env?.VITE_NEON_DATABASE_URL);
 
 if (!connectionString) {
   console.warn('Neon database URL not found. Please set VITE_NEON_DATABASE_URL in your .env file.');
@@ -19,9 +22,9 @@ export const pool = connectionString ? new Pool({ connectionString }) : null;
 export const sql = pool;
 
 // Helper function for queries with error handling
-export async function query<T = any>(
+export async function query<T = unknown>(
   queryText: string,
-  params?: any[]
+  params?: unknown[]
 ): Promise<{ rows: T[]; rowCount: number }> {
   if (!pool) {
     throw new Error('Neon database connection not configured. Please set VITE_NEON_DATABASE_URL.');
@@ -37,9 +40,9 @@ export async function query<T = any>(
 }
 
 // Helper for single row queries
-export async function queryOne<T = any>(
+export async function queryOne<T = unknown>(
   queryText: string,
-  params?: any[]
+  params?: unknown[]
 ): Promise<T | null> {
   const { rows } = await query<T>(queryText, params);
   return rows[0] || null;
@@ -47,7 +50,7 @@ export async function queryOne<T = any>(
 
 // Helper for transactions
 export async function transaction<T>(
-  callback: (client: any) => Promise<T>
+  callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   if (!pool) {
     throw new Error('Neon database connection not configured.');

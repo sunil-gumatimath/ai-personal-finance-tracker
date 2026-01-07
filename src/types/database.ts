@@ -40,6 +40,7 @@ export interface Transaction {
     user_id: string
     account_id: string
     category_id: string | null
+    to_account_id: string | null // For transfer transactions
     type: 'income' | 'expense' | 'transfer'
     amount: number
     description: string | null
@@ -52,6 +53,7 @@ export interface Transaction {
     // Joined fields
     account?: Account
     category?: Category
+    to_account?: Account // For transfer transactions
 }
 
 export interface Budget {

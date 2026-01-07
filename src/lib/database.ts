@@ -9,9 +9,9 @@ import { query as neonQuery, queryOne as neonQueryOne, sql } from './neon';
 /**
  * Unified query function
  */
-export async function query<T = any>(
+export async function query<T = unknown>(
   queryText: string,
-  params?: any[]
+  params?: unknown[]
 ): Promise<{ rows: T[]; rowCount: number }> {
   return neonQuery<T>(queryText, params);
 }
@@ -19,9 +19,9 @@ export async function query<T = any>(
 /**
  * Query single row
  */
-export async function queryOne<T = any>(
+export async function queryOne<T = unknown>(
   queryText: string,
-  params?: any[]
+  params?: unknown[]
 ): Promise<T | null> {
   return neonQueryOne<T>(queryText, params);
 }
@@ -53,12 +53,12 @@ export async function getCurrentUserId(): Promise<string | null> {
       console.error('Error parsing user from local storage:', e);
     }
   }
-  // Return a default demo ID if no user is found, to allow the app to function
-  return 'demo-user-id';
+  // Return null if no user is found, requiring the user to log in
+  return null;
 }
 
 // Helper to construct and execute INSERT queries
-export async function insertRecord<T = any>(table: string, data: Record<string, any>): Promise<T> {
+export async function insertRecord<T = unknown>(table: string, data: Record<string, unknown>): Promise<T> {
   const keys = Object.keys(data);
   const values = Object.values(data);
   const columns = keys.join(', ');
@@ -70,7 +70,7 @@ export async function insertRecord<T = any>(table: string, data: Record<string, 
 }
 
 // Helper to construct and execute UPDATE queries
-export async function updateRecord<T = any>(table: string, id: string, data: Record<string, any>): Promise<T> {
+export async function updateRecord<T = unknown>(table: string, id: string, data: Record<string, unknown>): Promise<T> {
   const keys = Object.keys(data);
   const values = Object.values(data);
 
