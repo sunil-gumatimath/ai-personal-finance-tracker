@@ -20,7 +20,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog'
-import { supabase } from '@/lib/supabase'
+import { query } from '@/lib/database'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -42,15 +42,20 @@ export function Calendar() {
         const end = endOfWeek(endOfMonth(currentDate))
 
         try {
-            const { data, error } = await supabase
-                .from('transactions')
-                .select('*, category:categories(*), account:accounts(*)')
-                .eq('user_id', user.id)
-                .gte('date', start.toISOString())
-                .lte('date', end.toISOString())
+            const { rows } = await query<Transaction>(`
+                SELECT 
+                    t.*, 
+                    row_to_json(c.*) as category, 
+                    row_to_json(a.*) as account
+                FROM transactions t
+                LEFT JOIN categories c ON t.category_id = c.id
+                LEFT JOIN accounts a ON t.account_id = a.id
+                WHERE t.user_id = $1
+                AND t.date >= $2
+                AND t.date <= $3
+            `, [user.id, start.toISOString(), end.toISOString()])
 
-            if (error) throw error
-            if (data) setTransactions(data)
+            if (rows) setTransactions(rows)
         } catch (error) {
             console.error('Error fetching transactions:', error)
         } finally {
