@@ -1,4 +1,4 @@
-# Personal Finance Tracker
+# AI Personal Finance Tracker
 
 A premium, AI-powered personal finance management platform designed for clarity and growth. Track expenses, manage portfolios, and achieve financial goals with sophisticated design, intelligent insights, and an intuitive user experience.
 
