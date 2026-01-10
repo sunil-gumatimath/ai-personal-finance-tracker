@@ -185,11 +185,6 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                     className="relative h-[180px] w-full flex items-center justify-center cursor-pointer group/ring"
                                     onClick={() => setOpen(true)}
                                 >
-                                    {/* Glow effect */}
-                                    <div
-                                        className="absolute inset-0 blur-xl opacity-20 rounded-full"
-                                        style={{ backgroundColor: getGaugeFillColor(score) }}
-                                    />
 
                                     <svg viewBox="0 0 120 120" className="w-[160px] h-[160px] transform -rotate-90">
                                         <defs>
@@ -236,19 +231,6 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                             strokeLinecap="round"
                                             strokeDasharray={circumference}
                                             strokeDashoffset={strokeDashoffset}
-                                        />
-
-                                        {/* End cap glow */}
-                                        <circle
-                                            cx="60"
-                                            cy="10"
-                                            r="6"
-                                            fill={getGaugeFillColor(score)}
-                                            opacity={score > 5 ? 0.6 : 0}
-                                            style={{
-                                                transform: `rotate(${(score / 100) * 360}deg)`,
-                                                transformOrigin: '60px 60px'
-                                            }}
                                         />
                                     </svg>
 
@@ -501,8 +483,7 @@ function EnhancedMetricBar({ icon: Icon, label, value, weight, description, deta
                             <div
                                 className={cn(
                                     "h-full rounded-full transition-all duration-700 ease-out",
-                                    colors.bar,
-                                    isHovered && "shadow-lg " + colors.glow
+                                    colors.bar
                                 )}
                                 style={{
                                     width: `${Math.min(100, Math.max(value > 0 ? 3 : 0, value))}%`,
