@@ -107,6 +107,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
 4. **Database Setup:**
     - Create a new project in [Neon](https://neon.tech)
     - Execute the SQL statements in `database/database-neon.sql` in your Neon SQL Editor
+    - Execute the SQL statements in `database/database-debts.sql` to add debt tracking functionality
     - After your first login, run `SELECT seed_my_data();` to populate demo data
 
 5. **AI Integration (Optional):**
