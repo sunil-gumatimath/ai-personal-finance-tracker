@@ -26,6 +26,33 @@ import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
 import type { Transaction } from '@/types'
 
+// PostgreSQL DECIMAL may come back as a string; normalize before doing math
+function toNumber(val: unknown): number {
+    if (typeof val === 'number') return isNaN(val) ? 0 : val
+    if (typeof val === 'string') {
+        const parsed = parseFloat(val)
+        return isNaN(parsed) ? 0 : parsed
+    }
+    return 0
+}
+
+// PostgreSQL DATE often comes back as 'YYYY-MM-DD'. `new Date('YYYY-MM-DD')` is UTC and can
+// shift to the previous/next day in local timezones, so parse date-only values as local dates.
+function parseTransactionDate(val: unknown): Date {
+    if (val instanceof Date) return val
+    if (typeof val === 'string') {
+        const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(val)
+        if (match) {
+            const year = Number(match[1])
+            const month = Number(match[2])
+            const day = Number(match[3])
+            return new Date(year, month - 1, day)
+        }
+        return new Date(val)
+    }
+    return new Date(NaN)
+}
+
 export function Calendar() {
     const { user } = useAuth()
     const { formatCurrency } = usePreferences()
@@ -88,16 +115,16 @@ export function Calendar() {
         // Group transactions by date
         const grid = daysInMonth.map(day => {
             const dayTransactions = transactions.filter(t =>
-                isSameDay(new Date(t.date), day)
+                isSameDay(parseTransactionDate(t.date), day)
             )
 
             const income = dayTransactions
                 .filter(t => t.type === 'income')
-                .reduce((sum, t) => sum + t.amount, 0)
+                .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
             const expense = dayTransactions
                 .filter(t => t.type === 'expense')
-                .reduce((sum, t) => sum + t.amount, 0)
+                .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
             return {
                 date: day,
@@ -234,7 +261,7 @@ export function Calendar() {
                                     "font-semibold",
                                     t.type === 'income' ? "text-green-500" : "text-red-500"
                                 )}>
-                                    {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                                    {t.type === 'income' ? '+' : '-'}{formatCurrency(toNumber(t.amount))}
                                 </div>
                             </div>
                         ))}

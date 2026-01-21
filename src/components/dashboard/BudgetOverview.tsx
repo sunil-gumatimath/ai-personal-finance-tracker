@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pie, PieChart, Cell, ResponsiveContainer, Sector } from 'recharts'
+import { Pie, PieChart, Cell, ResponsiveContainer, Sector, type TooltipProps } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { SpendingByCategory } from '@/types'
@@ -18,6 +18,25 @@ interface BudgetOverviewProps {
     previousMonthData?: SpendingByCategory[]
 }
 
+type ChartDatum = {
+    category: string
+    amount: number
+    percentage: number
+    fill: string
+}
+
+type ActiveShapeProps = {
+    cx: number
+    cy: number
+    innerRadius: number
+    outerRadius: number
+    startAngle: number
+    endAngle: number
+    fill: string
+    payload: ChartDatum
+    percent: number
+}
+
 const COLORS = [
     'hsl(346.8 77.2% 49.8%)', // Rose
     'hsl(142.1 76.2% 36.3%)', // Green
@@ -34,11 +53,11 @@ const COLORS = [
 ]
 
 // Custom active shape for enhanced hover effect
-const renderActiveShape = (props: any) => {
+const renderActiveShape = (props: unknown) => {
     const {
         cx, cy, innerRadius, outerRadius, startAngle, endAngle,
         fill, payload, percent
-    } = props
+    } = props as ActiveShapeProps
 
     return (
         <g>
@@ -86,9 +105,13 @@ const renderActiveShape = (props: any) => {
 }
 
 // Custom tooltip component
-const CustomTooltip = ({ active, payload, formatCurrency }: any) => {
+type CustomTooltipProps = TooltipProps<number, string> & {
+    formatCurrency: (amount: number) => string
+}
+
+const CustomTooltip = ({ active, payload, formatCurrency }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
-        const data = payload[0].payload
+        const data = payload[0]?.payload as ChartDatum
         return (
             <div className="bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl p-3 min-w-[160px]">
                 <div className="flex items-center gap-2 mb-2">
@@ -158,7 +181,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
         }, {} as ChartConfig)
     } satisfies ChartConfig
 
-    const onPieEnter = (_: any, index: number) => {
+    const onPieEnter = (_: unknown, index: number) => {
         setActiveIndex(index)
     }
 

@@ -53,6 +53,16 @@ export function Dashboard() {
             }
 
             try {
+                // PostgreSQL DECIMAL may come back as a string; normalize before doing math
+                const toNumber = (val: unknown): number => {
+                    if (typeof val === 'number') return isNaN(val) ? 0 : val
+                    if (typeof val === 'string') {
+                        const parsed = parseFloat(val)
+                        return isNaN(parsed) ? 0 : parsed
+                    }
+                    return 0
+                }
+
                 // Helper to get local date string (YYYY-MM-DD) to avoid timezone issues
                 const getLocalDateString = (date: Date): string => {
                     const year = date.getFullYear()
@@ -92,7 +102,14 @@ export function Dashboard() {
                 }
 
                 // 2. Fetch both current and last month data for comparison
-                const { rows: twoMonthData } = await query<{ type: string; amount: number; date: string; category: Category }>(`
+                type TwoMonthRow = {
+                    type: Transaction['type']
+                    amount: unknown
+                    date: string | Date
+                    category: Category | null
+                }
+
+                const { rows: twoMonthData } = await query<TwoMonthRow>(`
                     SELECT 
                         t.type,
                         t.amount,
@@ -123,18 +140,18 @@ export function Dashboard() {
 
                     // Calculate current month stats
                     const income = currentMonthData
-                        .filter((t: any) => t.type === 'income')
-                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
+                        .filter((t) => t.type === 'income')
+                        .reduce((sum, t) => sum + toNumber(t.amount), 0)
                     const expenses = currentMonthData
-                        .filter((t: any) => t.type === 'expense')
-                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
+                        .filter((t) => t.type === 'expense')
+                        .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
                     const lastMonthIncome = lastMonthData
-                        .filter((t: any) => t.type === 'income')
-                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
+                        .filter((t) => t.type === 'income')
+                        .reduce((sum, t) => sum + toNumber(t.amount), 0)
                     const lastMonthExpenses = lastMonthData
-                        .filter((t: any) => t.type === 'expense')
-                        .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
+                        .filter((t) => t.type === 'expense')
+                        .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
                     // Calculate percentage changes
                     const incomeChange = lastMonthIncome > 0
@@ -168,7 +185,7 @@ export function Dashboard() {
                             const catColor = category?.color || '#94a3b8'
                             const current = categoryMap.get(catName) || { amount: 0, color: catColor }
                             categoryMap.set(catName, {
-                                amount: current.amount + Number(t.amount || 0),
+                                amount: current.amount + toNumber(t.amount),
                                 color: catColor
                             })
                         })
@@ -209,8 +226,8 @@ export function Dashboard() {
                         const monthKey = d.toLocaleString('default', { month: 'short' })
                         if (monthsMap.has(monthKey)) {
                             const current = monthsMap.get(monthKey)!
-                            if (t.type === 'income') current.income += Number(t.amount || 0)
-                            if (t.type === 'expense') current.expenses += Number(t.amount || 0)
+                            if (t.type === 'income') current.income += toNumber(t.amount)
+                            if (t.type === 'expense') current.expenses += toNumber(t.amount)
                         }
                     })
 
