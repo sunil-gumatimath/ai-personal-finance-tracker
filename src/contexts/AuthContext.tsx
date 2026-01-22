@@ -82,10 +82,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
 
+    const hashPassword = async (password: string) => {
+        const msgBuffer = new TextEncoder().encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    }
+
     const signIn = async (email: string, password: string) => {
         try {
             setLoading(true)
-            const { rows } = await query<DbUser>('SELECT * FROM users WHERE email = $1 AND encrypted_password = $2', [email, password])
+            const hashedPassword = await hashPassword(password);
+            const { rows } = await query<DbUser>('SELECT * FROM users WHERE email = $1 AND encrypted_password = $2', [email, hashedPassword])
 
             if (rows.length === 0) {
                 setLoading(false)
@@ -132,9 +141,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             // Create User
+            const hashedPassword = await hashPassword(password);
             const { rows: newUsers } = await query<DbUser>(
                 'INSERT INTO users (email, encrypted_password, full_name) VALUES ($1, $2, $3) RETURNING *',
-                [email, password, fullName]
+                [email, hashedPassword, fullName]
             )
             const newUser = newUsers[0]
 
