@@ -93,8 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signIn = async (email: string, password: string) => {
         try {
             setLoading(true)
-            const hashedPassword = await hashPassword(password);
-            const { rows } = await query<DbUser>('SELECT * FROM users WHERE email = $1 AND encrypted_password = $2', [email, hashedPassword])
+            // Fetch user by email to check password manually
+            const { rows } = await query<DbUser & { encrypted_password: string }>('SELECT * FROM users WHERE email = $1', [email])
 
             if (rows.length === 0) {
                 setLoading(false)
@@ -102,6 +102,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             const user = rows[0]
+            const hashedPassword = await hashPassword(password)
+            let isPasswordValid = false
+            let needsMigration = false
+
+            // 1. Try hashed comparison (new/migrated users)
+            if (user.encrypted_password === hashedPassword) {
+                isPasswordValid = true
+            }
+            // 2. Fallback to plaintext comparison (legacy users)
+            else if (user.encrypted_password === password) {
+                isPasswordValid = true
+                needsMigration = true
+            }
+
+            if (!isPasswordValid) {
+                setLoading(false)
+                return { error: new Error('Invalid email or password') }
+            }
+
+            // 3. Migrate user if needed
+            if (needsMigration) {
+                try {
+                    await query('UPDATE users SET encrypted_password = $1 WHERE id = $2', [hashedPassword, user.id])
+                    console.log(`Migrated user ${user.id} to hashed password`)
+                } catch (e) {
+                    console.error('Failed to migrate user password:', e)
+                    // Don't block login on migration failure
+                }
+            }
+
             const sessionData = {
                 user: {
                     id: user.id,
