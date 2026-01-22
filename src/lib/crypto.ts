@@ -9,18 +9,7 @@ export async function hashPassword(password: string): Promise<string> {
         ["deriveBits", "deriveKey"]
     );
 
-    const key = await crypto.subtle.deriveKey(
-        {
-            name: "PBKDF2",
-            salt: salt,
-            iterations: 100000,
-            hash: "SHA-256"
-        },
-        keyMaterial,
-        { name: "AES-GCM", length: 256 },
-        true,
-        ["encrypt", "decrypt"]
-    );
+
 
     // We can't export the key directly in a standard way that looks like a hash string easily without raw export.
     // Instead of deriveKey (which is for encryption), let's use deriveBits to get the hash.
