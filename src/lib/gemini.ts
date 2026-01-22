@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const DEFAULT_MODEL = 'gemini-1.5-flash'
+const DEFAULT_MODEL = 'gemini-3-flash-preview'
 
 export const generateFinancialAdvice = async (prompt: string, apiKey?: string, modelName?: string) => {
     const key = apiKey
