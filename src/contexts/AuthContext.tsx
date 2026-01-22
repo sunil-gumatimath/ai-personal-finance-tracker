@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { query } from '@/lib/database'
+import { hashPassword, verifyPassword } from '@/lib/crypto'
 
 // Define types for Auth
 type UserMetadata = {
@@ -25,6 +26,7 @@ type Session = {
 interface DbUser {
     id: string;
     email: string;
+    encrypted_password?: string;
     full_name: string;
     avatar_url: string | null;
     created_at: string;
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signIn = async (email: string, password: string) => {
         try {
             setLoading(true)
-            const { rows } = await query<DbUser>('SELECT * FROM users WHERE email = $1 AND encrypted_password = $2', [email, password])
+            const { rows } = await query<DbUser>('SELECT * FROM users WHERE email = $1', [email])
 
             if (rows.length === 0) {
                 setLoading(false)
@@ -93,6 +95,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             const user = rows[0]
+            const storedPassword = user.encrypted_password || ''
+
+            let isValid = false
+            let isLegacy = false
+
+            if (storedPassword.startsWith('$pbkdf2$')) {
+                // It's a hashed password, verify it
+                isValid = await verifyPassword(password, storedPassword)
+            } else {
+                // Legacy plain text check
+                // Only if it doesn't look like a PBKDF2 hash (which it shouldn't)
+                if (storedPassword === password) {
+                    isValid = true
+                    isLegacy = true
+                }
+            }
+
+            if (!isValid) {
+                setLoading(false)
+                return { error: new Error('Invalid email or password') }
+            }
+
+            if (isLegacy) {
+                const newHash = await hashPassword(password)
+                await query('UPDATE users SET encrypted_password = $1 WHERE id = $2', [newHash, user.id])
+            }
+
             const sessionData = {
                 user: {
                     id: user.id,
@@ -131,10 +160,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { error: new Error('User already exists') }
             }
 
+            const hashedPassword = await hashPassword(password)
+
             // Create User
             const { rows: newUsers } = await query<DbUser>(
                 'INSERT INTO users (email, encrypted_password, full_name) VALUES ($1, $2, $3) RETURNING *',
-                [email, password, fullName]
+                [email, hashedPassword, fullName]
             )
             const newUser = newUsers[0]
 
