@@ -84,9 +84,12 @@ serve({
             }
 
             let status = 200;
+            const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000'];
+            const origin = req.headers.get('origin') || '';
+            const corsOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
             const headers = new Headers({
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "http://localhost:5173",
+                "Access-Control-Allow-Origin": corsOrigin,
                 "Access-Control-Allow-Credentials": "true",
                 "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type, Cookie",
