@@ -8,15 +8,13 @@ FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
-# Add build-time arguments for environment variables
-ARG VITE_NEON_DATABASE_URL
-ARG VITE_USE_NEON
-ARG VITE_GEMINI_API_KEY
+# Build-time arguments (kept for compatibility)
+ARG NEON_DATABASE_URL
+ARG AUTH_SECRET
 
-# Set them as environment variables so Vite can pick them up during build
-ENV VITE_NEON_DATABASE_URL=$VITE_NEON_DATABASE_URL
-ENV VITE_USE_NEON=$VITE_USE_NEON
-ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
+# Set env vars for serverless functions (not used by static build)
+ENV NEON_DATABASE_URL=$NEON_DATABASE_URL
+ENV AUTH_SECRET=$AUTH_SECRET
 
 # Copy package files first (for better layer caching)
 COPY package.json bun.lock ./

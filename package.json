@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bunx --bun vite",
+    "dev": "bun scripts/dev.ts",
+    "api": "bun --watch api/_server.ts",
+    "vite": "bunx --bun vite",
     "build": "bun run tsc -b && bunx --bun vite build",
     "lint": "eslint .",
     "preview": "bunx --bun vite preview",

@@ -100,8 +100,8 @@ A premium, AI-powered personal finance management platform designed for clarity 
 
    Create a `.env` file in the root directory:
    ```env
-   VITE_NEON_DATABASE_URL=your_neon_database_url
-   VITE_USE_NEON=true
+   NEON_DATABASE_URL=your_neon_database_url
+   AUTH_SECRET=your_long_random_secret
    ```
 
 4. **Database Setup:**
@@ -125,6 +125,11 @@ A premium, AI-powered personal finance management platform designed for clarity 
 **Start development server:**
 ```bash
 bun run dev
+```
+
+**Fullstack (Vercel API routes) local dev:**
+```bash
+vercel dev
 ```
 
 **Type checking:**
@@ -173,8 +178,8 @@ The project is optimized for deployment on Vercel:
 1. Push your code to GitHub
 2. Import the repository in [Vercel](https://vercel.com)
 3. Configure environment variables:
-   - `VITE_NEON_DATABASE_URL`
-   - `VITE_USE_NEON=true`
+   - `NEON_DATABASE_URL`
+   - `AUTH_SECRET`
 4. Deploy with Bun runtime for optimal performance
 
 ### Docker
