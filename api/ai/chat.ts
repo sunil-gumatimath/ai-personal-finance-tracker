@@ -1,8 +1,9 @@
-import { getAuthedUserId } from '../_auth'
-import { query, queryOne } from '../_db'
-import { generateFinancialAdvice } from '../_gemini'
+import { getAuthedUserId } from '../_auth.js'
+import { query, queryOne } from '../_db.js'
+import { generateFinancialAdvice } from '../_gemini.js'
+import type { ApiRequest, ApiResponse } from '../_types.js'
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = await getAuthedUserId(req)
   if (!userId) {
     res.status(401).json({ error: 'Unauthorized' })
@@ -27,8 +28,8 @@ export default async function handler(req: any, res: any) {
     )
 
     const prefs = profile?.preferences || {}
-    const apiKey = (prefs as any).geminiApiKey as string | undefined
-    const currency = (prefs as any).currency || profile?.currency || 'USD'
+    const apiKey = typeof prefs.geminiApiKey === 'string' ? prefs.geminiApiKey : undefined
+    const currency = typeof prefs.currency === 'string' ? prefs.currency : (profile?.currency || 'USD')
 
     if (!apiKey) {
       res.status(400).json({ error: 'Gemini API key not set in preferences' })

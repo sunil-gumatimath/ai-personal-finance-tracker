@@ -1,6 +1,7 @@
-import { getAuthedUserId } from '../_auth'
-import { query, queryOne } from '../_db'
-import { generateFinancialAdvice } from '../_gemini'
+import { getAuthedUserId } from '../_auth.js'
+import { query, queryOne } from '../_db.js'
+import { generateFinancialAdvice } from '../_gemini.js'
+import type { ApiRequest, ApiResponse } from '../_types.js'
 
 type Insight = {
   id: string
@@ -15,7 +16,7 @@ type Insight = {
   created_at?: string
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = await getAuthedUserId(req)
   if (!userId) {
     res.status(401).json({ error: 'Unauthorized' })
@@ -88,7 +89,7 @@ export default async function handler(req: any, res: any) {
         [userId],
       )
       const prefs = profile?.preferences || {}
-      const currency = (prefs as any).currency || profile?.currency || 'USD'
+      const currency = typeof prefs.currency === 'string' ? prefs.currency : (profile?.currency || 'USD')
       const currencyLocales: Record<string, string> = {
         USD: 'en-US',
         INR: 'en-IN',
@@ -101,9 +102,17 @@ export default async function handler(req: any, res: any) {
           style: 'currency',
           currency,
         }).format(amount)
-      const apiKey = (prefs as any).geminiApiKey as string | undefined
+      const apiKey = typeof prefs.geminiApiKey === 'string' ? prefs.geminiApiKey : undefined
 
-      const { rows: transactions } = await query<any>(
+      type TransactionWithCategory = {
+        type: string
+        amount: number | string | null
+        description: string | null
+        date: string
+        category: { name?: string } | null
+      }
+
+      const { rows: transactions } = await query<TransactionWithCategory>(
         `
         SELECT t.*, row_to_json(c.*) as category
         FROM transactions t
@@ -116,7 +125,7 @@ export default async function handler(req: any, res: any) {
       )
 
       const newInsights: Omit<Insight, 'id'>[] = []
-      const categoryStats = new Map<string, { total: number; count: number; transactions: any[] }>()
+      const categoryStats = new Map<string, { total: number; count: number; transactions: TransactionWithCategory[] }>()
 
       for (const t of transactions || []) {
         if (t.type === 'expense' && t.category) {

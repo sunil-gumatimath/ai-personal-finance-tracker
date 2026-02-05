@@ -1,44 +1,28 @@
-import { Pool, neonConfig, type PoolClient } from '@neondatabase/serverless'
+import { Pool, PoolClient } from 'pg'
 
-// Configure WebSocket and create connection pool
+// Lazy initialization of the pool
 let pool: Pool | null = null
-let initPromise: Promise<void> | null = null
 
-async function initializePool() {
-  if (pool) return
-
-  // Configure WebSocket for Node.js environments (local development with Bun)
-  // In Vercel serverless, native WebSocket is available
-  if (typeof globalThis.WebSocket === 'undefined') {
-    try {
-      const ws = await import('ws')
-      neonConfig.webSocketConstructor = ws.default
-    } catch {
-      // WebSocket not available - Neon will use HTTP fallback
-      console.warn('WebSocket not available, using HTTP fallback')
-    }
-  }
+function getPool(): Pool {
+  if (pool) return pool
 
   const connectionString = process.env.NEON_DATABASE_URL || process.env.VITE_NEON_DATABASE_URL
-
   if (!connectionString) {
-    console.warn('NEON_DATABASE_URL or VITE_NEON_DATABASE_URL is not set. Database calls will fail.')
-    return
+    throw new Error('Database connection string is missing. Check NEON_DATABASE_URL.')
   }
 
-  pool = new Pool({ connectionString })
-}
+  pool = new Pool({
+    connectionString,
+    ssl: {
+      rejectUnauthorized: true // Neon requires SSL
+    }
+  })
 
-// Ensure pool is initialized before use
-async function getPool(): Promise<Pool> {
-  if (!initPromise) {
-    initPromise = initializePool()
-  }
-  await initPromise
-
-  if (!pool) {
-    throw new Error('Neon database connection not configured. Set NEON_DATABASE_URL.')
-  }
+  // Error handling for idle clients
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err)
+    // Don't exit, just log
+  })
 
   return pool
 }
@@ -47,9 +31,14 @@ export async function query<T = unknown>(
   queryText: string,
   params?: unknown[],
 ): Promise<{ rows: T[]; rowCount: number }> {
-  const db = await getPool()
-  const result = await db.query(queryText, params)
-  return { rows: result.rows as T[], rowCount: result.rowCount || 0 }
+  try {
+    const db = getPool()
+    const result = await db.query(queryText, params)
+    return { rows: result.rows as T[], rowCount: result.rowCount || 0 }
+  } catch (error) {
+    console.error('Database query error:', error)
+    throw error // Re-throw to be handled by the API endpoint
+  }
 }
 
 export async function queryOne<T = unknown>(
@@ -61,8 +50,7 @@ export async function queryOne<T = unknown>(
 }
 
 export async function transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
-  const db = await getPool()
-
+  const db = getPool()
   const client = await db.connect()
   try {
     await client.query('BEGIN')

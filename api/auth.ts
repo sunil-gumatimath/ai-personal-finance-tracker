@@ -1,8 +1,9 @@
-import { queryOne } from './_db'
-import { verifyPassword, hashPassword } from './_crypto'
-import { createToken, setAuthCookie, clearAuthCookie, getAuthedUser } from './_auth'
+import { queryOne } from './_db.js'
+import { verifyPassword, hashPassword } from './_crypto.js'
+import { createToken, setAuthCookie, clearAuthCookie, getAuthedUser } from './_auth.js'
+import type { ApiRequest, ApiResponse } from './_types.js'
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
     const action = req.query?.action
 
     // Handle /api/auth?action=me

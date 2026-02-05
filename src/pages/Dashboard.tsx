@@ -225,8 +225,9 @@ export function Dashboard() {
 
                 // 4. Fetch accounts for total balance
                 const accountsRes = await api.accounts.list()
-                const accounts = (accountsRes.accounts || []).filter((a: any) => a.is_active)
-                const totalBalance = accounts.reduce((sum: number, a: any) => {
+                type AccountBalanceRow = { is_active: boolean; balance: number | string }
+                const accounts = (accountsRes.accounts || []).filter((a: AccountBalanceRow) => a.is_active)
+                const totalBalance = accounts.reduce((sum: number, a: AccountBalanceRow) => {
                     const balance = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance
                     return sum + (isNaN(balance) ? 0 : balance)
                 }, 0)

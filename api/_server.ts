@@ -1,6 +1,7 @@
 
 import { serve } from "bun";
 import path from "path";
+import type { ApiRequest, ApiResponse } from "./_types.js";
 
 const PORT = process.env.PORT || 3001;
 
@@ -20,7 +21,7 @@ serve({
         const apiPath = pathname.replace(/^\/api\//, "");
 
         let filePath = "";
-        let extraParams: Record<string, string> = {};
+        const extraParams: Record<string, string> = {};
 
         // 1. Check exact match: api/some/path.ts
         const exactPath = path.join(process.cwd(), "api", apiPath + ".ts");
@@ -83,7 +84,7 @@ serve({
             }
 
             let status = 200;
-            let headers = new Headers({
+            const headers = new Headers({
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "http://localhost:5173",
                 "Access-Control-Allow-Credentials": "true",
@@ -95,23 +96,23 @@ serve({
                 return new Response(null, { status: 204, headers });
             }
 
-            const mockReq = {
+            const mockReq: ApiRequest = {
                 method: req.method,
-                body,
+                body: body as Record<string, unknown>,
                 headers: Object.fromEntries(req.headers.entries()),
                 query: { ...Object.fromEntries(url.searchParams.entries()), ...extraParams },
             };
 
             console.log(`🎬 Calling handler...`);
-            let responseBody: any = null;
+            let responseBody: string | null = null;
 
-            const mockRes = {
+            const mockRes: ApiResponse = {
                 status(s: number) {
                     console.log(`🚥 Status set to ${s}`);
                     status = s;
                     return this;
                 },
-                json(data: any) {
+                json(data: unknown) {
                     console.log(`📄 Response:`, data);
                     responseBody = JSON.stringify(data);
                     return this;
@@ -121,9 +122,9 @@ serve({
                     headers.set(k, v);
                     return this;
                 },
-                end(data?: any) {
+                end(data?: unknown) {
                     console.log(`🔚 End called`);
-                    responseBody = data;
+                    responseBody = typeof data === "string" ? data : data == null ? null : String(data);
                     return this;
                 }
             };
@@ -135,9 +136,10 @@ serve({
                 status,
                 headers,
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(`💥 Error in ${pathname}:`, error);
-            return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), {
+            const message = error instanceof Error ? error.message : "Internal Server Error";
+            return new Response(JSON.stringify({ error: message }), {
                 status: 500,
                 headers: { "Content-Type": "application/json" },
             });

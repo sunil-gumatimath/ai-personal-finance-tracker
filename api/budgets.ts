@@ -1,5 +1,6 @@
-import { getAuthedUserId } from './_auth'
-import { query } from './_db'
+import { getAuthedUserId } from './_auth.js'
+import { query } from './_db.js'
+import type { ApiRequest, ApiResponse } from './_types.js'
 
 const toDateString = (date: Date) => {
   const year = date.getFullYear()
@@ -8,7 +9,12 @@ const toDateString = (date: Date) => {
   return `${year}-${month}-${day}`
 }
 
-export default async function handler(req: any, res: any) {
+type BudgetRow = {
+  period: 'weekly' | 'monthly' | 'yearly'
+  category_id: string
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = await getAuthedUserId(req)
   if (!userId) {
     res.status(401).json({ error: 'Unauthorized' })
@@ -90,7 +96,7 @@ export default async function handler(req: any, res: any) {
         transactionsByCategory.set(t.category_id, existing)
       }
 
-      const budgetsWithSpent = (budgetsRes.rows || []).map((budget: any) => {
+      const budgetsWithSpent = (budgetsRes.rows || []).map((budget: BudgetRow) => {
         let startDateStr: string
         switch (budget.period) {
           case 'weekly':
