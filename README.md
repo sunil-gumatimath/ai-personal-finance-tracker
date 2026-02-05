@@ -82,6 +82,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
 
 - Bun 1.3.x or later
 - A Neon account
+- Vercel CLI (for local fullstack dev)
 
 ## Quick Start
 
@@ -103,6 +104,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
    NEON_DATABASE_URL=your_neon_database_url
    AUTH_SECRET=your_long_random_secret
    ```
+   For local fullstack dev, `vercel dev` will read this file automatically.
 
 4. **Database Setup:**
     - Create a new project in [Neon](https://neon.tech)
@@ -115,21 +117,23 @@ A premium, AI-powered personal finance management platform designed for clarity 
    - Create an API Key
    - Add it in **Settings > AI Integration** within the app
 
-6. **Start Development:**
+6. **Start Development (Fullstack):**
    ```bash
-   bun run dev
+   vercel dev
    ```
+   This runs both the Vite frontend and the `/api` serverless routes locally.
+   If you only run `bun run dev`, the UI loads but login and data APIs will 404.
 
 ## Development Commands
-
-**Start development server:**
-```bash
-bun run dev
-```
 
 **Fullstack (Vercel API routes) local dev:**
 ```bash
 vercel dev
+```
+
+**Frontend only (no API routes):**
+```bash
+bun run dev
 ```
 
 **Type checking:**
