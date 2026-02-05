@@ -1,5 +1,6 @@
 import { getAuthedUserId } from './_auth.js'
 import { queryOne } from './_db.js'
+import { validateColumns } from './_query-builder.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -28,7 +29,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   if (req.method === 'PATCH') {
     try {
-      const { preferences, currency, full_name, avatar_url } = req.body || {}
+      const body = req.body || {}
+      const preferences = body.preferences as Record<string, unknown> | undefined
+      const currency = typeof body.currency === 'string' ? body.currency : undefined
+      const full_name = body.full_name
+      const avatar_url = body.avatar_url
+      
+      // Validate currency if provided
+      if (currency !== undefined) {
+        const validCurrencies = ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD', 'CNY']
+        if (!validCurrencies.includes(currency)) {
+          res.status(400).json({ error: 'Invalid currency code' })
+          return
+        }
+      }
+      
       const existing = await queryOne<{ preferences: Record<string, unknown> | null }>(
         'SELECT preferences FROM profiles WHERE user_id = $1',
         [userId],
@@ -45,14 +60,31 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       )
 
       if (full_name !== undefined || avatar_url !== undefined) {
+        // Validate the columns we're updating
+        const columnsToUpdate: string[] = []
+        if (full_name !== undefined) columnsToUpdate.push('full_name')
+        if (avatar_url !== undefined) columnsToUpdate.push('avatar_url')
+        
+        // Validate columns against allowed list
+        validateColumns('users', columnsToUpdate)
+        validateColumns('profiles', columnsToUpdate)
+        
         const updates: string[] = []
         const values: (string | null)[] = []
         let i = 1
         if (full_name !== undefined) {
+          if (typeof full_name !== 'string') {
+            res.status(400).json({ error: 'Full name must be a string' })
+            return
+          }
           updates.push(`full_name = $${i++}`)
           values.push(full_name)
         }
         if (avatar_url !== undefined) {
+          if (avatar_url !== null && typeof avatar_url !== 'string') {
+            res.status(400).json({ error: 'Avatar URL must be a string or null' })
+            return
+          }
           updates.push(`avatar_url = $${i++}`)
           values.push(avatar_url)
         }
@@ -67,6 +99,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       res.status(200).json({ ok: true, preferences: merged, currency: currency || null })
     } catch (error) {
       console.error('Profile PATCH error:', error)
+      if (error instanceof Error && error.message.includes('Invalid columns')) {
+        res.status(400).json({ error: error.message })
+        return
+      }
       res.status(500).json({ error: 'Server error' })
     }
     return

@@ -1,5 +1,6 @@
 import { getAuthedUserId } from './_auth.js'
 import { query } from './_db.js'
+import { buildUpdateQuery, buildInsertQuery } from './_query-builder.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -12,18 +13,40 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   // Handle ID-based operations (PUT, DELETE)
   const id = req.query?.id
   if (id && typeof id === 'string') {
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      res.status(400).json({ error: 'Invalid category ID format' })
+      return
+    }
+
     if (req.method === 'PUT') {
       try {
         const data = req.body || {}
-        const keys = Object.keys(data).filter(k => k !== 'user_id')
-        const values = keys.map(k => data[k])
-        const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ')
-        values.push(id, userId)
-        const text = `UPDATE categories SET ${setClause} WHERE id = $${keys.length + 1} AND user_id = $${keys.length + 2} RETURNING *`
-        const { rows } = await query(text, values)
+        
+        const queryData = buildUpdateQuery(
+          'categories',
+          data,
+          'id = $1 AND user_id = $2',
+          [id, userId]
+        )
+        
+        if (!queryData) {
+          res.status(400).json({ error: 'No valid fields to update' })
+          return
+        }
+        
+        const { rows } = await query(queryData.text, queryData.values)
+        if (rows.length === 0) {
+          res.status(404).json({ error: 'Category not found' })
+          return
+        }
         res.status(200).json({ category: rows[0] })
       } catch (error) {
         console.error('Categories PUT error:', error)
+        if (error instanceof Error && error.message.includes('Invalid columns')) {
+          res.status(400).json({ error: error.message })
+          return
+        }
         res.status(500).json({ error: 'Server error' })
       }
       return
@@ -49,6 +72,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     try {
       const type = req.query?.type
       if (type) {
+        // Validate type parameter
+        if (!['income', 'expense'].includes(type)) {
+          res.status(400).json({ error: 'Invalid category type' })
+          return
+        }
         const { rows } = await query('SELECT * FROM categories WHERE user_id = $1 AND type = $2', [
           userId,
           type,
@@ -68,17 +96,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method === 'POST') {
     try {
       const data = req.body || {}
-      const keys = Object.keys(data).filter(k => k !== 'user_id')
-      const values = keys.map(k => data[k])
-      keys.push('user_id')
-      values.push(userId)
-      const columns = keys.join(', ')
-      const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ')
-      const text = `INSERT INTO categories (${columns}) VALUES (${placeholders}) RETURNING *`
-      const { rows } = await query(text, values)
+      const catName = typeof data.name === 'string' ? data.name : ''
+      const catType = typeof data.type === 'string' ? data.type : ''
+      
+      // Validate required fields
+      if (!catName || catName.trim().length === 0) {
+        res.status(400).json({ error: 'Category name is required' })
+        return
+      }
+      if (!catType || !['income', 'expense'].includes(catType)) {
+        res.status(400).json({ error: 'Valid category type is required (income, expense)' })
+        return
+      }
+      
+      const queryData = buildInsertQuery('categories', data, { user_id: userId })
+      const { rows } = await query(queryData.text, queryData.values)
       res.status(201).json({ category: rows[0] })
     } catch (error) {
       console.error('Categories POST error:', error)
+      if (error instanceof Error && error.message.includes('Invalid columns')) {
+        res.status(400).json({ error: error.message })
+        return
+      }
       res.status(500).json({ error: 'Server error' })
     }
     return
