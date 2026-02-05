@@ -145,9 +145,9 @@ export const api = {
     delete: (id: string) => apiFetch<{ ok: boolean }>(`/api/debts?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
     payments: {
       list: (debtId: string) =>
-        apiFetch<{ payments: unknown[] }>(`/api/debt-payments?debtId=${encodeURIComponent(debtId)}`),
+        apiFetch<{ payments: unknown[] }>(`/api/debts?action=payments&debtId=${encodeURIComponent(debtId)}`),
       create: (data: Record<string, unknown>) =>
-        apiFetch<{ payment: unknown }>('/api/debt-payments', {
+        apiFetch<{ payment: unknown }>('/api/debts?action=payments', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
