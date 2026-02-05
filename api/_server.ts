@@ -19,17 +19,38 @@ serve({
         // Route /api/auth/login to api/auth/login.ts
         const apiPath = pathname.replace(/^\/api\//, "");
 
-        // Support both direct file (api/auth/login.ts) and index file (api/accounts/index.ts)
-        const possiblePaths = [
-            path.join(process.cwd(), "api", apiPath + ".ts"),
-            path.join(process.cwd(), "api", apiPath, "index.ts"),
-        ];
-
         let filePath = "";
-        for (const p of possiblePaths) {
-            if (await Bun.file(p).exists()) {
-                filePath = p;
-                break;
+        let extraParams: Record<string, string> = {};
+
+        // 1. Check exact match: api/some/path.ts
+        const exactPath = path.join(process.cwd(), "api", apiPath + ".ts");
+        if (await Bun.file(exactPath).exists()) {
+            filePath = exactPath;
+        }
+
+        // 2. Check index: api/some/path/index.ts
+        if (!filePath) {
+            const indexPath = path.join(process.cwd(), "api", apiPath, "index.ts");
+            if (await Bun.file(indexPath).exists()) {
+                filePath = indexPath;
+            }
+        }
+
+        // 3. Check for dynamic route [id].ts in the parent folder
+        // e.g. api/transactions/123 -> api/transactions/[id].ts
+        if (!filePath) {
+            const parts = apiPath.split("/");
+            if (parts.length > 0) {
+                const lastPart = parts.pop(); // The ID, e.g. "123"
+                const parentPath = parts.join("/"); // e.g. "transactions"
+                const dynamicPath = path.join(process.cwd(), "api", parentPath, "[id].ts");
+
+                if (await Bun.file(dynamicPath).exists()) {
+                    filePath = dynamicPath;
+                    if (lastPart) {
+                        extraParams.id = lastPart;
+                    }
+                }
             }
         }
 
@@ -78,7 +99,7 @@ serve({
                 method: req.method,
                 body,
                 headers: Object.fromEntries(req.headers.entries()),
-                query: Object.fromEntries(url.searchParams.entries()),
+                query: { ...Object.fromEntries(url.searchParams.entries()), ...extraParams },
             };
 
             console.log(`🎬 Calling handler...`);
