@@ -6,7 +6,7 @@ let pool: Pool | null = null
 function getPool(): Pool {
   if (pool) return pool
 
-  const connectionString = process.env.NEON_DATABASE_URL || process.env.VITE_NEON_DATABASE_URL
+  const connectionString = process.env.NEON_DATABASE_URL
   if (!connectionString) {
     throw new Error('Database connection string is missing. Check NEON_DATABASE_URL.')
   }
