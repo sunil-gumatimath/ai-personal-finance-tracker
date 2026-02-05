@@ -22,6 +22,27 @@ export default async function handler(req: any, res: any) {
     return
   }
 
+  // Handle ID-based operations (PATCH for dismiss)
+  const id = req.query?.id
+  if (id && typeof id === 'string') {
+    if (req.method === 'PATCH') {
+      try {
+        await query('UPDATE ai_insights SET is_dismissed = true WHERE id = $1 AND user_id = $2', [
+          id,
+          userId,
+        ])
+        res.status(200).json({ ok: true })
+      } catch (error) {
+        console.error('AI insight PATCH error:', error)
+        res.status(500).json({ error: 'Server error' })
+      }
+      return
+    }
+
+    res.status(405).json({ error: 'Method not allowed' })
+    return
+  }
+
   if (req.method === 'GET') {
     try {
       const { rows } = await query<Insight>(
