@@ -57,7 +57,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         try {
-            const { email, password, fullName } = req.body || {}
+            const body = req.body || {}
+            const email = typeof body.email === 'string' ? body.email : ''
+            const password = typeof body.password === 'string' ? body.password : ''
+            const fullName = typeof body.fullName === 'string' ? body.fullName : ''
+            
             if (!email || !password || !fullName) {
                 res.status(400).json({ error: 'Email, password, and full name are required' })
                 return
@@ -118,7 +122,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         try {
-            const { email, password } = req.body || {}
+            const body = req.body || {}
+            const email = typeof body.email === 'string' ? body.email : ''
+            const password = typeof body.password === 'string' ? body.password : ''
+            
             if (!email || !password) {
                 res.status(400).json({ error: 'Email and password are required' })
                 return

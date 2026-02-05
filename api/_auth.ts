@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto'
-import { queryOne } from './_db'
+import { queryOne } from './_db.js'
 
 const TOKEN_COOKIE = 'finance_token'
 const ONE_DAY_SECONDS = 60 * 60 * 24
@@ -94,10 +94,18 @@ export async function getAuthedUserId(req: { headers?: { cookie?: string } }): P
   return payload?.sub || null
 }
 
-export async function getAuthedUser(req: { headers?: { cookie?: string } }) {
+export type AuthedUser = {
+  id: string
+  email: string
+  full_name: string
+  avatar_url: string | null
+  created_at: string
+}
+
+export async function getAuthedUser(req: { headers?: { cookie?: string } }): Promise<AuthedUser | null> {
   const userId = await getAuthedUserId(req)
   if (!userId) return null
-  return queryOne(
+  return queryOne<AuthedUser>(
     'SELECT id, email, full_name, avatar_url, created_at FROM users WHERE id = $1',
     [userId],
   )
