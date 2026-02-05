@@ -88,8 +88,8 @@ A premium, AI-powered personal finance management platform designed for clarity 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/sunil-gumatimath/Personal-Finance-Tracker.git
-   cd Personal-Finance-Tracker
+   git clone https://github.com/sunil-gumatimath/ai-personal-finance-tracker.git
+   cd ai-personal-finance-tracker
    ```
 
 2. **Install dependencies:**
@@ -122,7 +122,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
    vercel dev
    ```
    This runs both the Vite frontend and the `/api` serverless routes locally.
-   If you only run `bun run dev`, the UI loads but login and data APIs will 404.
+   This is the closest behavior to production on Vercel.
 
 ## Development Commands
 
@@ -131,9 +131,14 @@ A premium, AI-powered personal finance management platform designed for clarity 
 vercel dev
 ```
 
-**Frontend only (no API routes):**
+**Frontend only:**
 ```bash
-bun run dev
+bun run vite
+```
+
+**Local API server only (Bun runtime):**
+```bash
+bun run api
 ```
 
 **Type checking:**
@@ -184,7 +189,12 @@ The project is optimized for deployment on Vercel:
 3. Configure environment variables:
    - `NEON_DATABASE_URL`
    - `AUTH_SECRET`
+   - `GEMINI_API_KEY` (optional, only if you want AI features enabled globally)
 4. Deploy with Bun runtime for optimal performance
+
+Notes:
+- API route files under `api/` are deployed as Vercel functions.
+- The Bun local API shim lives in `scripts/api-server.ts` and is not deployed.
 
 ### Docker
 
