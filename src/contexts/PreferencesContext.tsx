@@ -7,7 +7,7 @@ import {
     currencyLocales
 } from '@/types/preferences'
 import { useAuth } from '@/contexts/AuthContext'
-import { query } from '@/lib/database'
+import { api } from '@/lib/api'
 
 interface PreferencesContextType {
     preferences: Preferences
@@ -41,20 +41,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         const fetchPreferences = async () => {
             if (!user) return
             try {
-                const { rows } = await query<{ preferences: Preferences, currency: string }>(
-                    'SELECT preferences, currency FROM profiles WHERE user_id = $1',
-                    [user.id]
-                )
-                if (rows.length > 0) {
-                    const dbPrefs = rows[0].preferences || {}
-                    // Ensure currency matches the explicit column if different
-                    if (rows[0].currency && rows[0].currency !== dbPrefs.currency) {
-                        dbPrefs.currency = rows[0].currency
-                    }
-                    const merged = { ...defaultPreferences, ...dbPrefs }
-                    setPreferences(merged)
-                    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(merged))
+                const res = await api.profile.get()
+                const dbPrefs = (res.preferences as Preferences) || {}
+                if (res.currency && res.currency !== dbPrefs.currency) {
+                    dbPrefs.currency = res.currency
                 }
+                const merged = { ...defaultPreferences, ...dbPrefs }
+                setPreferences(merged)
+                localStorage.setItem(PREFERENCES_KEY, JSON.stringify(merged))
             } catch (error) {
                 console.error('Failed to fetch preferences:', error)
             }
@@ -93,19 +87,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
                 // Best effort sync.
                 const currentState = { ...preferences, ...newPreferences }
 
-                // Update JSONB column
-                await query(
-                    'UPDATE profiles SET preferences = $1, updated_at = NOW() WHERE user_id = $2',
-                    [JSON.stringify(currentState), user.id]
-                )
-
-                // If currency changed, also update the explicit currency column
-                if (newPreferences.currency) {
-                    await query(
-                        'UPDATE profiles SET currency = $1 WHERE user_id = $2',
-                        [newPreferences.currency, user.id]
-                    )
-                }
+                await api.profile.update({
+                    preferences: currentState,
+                    currency: newPreferences.currency,
+                })
             } catch (error) {
                 console.error('Failed to save preferences to DB:', error)
             }
