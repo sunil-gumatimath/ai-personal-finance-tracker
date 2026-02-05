@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { query } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
@@ -42,35 +42,20 @@ export function useFinancialHealth() {
             const endOfCurrMonth = format(endOfMonth(now), 'yyyy-MM-dd')
 
             // Fetch all necessary data
+            const threeMonthsAgo = format(subMonths(startOfMonth(now), 3), 'yyyy-MM-dd')
             const [
-                { rows: transactions },
-                { rows: budgets },
-                { rows: accounts }
+                transactionsRes,
+                budgetsRes,
+                accountsRes
             ] = await Promise.all([
-                query<Transaction>(`
-                    SELECT 
-                        t.*,
-                        row_to_json(c.*) as category
-                    FROM transactions t
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    WHERE t.user_id = $1
-                    AND t.date >= $2
-                    AND t.date <= $3
-                `, [user.id, startOfCurrMonth, endOfCurrMonth]),
-                query<Budget & { category: { name: string } }>(`
-                    SELECT 
-                        b.*,
-                        row_to_json(c.*) as category
-                    FROM budgets b
-                    LEFT JOIN categories c ON b.category_id = c.id
-                    WHERE b.user_id = $1
-                `, [user.id]),
-                query<Account>(`SELECT * FROM accounts WHERE user_id = $1`, [user.id])
+                api.transactions.list({ since: threeMonthsAgo }),
+                api.budgets.list(),
+                api.accounts.list()
             ])
 
-            const typedTransactions = (transactions || []) as Transaction[]
-            const typedBudgets = (budgets || []) as (Budget & { category: { name: string } })[]
-            const typedAccounts = (accounts || []) as Account[]
+            const typedTransactions = (transactionsRes.transactions || []) as Transaction[]
+            const typedBudgets = (budgetsRes.budgets || []) as (Budget & { category: { name: string } })[]
+            const typedAccounts = (accountsRes.accounts || []) as Account[]
 
             // Helper to safely parse number from PostgreSQL DECIMAL (which may come as string)
             const toNumber = (val: unknown): number => {
@@ -83,13 +68,18 @@ export function useFinancialHealth() {
             }
 
             // 1. Savings Rate Calculation
-            const income = typedTransactions.filter(t => t.type === 'income').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
-            const expenses = typedTransactions.filter(t => t.type === 'expense').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
+            const currentMonthTransactions = typedTransactions.filter(t => {
+                const dateStr = String(t.date).split('T')[0]
+                return dateStr >= startOfCurrMonth && dateStr <= endOfCurrMonth
+            })
+
+            const income = currentMonthTransactions.filter(t => t.type === 'income').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
+            const expenses = currentMonthTransactions.filter(t => t.type === 'expense').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
             const savingsRate = income > 0 ? Math.max(0, (income - expenses) / income) : 0
 
             // 2. Budget Adherence
             const spendingByCategory = new Map<string, number>()
-            typedTransactions.filter(t => t.type === 'expense').forEach(t => {
+            currentMonthTransactions.filter(t => t.type === 'expense').forEach(t => {
                 const catId = t.category_id || 'uncategorized'
                 spendingByCategory.set(catId, (spendingByCategory.get(catId) || 0) + toNumber(t.amount))
             })
@@ -114,17 +104,12 @@ export function useFinancialHealth() {
             }, 0)
 
             // Fetch last 3 months expenses to average
-            const threeMonthsAgo = format(subMonths(startOfMonth(now), 3), 'yyyy-MM-dd')
-            const { rows: pastTransactions } = await query<{ amount: number }>(`
-                SELECT amount 
-                FROM transactions 
-                WHERE user_id = $1 
-                AND type = 'expense'
-                AND date >= $2
-                AND date < $3
-            `, [user.id, threeMonthsAgo, startOfCurrMonth])
-
-            const pastExpenses = (pastTransactions || []).reduce((sum, t) => sum + toNumber(t.amount), 0)
+            const pastExpenses = typedTransactions
+                .filter(t => {
+                    const dateStr = String(t.date).split('T')[0]
+                    return t.type === 'expense' && dateStr >= threeMonthsAgo && dateStr < startOfCurrMonth
+                })
+                .reduce((sum, t) => sum + toNumber(t.amount), 0)
             const avgMonthlyExpenses = pastExpenses > 0 ? pastExpenses / 3 : (expenses > 0 ? expenses : 2000)
             const targetEmergencyFund = avgMonthlyExpenses * 6
             const emergencyFundProgress = Math.min(1, currentEmergencyFund / targetEmergencyFund)

@@ -5,10 +5,8 @@ import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { generateFinancialAdvice } from '@/lib/gemini'
 import { useAuth } from '@/contexts/AuthContext'
-import { query } from '@/lib/database'
-import { PREFERENCES_KEY } from '@/types/preferences'
+import { api } from '@/lib/api'
 import Markdown from 'react-markdown'
 
 interface Message {
@@ -23,33 +21,6 @@ const CHAT_EXPIRY_MS = 1000 * 60 * 60 * 24 // 24 hours
 // Simple debounce to prevent rapid API calls
 let lastApiCall = 0
 const API_COOLDOWN_MS = 2000
-
-// Helper to get fresh API key directly from localStorage
-const getFreshApiKey = (): string | undefined => {
-    try {
-        const stored = localStorage.getItem(PREFERENCES_KEY)
-        if (stored) {
-            const prefs = JSON.parse(stored)
-            return prefs.geminiApiKey || undefined
-        }
-    } catch {
-        // Ignore parse errors
-    }
-    return undefined
-}
-
-const getFreshCurrency = (): string => {
-    try {
-        const stored = localStorage.getItem(PREFERENCES_KEY)
-        if (stored) {
-            const prefs = JSON.parse(stored)
-            return prefs.currency || 'INR'
-        }
-    } catch {
-        // Ignore parse errors
-    }
-    return 'INR'
-}
 
 export function AIAgentChat() {
     const { user } = useAuth()
@@ -70,17 +41,8 @@ export function AIAgentChat() {
                 const isExpired = Date.now() - timestamp > CHAT_EXPIRY_MS
 
                 if (!isExpired && storedMessages.length > 0) {
-                    // Filter out old API key error messages if key now exists
-                    const apiKey = getFreshApiKey()
-                    const filteredMessages = apiKey
-                        ? storedMessages.filter((m: Message) =>
-                            !m.content.includes('Please add your Gemini API Key'))
-                        : storedMessages
-
-                    if (filteredMessages.length > 0) {
-                        setMessages(filteredMessages)
-                        return
-                    }
+                    setMessages(storedMessages)
+                    return
                 }
             }
         } catch (e) {
@@ -142,74 +104,11 @@ export function AIAgentChat() {
         }
         setMessages(prev => [...prev, newUserMessage])
 
-        // Get fresh API key from localStorage to avoid stale state issues
-        const apiKey = getFreshApiKey()
-        const currency = getFreshCurrency()
-
-        if (!apiKey) {
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: "Please add your Gemini API Key in Settings > Preferences to use the AI Assistant.",
-                timestamp: Date.now()
-            }])
-            return
-        }
-
         setIsLoading(true)
         lastApiCall = Date.now()
 
         try {
-            const { rows: recentTransactions } = await query(`
-                SELECT t.type, t.amount, t.date, t.description, c.name as category_name
-                FROM transactions t
-                LEFT JOIN categories c ON t.category_id = c.id
-                WHERE t.user_id = $1
-                ORDER BY t.date DESC
-                LIMIT 20
-            `, [user.id])
-
-            const { rows: accounts } = await query(`
-                SELECT name, balance, type
-                FROM accounts
-                WHERE user_id = $1
-            `, [user.id])
-
-            const { rows: budgets } = await query(`
-                SELECT b.amount, b.period, c.name as category_name
-                FROM budgets b
-                LEFT JOIN categories c ON b.category_id = c.id
-                WHERE b.user_id = $1
-            `, [user.id])
-
-            const context = `
-You are a helpful, friendly financial advisor assistant. The user is asking about their personal finances.
-
-**IMPORTANT: Currency Setting**
-The user's preferred currency is: ${currency}
-ALWAYS format all monetary values using ${currency} symbol and format. For example:
-- INR: ₹1,00,000 (Indian format with lakhs)
-- USD: $100,000
-- EUR: €100,000
-- GBP: £100,000
-
-**User's Financial Data:**
-- Accounts: ${JSON.stringify(accounts || [])}
-- Recent Transactions (last 20): ${JSON.stringify(recentTransactions || [])}
-- Budgets: ${JSON.stringify(budgets || [])}
-
-**User's Question:** ${userMessage}
-
-**Instructions:**
-1. Be concise but helpful (keep responses under 150 words unless more detail is needed)
-2. Use the actual data provided to give specific, personalized advice
-3. ALWAYS format numbers in ${currency} - this is critical!
-4. If asked about balance, calculate totals from the accounts data
-5. Be encouraging and positive while being honest about financial health
-6. Suggest actionable next steps when appropriate
-7. DO NOT use any emojis in your responses.
-            `
-
-            const response = await generateFinancialAdvice(context, apiKey)
+            const { response } = await api.ai.chat(userMessage)
 
             if (response) {
                 setMessages(prev => [...prev, {
@@ -222,9 +121,7 @@ ALWAYS format all monetary values using ${currency} symbol and format. For examp
             }
         } catch (error: unknown) {
             console.error('Chat error:', error)
-            const errorMessage = error instanceof Error && error.message?.includes('API key')
-                ? 'Invalid API key. Please check your Gemini API key in Settings.'
-                : (error instanceof Error ? error.message : 'Something went wrong. Please try again.')
+            const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 
             setMessages(prev => [...prev, {
                 role: 'assistant',

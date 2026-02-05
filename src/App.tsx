@@ -14,6 +14,7 @@ import {
   Settings,
   Login,
   Signup,
+  ForgotPassword,
   Calendar,
 } from '@/pages'
 import { Toaster } from '@/components/ui/sonner'
@@ -73,6 +74,14 @@ function AppRoutes() {
         element={
           <PublicRoute>
             <Signup />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
           </PublicRoute>
         }
       />
