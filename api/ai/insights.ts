@@ -129,7 +129,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
       for (const t of transactions || []) {
         if (t.type === 'expense' && t.category) {
-          const catName = t.category.name
+          const catName = t.category.name || 'Uncategorized'
           const stats = categoryStats.get(catName) || { total: 0, count: 0, transactions: [] }
           stats.total += Number(t.amount || 0)
           stats.count += 1
@@ -138,7 +138,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
       }
 
-      categoryStats.forEach((stats, catName) => {
+      categoryStats.forEach((stats, categoryName) => {
         const average = stats.total / stats.count
         const recentTransactions = stats.transactions.slice(0, 3)
         recentTransactions.forEach(t => {
@@ -147,8 +147,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             newInsights.push({
               type: 'anomaly',
               title: 'Unusual Spending',
-              description: `You spent ${formatCurrency(amount)} on ${t.description || catName}, which is higher than your typical ${formatCurrency(average)} average.`,
-              category: catName,
+              description: `You spent ${formatCurrency(amount)} on ${t.description || categoryName}, which is higher than your typical ${formatCurrency(average)} average.`,
+              category: categoryName,
               amount,
               date: t.date,
             })
