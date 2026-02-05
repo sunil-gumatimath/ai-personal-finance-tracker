@@ -9,7 +9,7 @@ import {
     AICoach,
     FinancialHealthScore
 } from '@/components/dashboard'
-import { query } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { Transaction, DashboardStats, SpendingByCategory, MonthlyTrend, Category } from '@/types'
@@ -81,25 +81,9 @@ export function Dashboard() {
                 const startOfLastMonthStr = getLocalDateString(startOfLastMonth)
                 const sixMonthsAgoStr = getLocalDateString(sixMonthsAgo)
 
-                // 1. Fetch recent transactions with expanded details
-                const { rows: transactions } = await query<Transaction>(`
-                    SELECT
-                        t.*,
-                        row_to_json(c.*) as category,
-                        row_to_json(a.*) as account,
-                        row_to_json(ta.*) as to_account
-                    FROM transactions t
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    LEFT JOIN accounts a ON t.account_id = a.id
-                    LEFT JOIN accounts ta ON t.to_account_id = ta.id
-                    WHERE t.user_id = $1
-                    ORDER BY t.date DESC
-                    LIMIT 10
-                `, [user.id])
-
-                if (transactions) {
-                    setRecentTransactions(transactions)
-                }
+                const transactionsRes = await api.transactions.list({ since: sixMonthsAgoStr })
+                const allTransactions = (transactionsRes.transactions || []) as Transaction[]
+                setRecentTransactions(allTransactions.slice(0, 10))
 
                 // 2. Fetch both current and last month data for comparison
                 type TwoMonthRow = {
@@ -109,17 +93,10 @@ export function Dashboard() {
                     category: Category | null
                 }
 
-                const { rows: twoMonthData } = await query<TwoMonthRow>(`
-                    SELECT 
-                        t.type,
-                        t.amount,
-                        t.date,
-                        row_to_json(c.*) as category
-                    FROM transactions t
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    WHERE t.user_id = $1
-                    AND t.date >= $2
-                `, [user.id, startOfLastMonthStr])
+                const twoMonthData = allTransactions.filter(t => {
+                    const dateVal = String(t.date).split('T')[0]
+                    return dateVal >= startOfLastMonthStr
+                }) as TwoMonthRow[]
 
                 if (twoMonthData) {
                     // Helper to normalize date to YYYY-MM-DD (PostgreSQL may return Date objects or ISO strings)
@@ -203,13 +180,9 @@ export function Dashboard() {
                 }
 
                 // 3. Fetch 6-month trend data
-                const { rows: trendData } = await query<{ type: string; amount: number; date: string }>(`
-                    SELECT type, amount, date 
-                    FROM transactions 
-                    WHERE user_id = $1 
-                    AND date >= $2
-                    ORDER BY date ASC
-                `, [user.id, sixMonthsAgoStr])
+                const trendData = allTransactions
+                    .filter(t => String(t.date).split('T')[0] >= sixMonthsAgoStr)
+                    .map(t => ({ type: t.type, amount: t.amount as number, date: String(t.date) }))
 
                 if (trendData) {
                     const monthsMap = new Map<string, { income: number; expenses: number }>()
@@ -251,19 +224,13 @@ export function Dashboard() {
                 }
 
                 // 4. Fetch accounts for total balance
-                const { rows: accounts } = await query<{ balance: string | number }>(
-                    'SELECT balance FROM accounts WHERE user_id = $1 AND is_active = true',
-                    [user.id]
-                )
-
-                if (accounts) {
-                    // Handle PostgreSQL DECIMAL type which may come as string
-                    const totalBalance = accounts.reduce((sum: number, a) => {
-                        const balance = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance
-                        return sum + (isNaN(balance) ? 0 : balance)
-                    }, 0)
-                    setStats((prev) => ({ ...prev, totalBalance }))
-                }
+                const accountsRes = await api.accounts.list()
+                const accounts = (accountsRes.accounts || []).filter((a: any) => a.is_active)
+                const totalBalance = accounts.reduce((sum: number, a: any) => {
+                    const balance = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance
+                    return sum + (isNaN(balance) ? 0 : balance)
+                }, 0)
+                setStats((prev) => ({ ...prev, totalBalance }))
             } catch (error) {
                 console.error('Error fetching dashboard data:', error)
                 // No mock data fallback - show empty state with zeros

@@ -54,7 +54,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -119,11 +119,8 @@ export function Accounts() {
         }
 
         try {
-            const { rows } = await query<Account>(
-                `SELECT * FROM accounts WHERE user_id = $1 ORDER BY is_active DESC, name ASC`,
-                [user.id]
-            )
-            setAccounts(rows || [])
+            const res = await api.accounts.list()
+            setAccounts((res.accounts || []) as Account[])
         } catch (error) {
             console.error('Error fetching accounts:', error)
             toast.error('Failed to load accounts')
@@ -147,7 +144,6 @@ export function Accounts() {
 
         try {
             const accountData = {
-                user_id: user.id,
                 name: formData.name,
                 type: formData.type,
                 balance: parseFloat(formData.balance) || 0,
@@ -158,10 +154,10 @@ export function Accounts() {
             }
 
             if (editingAccount) {
-                await updateRecord('accounts', editingAccount.id, accountData)
+                await api.accounts.update(editingAccount.id, accountData)
                 toast.success('Account updated successfully')
             } else {
-                await insertRecord('accounts', accountData)
+                await api.accounts.create(accountData)
                 toast.success('Account created successfully')
             }
 
@@ -180,11 +176,8 @@ export function Accounts() {
 
         try {
             // Check for transactions where this account is used as source OR destination
-            const { rows } = await query<{ count: string }>(
-                'SELECT COUNT(*) as count FROM transactions WHERE account_id = $1 OR to_account_id = $1',
-                [account.id]
-            )
-            setLinkedTransactionsCount(parseInt(rows[0]?.count || '0', 10))
+            const res = await api.accounts.linkedCount(account.id)
+            setLinkedTransactionsCount(res.count)
         } catch (error) {
             console.error('Error checking transactions:', error)
             setLinkedTransactionsCount(0)
@@ -200,12 +193,7 @@ export function Accounts() {
         setIsDeleting(true)
         try {
             // If there are linked transactions, we need to handle them
-            if (linkedTransactionsCount > 0) {
-                // Delete associated transactions (both as source and destination)
-                await query('DELETE FROM transactions WHERE account_id = $1 OR to_account_id = $1', [accountToDelete.id])
-            }
-
-            await deleteRecord('accounts', accountToDelete.id)
+            await api.accounts.delete(accountToDelete.id, linkedTransactionsCount > 0)
 
             toast.success(`"${accountToDelete.name}" deleted successfully`)
             fetchAccounts()

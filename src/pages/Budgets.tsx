@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -49,83 +49,13 @@ export function Budgets() {
         }
 
         try {
-            // Helper to get local date string (YYYY-MM-DD) to avoid timezone issues
-            const getLocalDateString = (date: Date): string => {
-                const year = date.getFullYear()
-                const month = String(date.getMonth() + 1).padStart(2, '0')
-                const day = String(date.getDate()).padStart(2, '0')
-                return `${year}-${month}-${day}`
-            }
-
-            // Calculate period start dates using local time
-            const now = new Date()
-            const startOfWeek = new Date(now)
-            startOfWeek.setDate(now.getDate() - now.getDay())
-            startOfWeek.setHours(0, 0, 0, 0)
-
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-            const startOfYear = new Date(now.getFullYear(), 0, 1)
-
-            // Get the earliest possible start date (start of year) for a single query
-            const earliestStartDate = getLocalDateString(startOfYear)
-
-            const [budgetsRes, categoriesRes, transactionsRes] = await Promise.all([
-                query<Budget>(`
-                    SELECT b.*, row_to_json(c.*) as category
-                    FROM budgets b
-                    LEFT JOIN categories c ON b.category_id = c.id
-                    WHERE b.user_id = $1
-                `, [user.id]),
-                query<Category>(
-                    `SELECT * FROM categories WHERE user_id = $1 AND type = 'expense'`,
-                    [user.id]
-                ),
-                // Single query for all expense transactions from start of year
-                query<{ amount: number; category_id: string; date: string }>(`
-                    SELECT amount, category_id, date
-                    FROM transactions
-                    WHERE user_id = $1 
-                    AND type = 'expense'
-                    AND date >= $2
-                `, [user.id, earliestStartDate])
+            const [budgetsRes, categoriesRes] = await Promise.all([
+                api.budgets.list(),
+                api.categories.list('expense'),
             ])
 
-            if (budgetsRes.rows && transactionsRes.rows) {
-                // Group transactions by category for efficient lookup
-                const transactionsByCategory = new Map<string, { amount: number; date: string }[]>()
-                for (const t of transactionsRes.rows) {
-                    if (!t.category_id) continue
-                    const existing = transactionsByCategory.get(t.category_id) || []
-                    existing.push({ amount: t.amount, date: t.date })
-                    transactionsByCategory.set(t.category_id, existing)
-                }
-
-                // Calculate spent for each budget using in-memory data
-                const budgetsWithSpent = budgetsRes.rows.map((budget) => {
-                    let startDateStr: string
-                    switch (budget.period) {
-                        case 'weekly':
-                            startDateStr = getLocalDateString(startOfWeek)
-                            break
-                        case 'yearly':
-                            startDateStr = getLocalDateString(startOfYear)
-                            break
-                        default: // monthly
-                            startDateStr = getLocalDateString(startOfMonth)
-                    }
-
-                    const categoryTransactions = transactionsByCategory.get(budget.category_id) || []
-                    const spent = categoryTransactions
-                        .filter(t => t.date >= startDateStr)
-                        .reduce((sum, t) => sum + t.amount, 0)
-
-                    return { ...budget, spent }
-                })
-
-                setBudgets(budgetsWithSpent as Budget[])
-            }
-
-            if (categoriesRes.rows) setCategories(categoriesRes.rows)
+            setBudgets((budgetsRes.budgets || []) as Budget[])
+            setCategories((categoriesRes.categories || []) as Category[])
         } catch (error) {
             console.error('Error fetching data:', error)
             toast.error('Failed to load budgets')
@@ -156,7 +86,6 @@ export function Budgets() {
             const startDateStr = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}-01`
 
             const budgetData = {
-                user_id: user.id,
                 category_id: formData.category_id,
                 amount: parseFloat(formData.amount),
                 period: formData.period,
@@ -164,10 +93,10 @@ export function Budgets() {
             }
 
             if (editingBudget) {
-                await updateRecord('budgets', editingBudget.id, budgetData)
+                await api.budgets.update(editingBudget.id, budgetData)
                 toast.success('Budget updated successfully')
             } else {
-                await insertRecord('budgets', budgetData)
+                await api.budgets.create(budgetData)
                 toast.success('Budget created successfully')
             }
 
@@ -182,7 +111,7 @@ export function Budgets() {
 
     const handleDelete = async (id: string) => {
         try {
-            await deleteRecord('budgets', id)
+            await api.budgets.delete(id)
             toast.success('Budget deleted')
             fetchData()
         } catch (error) {

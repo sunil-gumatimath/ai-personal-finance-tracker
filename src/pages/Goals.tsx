@@ -39,7 +39,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -88,13 +88,8 @@ export function Goals() {
         }
 
         try {
-            const { rows } = await query<Goal>(`
-                SELECT * FROM goals 
-                WHERE user_id = $1 
-                ORDER BY created_at DESC
-            `, [user.id])
-
-            setGoals(rows || [])
+            const res = await api.goals.list()
+            setGoals((res.goals || []) as Goal[])
         } catch (error) {
             console.error('Error fetching goals:', error)
             toast.error('Failed to load goals')
@@ -113,7 +108,6 @@ export function Goals() {
 
         try {
             const goalData = {
-                user_id: user.id,
                 name: formData.name,
                 target_amount: parseFloat(formData.target_amount),
                 current_amount: parseFloat(formData.current_amount) || 0,
@@ -123,10 +117,10 @@ export function Goals() {
             }
 
             if (editingGoal) {
-                await updateRecord('goals', editingGoal.id, goalData)
+                await api.goals.update(editingGoal.id, goalData)
                 toast.success('Goal updated successfully')
             } else {
-                await insertRecord('goals', goalData)
+                await api.goals.create(goalData)
                 toast.success('Goal created successfully! 🎯')
             }
 
@@ -151,7 +145,7 @@ export function Goals() {
             const actualContribution = Math.min(contributionAmount, remaining)
             const newAmount = selectedGoal.current_amount + actualContribution
 
-            await updateRecord('goals', selectedGoal.id, { current_amount: newAmount })
+            await api.goals.update(selectedGoal.id, { current_amount: newAmount })
 
             const isCompleted = newAmount >= selectedGoal.target_amount
 
@@ -181,7 +175,7 @@ export function Goals() {
 
     const handleDelete = async (id: string) => {
         try {
-            await deleteRecord('goals', id)
+            await api.goals.delete(id)
             toast.success('Goal deleted')
             fetchGoals()
         } catch (error) {

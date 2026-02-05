@@ -19,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import type { Category } from '@/types'
@@ -54,13 +54,8 @@ export function Categories() {
         }
 
         try {
-            const { rows } = await query<Category>(`
-                SELECT * FROM categories
-                WHERE user_id = $1
-                ORDER BY type, name
-            `, [user.id])
-
-            setCategories(rows || [])
+            const res = await api.categories.list()
+            setCategories((res.categories || []) as Category[])
         } catch (error) {
             console.error('Error fetching categories:', error)
             toast.error('Failed to load categories')
@@ -79,7 +74,6 @@ export function Categories() {
 
         try {
             const categoryData = {
-                user_id: user.id,
                 name: formData.name,
                 type: formData.type,
                 color: formData.color,
@@ -87,10 +81,10 @@ export function Categories() {
             }
 
             if (editingCategory) {
-                await updateRecord('categories', editingCategory.id, categoryData)
+                await api.categories.update(editingCategory.id, categoryData)
                 toast.success('Category updated successfully')
             } else {
-                await insertRecord('categories', categoryData)
+                await api.categories.create(categoryData)
                 toast.success('Category created successfully')
             }
 
@@ -105,7 +99,7 @@ export function Categories() {
 
     const handleDelete = async (id: string) => {
         try {
-            await deleteRecord('categories', id)
+            await api.categories.delete(id)
             toast.success('Category deleted')
             fetchCategories()
         } catch (error) {

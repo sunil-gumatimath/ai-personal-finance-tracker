@@ -46,7 +46,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -83,26 +83,16 @@ export function Transactions() {
 
         try {
             const [transactionsRes, categoriesRes, accountsRes] = await Promise.all([
-                query<Transaction>(`
-                    SELECT
-                        t.*,
-                        row_to_json(c.*) as category,
-                        row_to_json(a.*) as account,
-                        row_to_json(ta.*) as to_account
-                    FROM transactions t
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    LEFT JOIN accounts a ON t.account_id = a.id
-                    LEFT JOIN accounts ta ON t.to_account_id = ta.id
-                    WHERE t.user_id = $1
-                    ORDER BY t.date DESC
-                `, [user.id]),
-                query<Category>('SELECT * FROM categories WHERE user_id = $1', [user.id]),
-                query<Account>('SELECT * FROM accounts WHERE user_id = $1 AND is_active = true', [user.id]),
+                api.transactions.list(),
+                api.categories.list(),
+                api.accounts.list(),
             ])
 
-            setTransactions(transactionsRes.rows || [])
-            setCategories(categoriesRes.rows || [])
-            setAccounts(accountsRes.rows || [])
+            setTransactions((transactionsRes.transactions || []) as Transaction[])
+            setCategories((categoriesRes.categories || []) as Category[])
+            setAccounts(
+                ((accountsRes.accounts || []) as Account[]).filter(a => a.is_active),
+            )
         } catch (error) {
             console.error('Error fetching data:', error)
             toast.error('Failed to load transactions')
@@ -131,7 +121,6 @@ export function Transactions() {
 
         try {
             const transactionData: Record<string, unknown> = {
-                user_id: user.id,
                 type: formData.type,
                 amount: parseFloat(formData.amount),
                 description: formData.description || null,
@@ -148,10 +137,10 @@ export function Transactions() {
             }
 
             if (editingTransaction) {
-                await updateRecord('transactions', editingTransaction.id, transactionData)
+                await api.transactions.update(editingTransaction.id, transactionData)
                 toast.success('Transaction updated successfully')
             } else {
-                await insertRecord('transactions', transactionData)
+                await api.transactions.create(transactionData)
                 toast.success('Transaction added successfully')
             }
 
@@ -166,7 +155,7 @@ export function Transactions() {
 
     const handleDelete = async (id: string) => {
         try {
-            await deleteRecord('transactions', id)
+            await api.transactions.delete(id)
             toast.success('Transaction deleted')
             fetchData()
         } catch (error) {

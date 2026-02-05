@@ -55,7 +55,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { query, insertRecord, updateRecord, deleteRecord } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -132,11 +132,8 @@ export function Debts() {
         }
 
         try {
-            const { rows } = await query<Debt>(`
-                SELECT * FROM debts 
-                WHERE user_id = $1 
-                ORDER BY is_active DESC, current_balance DESC
-            `, [user.id])
+            const res = await api.debts.list()
+            const rows = (res.debts || []) as Debt[]
 
             // Convert numeric strings to numbers
             const typedRows = (rows || []).map(debt => ({
@@ -160,12 +157,8 @@ export function Debts() {
         if (!user) return
 
         try {
-            const { rows } = await query<DebtPayment>(`
-                SELECT * FROM debt_payments 
-                WHERE debt_id = $1 AND user_id = $2
-                ORDER BY payment_date DESC
-                LIMIT 10
-            `, [debtId, user.id])
+            const res = await api.debts.payments.list(debtId)
+            const rows = (res.payments || []) as DebtPayment[]
 
             // Convert numeric strings to numbers
             const typedRows = (rows || []).map(payment => ({
@@ -197,7 +190,6 @@ export function Debts() {
 
         try {
             const debtData = {
-                user_id: user.id,
                 name: formData.name,
                 type: formData.type,
                 original_amount: parseFloat(formData.original_amount),
@@ -214,10 +206,10 @@ export function Debts() {
             }
 
             if (editingDebt) {
-                await updateRecord('debts', editingDebt.id, debtData)
+                await api.debts.update(editingDebt.id, debtData)
                 toast.success('Debt updated successfully')
             } else {
-                await insertRecord('debts', debtData)
+                await api.debts.create(debtData)
                 toast.success('Debt added successfully')
             }
 
@@ -241,7 +233,6 @@ export function Debts() {
 
             const paymentData = {
                 debt_id: selectedDebt.id,
-                user_id: user.id,
                 amount,
                 principal_amount: principalAmount,
                 interest_amount: interestAmount,
@@ -249,7 +240,7 @@ export function Debts() {
                 notes: paymentFormData.notes || null,
             }
 
-            await insertRecord('debt_payments', paymentData)
+            await api.debts.payments.create(paymentData)
 
             const newBalance = Math.max(0, selectedDebt.current_balance - principalAmount)
             if (newBalance === 0) {
@@ -272,7 +263,7 @@ export function Debts() {
 
     const handleDelete = async (id: string) => {
         try {
-            await deleteRecord('debts', id)
+            await api.debts.delete(id)
             toast.success('Debt deleted')
             fetchDebts()
         } catch (error) {
@@ -283,7 +274,7 @@ export function Debts() {
 
     const handleMarkPaidOff = async (debt: Debt) => {
         try {
-            await updateRecord('debts', debt.id, {
+            await api.debts.update(debt.id, {
                 current_balance: 0,
                 is_active: false
             })

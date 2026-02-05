@@ -8,5 +8,6 @@ export { Debts } from './Debts'
 export { Settings } from './Settings'
 export { Login } from './Login'
 export { Signup } from './Signup'
+export { ForgotPassword } from './ForgotPassword'
 export { Calendar } from './Calendar'
 

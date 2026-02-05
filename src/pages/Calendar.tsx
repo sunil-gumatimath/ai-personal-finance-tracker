@@ -20,7 +20,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog'
-import { query } from '@/lib/database'
+import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
@@ -63,7 +63,10 @@ export function Calendar() {
     const [isDialogOpen, setIsDialogOpen] = useState(false)
 
     const fetchTransactions = useCallback(async () => {
-        if (!user) return
+        if (!user) {
+            setLoading(false)
+            return
+        }
 
         const start = startOfWeek(startOfMonth(currentDate))
         const end = endOfWeek(endOfMonth(currentDate))
@@ -77,22 +80,11 @@ export function Calendar() {
         }
 
         try {
-            const { rows } = await query<Transaction>(`
-                SELECT
-                    t.*,
-                    row_to_json(c.*) as category,
-                    row_to_json(a.*) as account,
-                    row_to_json(ta.*) as to_account
-                FROM transactions t
-                LEFT JOIN categories c ON t.category_id = c.id
-                LEFT JOIN accounts a ON t.account_id = a.id
-                LEFT JOIN accounts ta ON t.to_account_id = ta.id
-                WHERE t.user_id = $1
-                AND t.date >= $2
-                AND t.date <= $3
-            `, [user.id, formatDateStr(start), formatDateStr(end)])
-
-            if (rows) setTransactions(rows)
+            const res = await api.transactions.list({ since: formatDateStr(start) })
+            const rows = (res.transactions || []) as Transaction[]
+            const endStr = formatDateStr(end)
+            const filtered = rows.filter(t => String(t.date).split('T')[0] <= endStr)
+            setTransactions(filtered)
         } catch (error) {
             console.error('Error fetching transactions:', error)
         } finally {
