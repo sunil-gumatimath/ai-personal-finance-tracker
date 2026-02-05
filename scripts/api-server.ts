@@ -1,7 +1,7 @@
 
 import { serve } from "bun";
 import path from "path";
-import type { ApiRequest, ApiResponse } from "./_types.js";
+import type { ApiRequest, ApiResponse } from "../api/_types.js";
 
 const PORT = process.env.PORT || 3001;
 
