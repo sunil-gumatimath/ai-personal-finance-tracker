@@ -43,4 +43,11 @@ Desktop.ini
 # Testing
 coverage
 
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
 .vercel
