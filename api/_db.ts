@@ -8,7 +8,7 @@ function getPool(): Pool {
   if (pool) return pool
 
   const connectionString = process.env.NEON_DATABASE_URL
-  if (!connectionString) {
+  if (!connectionString || connectionString === '') {
     console.warn('⚠️ Database connection string is missing. Using mock database for development.')
     useMock = true
     throw new Error('MOCK_MODE')
