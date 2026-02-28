@@ -8,9 +8,9 @@
     "api": "bun --watch scripts/api-server.ts",
     "vite": "bunx --bun vite",
     "build": "bun run tsc -b && bunx --bun vite build",
-    "lint": "eslint .",
+    "lint": "bunx eslint .",
     "preview": "bunx --bun vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

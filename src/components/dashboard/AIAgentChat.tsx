@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, User, BotMessageSquare, X, Loader2 } from 'lucide-react'
+import { Send, User, BotMessageSquare, X, Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -13,6 +13,7 @@ interface Message {
     role: 'user' | 'assistant'
     content: string
     timestamp: number
+    processedQuery?: any
 }
 
 const CHAT_STORAGE_KEY = 'financetrack_ai_chat'
@@ -21,6 +22,24 @@ const CHAT_EXPIRY_MS = 1000 * 60 * 60 * 24 // 24 hours
 // Simple debounce to prevent rapid API calls
 let lastApiCall = 0
 const API_COOLDOWN_MS = 2000
+
+// Example queries to show users
+const QUERY_EXAMPLES = [
+    "How much did I spend on food last month?",
+    "What's my total account balance?",
+    "Show me my income vs expenses this month",
+    "Compare my spending this month vs last month",
+    "How much do I spend on transportation weekly?",
+    "What's my average monthly grocery bill?",
+    "Am I on track with my savings goals?",
+    "Show me a breakdown of my entertainment spending",
+    "How much debt do I have left?",
+    "What's my net worth?",
+    "Forecast my expenses for next month",
+    "Which category do I spend the most on?",
+    "What's my average daily spending?",
+    "How much have I earned this year?"
+]
 
 export function AIAgentChat() {
     const { user } = useAuth()
@@ -234,20 +253,43 @@ export function AIAgentChat() {
                     </div>
                 </CardContent>
 
-                {/* Input - Compact */}
-                <CardFooter className="px-3 py-2 border-t shrink-0">
+                {/* Input Section */}
+                <div className="px-3 py-2 border-t shrink-0">
+                    {/* Query Examples - Above Input */}
+                    {messages.length <= 1 && (
+                        <div className="pb-2">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground font-medium">Try asking:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                                {QUERY_EXAMPLES.slice(0, 3).map((example, index) => (
+                                    <Button
+                                        key={index}
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => setInput(example)}
+                                    >
+                                        {example.length > 30 ? example.substring(0, 30) + '...' : example}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
                     <form className="flex w-full gap-2" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
                         <Input
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Ask about your finances..."
+                            placeholder="Ask about your finances... (try: 'How much did I spend last month?')"
                             className="h-8 text-sm"
                         />
                         <Button type="submit" size="icon" disabled={isLoading || !input.trim()} className="h-8 w-8 shrink-0">
                             <Send className="h-3.5 w-3.5" />
                         </Button>
                     </form>
-                </CardFooter>
+                </div>
             </Card>
         </div>
     )
