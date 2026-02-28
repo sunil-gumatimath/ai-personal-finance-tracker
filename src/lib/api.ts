@@ -1,5 +1,27 @@
 type ApiError = { error: string }
 
+// Import notification types from the hook file
+type NotificationData = {
+  preferences: {
+    notifications: boolean
+    emailAlerts: boolean
+    budgetAlerts: boolean
+  }
+  budgetAlerts: Array<{
+    id: string
+    type: 'budget'
+    category: string
+    color: string
+    spent: number
+    limit: number
+    percentage: number
+    status: 'ok' | 'warning' | 'over'
+    message: string | null
+  }>
+  recentActivity: any[]
+  unreadCount: number
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
@@ -168,6 +190,25 @@ export const api = {
       apiFetch<{ response: string }>('/api/ai/chat', {
         method: 'POST',
         body: JSON.stringify({ message }),
+      }),
+  },
+  notifications: {
+    list: () => apiFetch<NotificationData>('/api/notifications'),
+    createBudgetAlert: (categoryId: string, message: string, severity: 'low' | 'medium' | 'high') =>
+      apiFetch<{ success: boolean; message: string }>('/api/notifications', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'budget_alert',
+          data: { categoryId, message, severity }
+        }),
+      }),
+    updatePushSubscription: (subscription: any) =>
+      apiFetch<{ success: boolean; message: string }>('/api/notifications', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'push_notification',
+          data: { subscription }
+        }),
       }),
   },
 }
