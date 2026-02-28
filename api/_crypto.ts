@@ -4,6 +4,11 @@ const subtle = webcrypto.subtle
 const encoder = new TextEncoder()
 
 export async function hashPassword(password: string): Promise<string> {
+  // Check if we're in mock mode (no database URL)
+  if (!process.env.NEON_DATABASE_URL) {
+    return `mock_hash_${password}`
+  }
+
   const salt = webcrypto.getRandomValues(new Uint8Array(16))
   const keyMaterial = await subtle.importKey(
     'raw',
@@ -33,6 +38,11 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  // Check if we're in mock mode
+  if (!process.env.NEON_DATABASE_URL) {
+    return storedHash === `mock_hash_${password}`
+  }
+
   if (!storedHash.startsWith('$pbkdf2$')) return false
   const parts = storedHash.split('$')
   if (parts.length !== 5) return false
