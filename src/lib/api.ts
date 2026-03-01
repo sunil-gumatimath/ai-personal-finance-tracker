@@ -18,7 +18,7 @@ type NotificationData = {
     status: 'ok' | 'warning' | 'over'
     message: string | null
   }>
-  recentActivity: any[]
+  recentActivity: Record<string, unknown>[]
   unreadCount: number
 }
 
@@ -202,7 +202,7 @@ export const api = {
           data: { categoryId, message, severity }
         }),
       }),
-    updatePushSubscription: (subscription: any) =>
+    updatePushSubscription: (subscription: unknown) =>
       apiFetch<{ success: boolean; message: string }>('/api/notifications', {
         method: 'POST',
         body: JSON.stringify({

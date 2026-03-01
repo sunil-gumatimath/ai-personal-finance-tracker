@@ -22,7 +22,7 @@ export interface NotificationPreferences {
 export interface NotificationData {
   preferences: NotificationPreferences
   budgetAlerts: BudgetAlert[]
-  recentActivity: any[]
+  recentActivity: Record<string, unknown>[]
   unreadCount: number
 }
 
@@ -53,7 +53,7 @@ export function useNotifications() {
     }
   }
 
-  const updatePushSubscription = async (subscription: any) => {
+  const updatePushSubscription = async (subscription: unknown) => {
     try {
       await api.notifications.updatePushSubscription(subscription)
     } catch (err) {

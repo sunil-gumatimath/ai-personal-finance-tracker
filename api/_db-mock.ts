@@ -427,7 +427,7 @@ export async function queryOne<T = unknown>(
   return rows[0] || null
 }
 
-export async function transaction<T>(callback: (client: any) => Promise<T>): Promise<T> {
+export async function transaction<T>(callback: (client: unknown) => Promise<T>): Promise<T> {
   // Mock transaction - just execute the callback
   return await callback(null)
 }

@@ -13,7 +13,7 @@ interface Message {
     role: 'user' | 'assistant'
     content: string
     timestamp: number
-    processedQuery?: any
+    processedQuery?: Record<string, unknown>
 }
 
 const CHAT_STORAGE_KEY = 'financetrack_ai_chat'

@@ -2,8 +2,8 @@ import { getAuthedUserId } from '../_auth.js'
 import { query, queryOne } from '../_db.js'
 import { generateFinancialAdvice } from '../_gemini.js'
 import type { ApiRequest, ApiResponse } from '../_types.js'
-// @ts-ignore - JavaScript module
-import { AIQueryProcessor, QUERY_EXAMPLES } from './query-processor.js'
+// @ts-expect-error - JavaScript module
+import { AIQueryProcessor } from './query-processor.js'
 
 // Helper function to fetch relevant financial data based on query intent
 async function fetchFinancialData(userId: string, intent: any) {
@@ -21,7 +21,7 @@ async function fetchFinancialData(userId: string, intent: any) {
     data.accounts = accounts || []
 
     // Fetch transactions based on intent
-    let transactionQuery = `
+    const transactionQuery = `
       SELECT t.type, t.amount, t.date, t.description, c.name as category_name
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id

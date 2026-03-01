@@ -109,11 +109,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   if (req.method === 'POST') {
     try {
-      const { type, data } = req.body || {}
+      const data: any = req.body || {}
 
-      if (type === 'budget_alert') {
+      if (data.type === 'budget_alert') {
         // Create a budget alert notification
-        const { categoryId, message, severity } = data as any
+        const { message, severity } = data as { message?: string; severity?: string }
         
         // This could store notifications in a dedicated table
         // For now, we'll just return success
@@ -130,10 +130,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return
       }
 
-      if (type === 'push_notification') {
+      if (data.type === 'push_notification') {
         // Handle push notification subscription
-        const { subscription } = data as any
-        
+        // Handle push notification subscription
         // Store subscription for push notifications
         // This would typically be stored in a notifications_subscriptions table
         
