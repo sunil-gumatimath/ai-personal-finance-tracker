@@ -76,7 +76,6 @@ serve({
             try {
                 if (req.method !== "GET") {
                     body = await req.json();
-                    console.log(`📦 Body:`, body);
                 }
             } catch (e) {
                 console.warn(`⚠️ Failed to parse body: ${e}`);
@@ -110,22 +109,18 @@ serve({
 
             const mockRes: ApiResponse = {
                 status(s: number) {
-                    console.log(`🚥 Status set to ${s}`);
                     status = s;
                     return this;
                 },
                 json(data: unknown) {
-                    console.log(`📄 Response:`, data);
                     responseBody = JSON.stringify(data);
                     return this;
                 },
                 setHeader(k: string, v: string) {
-                    console.log(`🏷️ Header: ${k}=${v}`);
                     headers.set(k, v);
                     return this;
                 },
                 end(data?: unknown) {
-                    console.log(`🔚 End called`);
                     responseBody = typeof data === "string" ? data : data == null ? null : String(data);
                     return this;
                 }

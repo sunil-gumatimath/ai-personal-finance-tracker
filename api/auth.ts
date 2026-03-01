@@ -149,19 +149,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             let isValid = false
             let isLegacy = false
 
-            console.log('🔍 DEBUG: Password verification - stored:', storedPassword, 'input:', password)
-
             if (storedPassword.startsWith('$pbkdf2$')) {
                 isValid = await verifyPassword(password, storedPassword)
-                console.log('🔍 DEBUG: Tried PBKDF2 verification, result:', isValid)
             } else if (storedPassword === password) {
                 isValid = true
                 isLegacy = true
-                console.log('🔍 DEBUG: Legacy plain text match, result:', isValid)
             } else if (storedPassword.startsWith('mock_hash_')) {
                 // Mock database password verification
                 isValid = storedPassword === `mock_hash_${password}`
-                console.log('🔍 DEBUG: Mock hash verification, expected:', `mock_hash_${password}`, 'got:', storedPassword, 'result:', isValid)
             }
 
             if (!isValid) {
