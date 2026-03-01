@@ -36,6 +36,8 @@ A premium, AI-powered personal finance management platform designed for clarity 
 - Debts & Loans: Comprehensive debt tracking with payment history, interest calculations, payoff projections, and smart payoff strategies (Snowball and Avalanche methods).
 - Unified Account View: Seamless management of diverse asset types including Checking, Savings, Credit, Investments, and Cash.
 - Adaptive Categories: Flexible, hierarchical category system with customizable visual identifiers.
+- Activity Calendar: Daily financial activity visualization with color-coded income/expense indicators and month-by-month navigation.
+- Password Recovery: Secure forgot password functionality with email-based reset process.
 
 
 ### Premium User Experience
@@ -210,15 +212,44 @@ Access the application at `http://localhost:8080`
 
 ```
 ├── src/
-│   ├── components/     # Reusable UI components
-│   ├── contexts/       # React Context providers
-│   ├── hooks/          # Custom React hooks
-│   ├── lib/            # Utilities and helpers
-│   ├── pages/          # Main application pages
-│   └── types/          # TypeScript type definitions
-├── database/           # Database schema and migrations
-├── public/             # Static assets
-└── scripts/            # Utility scripts
+│   ├── components/     # Reusable UI components (39 files)
+│   ├── contexts/       # React Context providers (Auth, Preferences)
+│   ├── hooks/          # Custom React hooks (6 files)
+│   ├── lib/            # Utilities and helpers (8 files)
+│   ├── pages/          # Main application pages (13 files)
+│   │   ├── Dashboard.tsx      # Financial overview with AI insights
+│   │   ├── Transactions.tsx   # Transaction management with CSV export
+│   │   ├── Budgets.tsx        # Budget tracking and analytics
+│   │   ├── Goals.tsx          # Savings goals management
+│   │   ├── Debts.tsx          # Debt tracking and payoff strategies
+│   │   ├── Accounts.tsx       # Account management
+│   │   ├── Categories.tsx     # Category customization
+│   │   ├── Calendar.tsx       # Daily financial activity view
+│   │   ├── Settings.tsx       # User preferences and AI integration
+│   │   ├── Login.tsx          # User authentication
+│   │   ├── Signup.tsx         # User registration
+│   │   └── ForgotPassword.tsx # Password recovery
+│   └── types/          # TypeScript type definitions (3 files)
+├── api/               # Backend API endpoints (21 files)
+│   ├── auth.ts         # Authentication (login, signup, password reset)
+│   ├── accounts.ts     # Account management
+│   ├── transactions.ts # Transaction CRUD operations
+│   ├── budgets.ts      # Budget management
+│   ├── goals.ts        # Goals tracking
+│   ├── debts.ts        # Debt management
+│   ├── categories.ts   # Category operations
+│   ├── profile.ts      # User profile management
+│   ├── notifications.ts # Budget alerts and notifications
+│   └── ai/            # AI-powered features
+│       ├── chat.ts     # Natural language AI assistant
+│       ├── insights.ts  # Financial coaching insights
+│       └── query-processor.js # NLP query processing
+├── database/          # Database schema and migrations
+│   ├── database-neon.sql    # Main database schema
+│   └── database-debts.sql   # Debt tracking tables
+├── public/            # Static assets and PWA files
+├── scripts/           # Utility scripts (5 files)
+└── docs/             # Additional documentation
 ```
 
 ## Database Schema
