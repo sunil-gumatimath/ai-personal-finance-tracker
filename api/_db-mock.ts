@@ -68,6 +68,13 @@ const mockTransactions = new Map<string, MockTransaction>()
 const mockCategories = new Map<string, MockCategory>()
 const mockAIInsights = new Map<string, MockAIInsight>()
 
+const MOCK_DB_DEBUG = process.env.MOCK_DB_DEBUG === '1'
+const debugLog = (...args: unknown[]) => {
+  if (MOCK_DB_DEBUG) {
+    console.log(...args)
+  }
+}
+
 // Initialize with sample data
 function initializeSampleData() {
   const userId = 'sample-user-123'
@@ -85,18 +92,18 @@ function initializeSampleData() {
   }
   mockUsers.set(userId, sampleUser)
   
-  // Create user's test account
-  const userUserId = 'user-sunil-123'
-  const userSampleUser: MockUser = {
-    id: userUserId,
-    email: 'sunilgumatimath38@gmail.com',
-    encrypted_password: 'mock_hash_Sunil@081120',
-    full_name: 'Sunil Gumatimath',
+  // Create an additional generic demo user
+  const secondaryUserId = 'sample-user-456'
+  const secondarySampleUser: MockUser = {
+    id: secondaryUserId,
+    email: 'user@example.com',
+    encrypted_password: 'mock_hash_demo123',
+    full_name: 'Sample User',
     avatar_url: null,
     created_at: new Date().toISOString(),
     last_sign_in_at: new Date().toISOString()
   }
-  mockUsers.set(userUserId, userSampleUser)
+  mockUsers.set(secondaryUserId, secondarySampleUser)
   
   // Create sample profile
   const sampleProfile: MockProfile = {
@@ -110,18 +117,18 @@ function initializeSampleData() {
   }
   mockProfiles.set(profileId, sampleProfile)
   
-  // Create user's profile
-  const userProfileId = 'user-profile-sunil-123'
-  const userSampleProfile: MockProfile = {
-    id: userProfileId,
-    user_id: userUserId,
-    full_name: 'Sunil Gumatimath',
-    currency: 'INR',
+  // Create secondary user's profile
+  const secondaryProfileId = 'sample-profile-456'
+  const secondarySampleProfile: MockProfile = {
+    id: secondaryProfileId,
+    user_id: secondaryUserId,
+    full_name: 'Sample User',
+    currency: 'USD',
     preferences: { geminiApiKey: '' },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
-  mockProfiles.set(userProfileId, userSampleProfile)
+  mockProfiles.set(secondaryProfileId, secondarySampleProfile)
   
   // Create sample categories
   const categories = [
@@ -220,24 +227,24 @@ export async function query<T = unknown>(
   queryText: string,
   params?: unknown[],
 ): Promise<{ rows: T[]; rowCount: number }> {
-  console.log(`🔧 MOCK DB Query: ${queryText}`, params)
+  debugLog(`🔧 MOCK DB Query: ${queryText}`, params)
   
   // Debug AI insights queries
   if (queryText.includes('ai_insights')) {
-    console.log('🔍 DEBUG: AI insights query detected:', queryText)
+    debugLog('🔍 DEBUG: AI insights query detected:', queryText)
   }
   
   // AI Insights queries - more specific pattern matching
   if (queryText.includes('SELECT * FROM ai_insights') && queryText.includes('WHERE user_id')) {
     const userId = params?.[0] as string
-    console.log('🔍 DEBUG: Looking for insights for user:', userId)
-    console.log('🔍 DEBUG: All insights:', Array.from(mockAIInsights.values()))
+    debugLog('🔍 DEBUG: Looking for insights for user:', userId)
+    debugLog('🔍 DEBUG: All insights:', Array.from(mockAIInsights.values()))
     const insights = Array.from(mockAIInsights.values()).filter(i => 
       i.user_id === userId && 
       !i.is_dismissed && 
       i.created_at
     )
-    console.log('🔍 DEBUG: Filtered insights:', insights)
+    debugLog('🔍 DEBUG: Filtered insights:', insights)
     // For mock purposes, return all non-dismissed insights (ignore 7-day filter)
     return { rows: insights as T[], rowCount: insights.length }
   }
@@ -249,10 +256,10 @@ export async function query<T = unknown>(
   
   if (queryText.includes('SELECT * FROM users WHERE email')) {
     const email = params?.[0] as string
-    console.log('🔍 DEBUG: Looking for user with email:', email)
-    console.log('🔍 DEBUG: All users in mock DB:', Array.from(mockUsers.values()).map(u => ({ id: u.id, email: u.email, name: u.full_name })))
+    debugLog('🔍 DEBUG: Looking for user with email:', email)
+    debugLog('🔍 DEBUG: All users in mock DB:', Array.from(mockUsers.values()).map(u => ({ id: u.id, email: u.email, name: u.full_name })))
     const user = Array.from(mockUsers.values()).find(u => u.email === email)
-    console.log('🔍 DEBUG: Found user:', user ? { id: user.id, email: user.email, name: user.full_name } : 'NOT FOUND')
+    debugLog('🔍 DEBUG: Found user:', user ? { id: user.id, email: user.email, name: user.full_name } : 'NOT FOUND')
     return { rows: user ? [user as T] : [], rowCount: user ? 1 : 0 }
   }
   
