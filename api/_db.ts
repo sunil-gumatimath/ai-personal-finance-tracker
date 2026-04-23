@@ -8,8 +8,15 @@ function getPool(): Pool {
   if (pool) return pool
 
   const connectionString = process.env.NEON_DATABASE_URL
+  const useMockExplicitly = process.env.USE_MOCK_DB === 'true'
+
   if (!connectionString || connectionString === '') {
-    console.warn('⚠️ Database connection string is missing. Using mock database for development.')
+    if (!useMockExplicitly) {
+      throw new Error(
+        'NEON_DATABASE_URL is not set. Set USE_MOCK_DB=true explicitly for development without a database, or configure NEON_DATABASE_URL.',
+      )
+    }
+    console.warn('⚠️ Using mock database for development (USE_MOCK_DB=true).')
     useMock = true
     throw new Error('MOCK_MODE')
   }
@@ -17,8 +24,8 @@ function getPool(): Pool {
   pool = new Pool({
     connectionString,
     ssl: {
-      rejectUnauthorized: true // Neon requires SSL
-    }
+      rejectUnauthorized: true, // Neon requires SSL
+    },
   })
 
   // Error handling for idle clients
@@ -62,7 +69,7 @@ export async function transaction<T>(callback: (client: PoolClient) => Promise<T
     const { transaction: mockTransaction } = await import('./_db-mock.js')
     return await mockTransaction<T>(callback)
   }
-  
+
   const db = getPool()
   const client = await db.connect()
   try {
