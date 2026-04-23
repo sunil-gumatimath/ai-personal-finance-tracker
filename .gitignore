@@ -40,6 +40,15 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# Local / Temporary files
+.opencode/
+create-test-token.js
+cookies.txt
+*.network-request
+*.network-response
+test-*.json
+!test-ai-chat.md
+
 # Testing
 coverage
 
