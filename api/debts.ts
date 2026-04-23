@@ -62,8 +62,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         res.status(201).json({ payment: rows[0] })
       } catch (error) {
         console.error('Debt payments POST error:', error)
-        if (error instanceof Error && error.message.includes('Invalid columns')) {
-          res.status(400).json({ error: error.message })
+        if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('exceeds maximum length'))) {
+          res.status(400).json({ error: 'Invalid request' })
           return
         }
         res.status(500).json({ error: 'Server error' })
@@ -105,8 +105,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         res.status(200).json({ debt: rows[0] })
       } catch (error) {
         console.error('Debts PUT error:', error)
-        if (error instanceof Error && error.message.includes('Invalid columns')) {
-          res.status(400).json({ error: error.message })
+        if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('exceeds maximum length'))) {
+          res.status(400).json({ error: 'Invalid request' })
           return
         }
         res.status(500).json({ error: 'Server error' })
@@ -161,14 +161,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const queryData = buildInsertQuery('debts', data, { user_id: userId })
       const { rows } = await query(queryData.text, queryData.values)
       res.status(201).json({ debt: rows[0] })
-    } catch (error) {
-      console.error('Debts POST error:', error)
-      if (error instanceof Error && error.message.includes('Invalid columns')) {
-        res.status(400).json({ error: error.message })
-        return
+      } catch (error) {
+        console.error('Debts POST error:', error)
+        if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('exceeds maximum length'))) {
+          res.status(400).json({ error: 'Invalid request' })
+          return
+        }
+        res.status(500).json({ error: 'Server error' })
       }
-      res.status(500).json({ error: 'Server error' })
-    }
     return
   }
 
