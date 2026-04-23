@@ -307,6 +307,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const prefs = profile?.preferences || {}
     const apiKey = typeof prefs.geminiApiKey === 'string' ? prefs.geminiApiKey : undefined
+    const modelName = typeof prefs.geminiModel === 'string' ? prefs.geminiModel : undefined
     const currency = typeof prefs.currency === 'string' ? prefs.currency : (profile?.currency || 'USD')
 
     if (!apiKey) {
@@ -357,7 +358,7 @@ ${financialData}
 **Suggested Approach:** ${processedQuery.suggestedResponse}
 `
 
-    const response = await generateFinancialAdvice(context, apiKey)
+    const response = await generateFinancialAdvice(context, apiKey, modelName)
     res.status(200).json({
       response,
       processedQuery: {
@@ -378,7 +379,7 @@ ${financialData}
       } else if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
         res.status(503).json({ error: 'External service unavailable. Please try again later.' })
       } else {
-        res.status(500).json({ error: `Server error: ${error.message}` })
+        res.status(500).json({ error: 'An internal server error occurred. Please try again later.' })
       }
     } else {
       res.status(500).json({ error: 'Unknown server error occurred.' })

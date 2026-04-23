@@ -103,6 +103,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           currency,
         }).format(amount)
       const apiKey = typeof prefs.geminiApiKey === 'string' ? prefs.geminiApiKey : undefined
+      const modelName = typeof prefs.geminiModel === 'string' ? prefs.geminiModel : undefined
 
       type TransactionWithCategory = {
         type: string
@@ -177,7 +178,7 @@ No markdown, no extra text, and NO emojis.
         `
 
         try {
-          const aiResponse = await generateFinancialAdvice(prompt, apiKey)
+          const aiResponse = await generateFinancialAdvice(prompt, apiKey, modelName)
           if (aiResponse) {
             const cleaned = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim()
             const aiInsights = JSON.parse(cleaned) as Array<{

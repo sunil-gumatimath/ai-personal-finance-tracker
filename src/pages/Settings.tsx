@@ -225,10 +225,23 @@ export function Settings() {
                                     <Label className="text-xs flex items-center gap-1.5">
                                         <Layout className="h-3 w-3" /> Model
                                     </Label>
-                                    <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted/50 text-sm text-muted-foreground">
-                                        <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" />
-                                        Gemini 3 Flash (Latest)
-                                    </div>
+                                    <Select value={preferences.geminiModel || 'gemini-1.5-flash'} onValueChange={(v) => savePreferences({ geminiModel: v })}>
+                                        <SelectTrigger className="h-9 text-sm">
+                                            <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" />
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Latest)</SelectItem>
+                                            <SelectItem value="gemini-3.1-flash-preview">Gemini 3.1 Flash</SelectItem>
+                                            <SelectItem value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</SelectItem>
+                                            <SelectItem value="gemini-3.0-pro-preview">Gemini 3.0 Pro</SelectItem>
+                                            <SelectItem value="gemini-3.0-flash-preview">Gemini 3.0 Flash</SelectItem>
+                                            <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</SelectItem>
+                                            <SelectItem value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Experimental)</SelectItem>
+                                            <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                                            <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>
