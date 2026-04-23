@@ -7,7 +7,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
 ## Features
 
 ### AI-Powered Intelligence
-- AI Financial Coach: Real-time personalized insights powered by Google Gemini 1.5 Flash, providing spending alerts and actionable coaching tips.
+- AI Financial Coach: Real-time personalized insights powered by Google Gemini (with per-user model selection from 1.5 Flash up to 3.1 Pro), providing spending alerts and actionable coaching tips.
 - Persisted Intelligence: AI-generated financial insights are now stored in the database, providing a consistent coaching history across sessions.
 - Interactive AI Chat: Natural language conversations about your finances with context-aware responses and smart recommendations.
 - Anomaly Detection: Automatic identification of unusual spending patterns and financial outliers.
@@ -55,7 +55,7 @@ A premium, AI-powered personal finance management platform designed for clarity 
 | Styling | Tailwind CSS 4, Shadcn UI (Radix UI) |
 | State Management | React Context API |
 | Database | Neon (PostgreSQL) with Serverless Adapter |
-| AI Integration | Google Gemini 1.5 Flash, React Markdown |
+| AI Integration | Google Gemini (multi-model: 1.5 Flash → 3.1 Pro), React Markdown |
 | Charts | Shadcn UI Charts (Recharts) |
 | Icons | Hugeicons React, Lucide React |
 | Runtime | Bun 1.3.x |
@@ -70,6 +70,9 @@ A premium, AI-powered personal finance management platform designed for clarity 
 - Action Plan: prioritized, actionable steps to improve financial standing, localized to user currency.
 
 ### Recent Improvements
+- **Security Hardening**: Added rate limiting on auth endpoints, security headers (CSP, HSTS, X-Frame-Options), strict CORS origin validation, and sanitized error messages that never leak internal details or SQL info.
+- **Per-User Gemini Model Selection**: Choose your preferred Gemini model (1.5 Flash through 3.1 Pro) directly in Settings, with model-specific billing awareness.
+- **Mock Database Mode**: Run the full stack locally without a Neon account by setting `USE_MOCK_DB=true`.
 - Debts & Loans Module: Comprehensive debt tracking with support for mortgages, car loans, student loans, credit cards, and more. Includes payment recording, interest calculations, payoff projections, and Snowball/Avalanche strategy comparison.
 - Enhanced Financial Health Score: Redesigned with animated ring progress, interactive metric cards, score history trends, and a detailed breakdown visualization with tooltips.
 - Advanced Spending Flow: Implemented interactive legends, category-specific details on hover, animated entry sequences, and budget progress indicators.
@@ -103,8 +106,18 @@ A premium, AI-powered personal finance management platform designed for clarity 
 
    Create a `.env` file in the root directory:
    ```env
+   # Required
    NEON_DATABASE_URL=your_neon_database_url
    AUTH_SECRET=your_long_random_secret
+
+   # Optional — local development without a Neon database
+   USE_MOCK_DB=true
+
+   # Optional — allow insecure cookies on http://localhost (never in production)
+   ALLOW_INSECURE_COOKIES=true
+
+   # Optional — global Gemini API key for AI features (can also be set per-user in Settings)
+   GEMINI_API_KEY=your_gemini_api_key
    ```
    For local fullstack dev, `vercel dev` will read this file automatically.
 
@@ -160,7 +173,7 @@ bun run build
 
 ## AI Features
 
-The application includes powerful AI-driven insights powered by Google Gemini 1.5 Flash:
+The application includes powerful AI-driven insights powered by Google Gemini (with per-user model selection):
 
 ### AI Financial Coach
 - Appears on the dashboard with real-time insights.
