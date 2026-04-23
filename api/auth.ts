@@ -1,7 +1,12 @@
 import { queryOne } from './_db.js'
 import { verifyPassword, hashPassword } from './_crypto.js'
 import { createToken, setAuthCookie, clearAuthCookie, getAuthedUser } from './_auth.js'
+import { checkRateLimit, recordFailedAttempt } from './_rate-limiter.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
+
+function getClientId(req: ApiRequest): string {
+  return req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || 'unknown'
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
     const action = req.query?.action
@@ -49,10 +54,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return
     }
 
+    // Handle unimplemented password reset
+    if (action === 'reset-password' || action === 'forgot-password') {
+        res.status(501).json({ error: 'Password reset is not yet implemented. Please contact support.' })
+        return
+    }
+
     // Handle /api/auth?action=signup
     if (action === 'signup') {
         if (req.method !== 'POST') {
             res.status(405).json({ error: 'Method not allowed' })
+            return
+        }
+
+        // Rate limit signup attempts
+        const clientId = getClientId(req)
+        const rateCheck = checkRateLimit(clientId, 'signup', true)
+        if (!rateCheck.allowed) {
+            res.status(429).json({ error: 'Too many signup attempts. Please try again later.' })
             return
         }
 
@@ -61,9 +80,27 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const email = typeof body.email === 'string' ? body.email : ''
             const password = typeof body.password === 'string' ? body.password : ''
             const fullName = typeof body.fullName === 'string' ? body.fullName : ''
-            
+
             if (!email || !password || !fullName) {
                 res.status(400).json({ error: 'Email, password, and full name are required' })
+                return
+            }
+
+            // Validate input lengths
+            if (email.length > 255) {
+                res.status(400).json({ error: 'Email exceeds maximum length of 255 characters' })
+                return
+            }
+            if (fullName.length > 100) {
+                res.status(400).json({ error: 'Full name exceeds maximum length of 100 characters' })
+                return
+            }
+            if (password.length < 6) {
+                res.status(400).json({ error: 'Password must be at least 6 characters' })
+                return
+            }
+            if (password.length > 128) {
+                res.status(400).json({ error: 'Password exceeds maximum length of 128 characters' })
                 return
             }
 
@@ -121,11 +158,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             return
         }
 
+        // Rate limit login attempts
+        const clientId = getClientId(req)
+        const rateCheck = checkRateLimit(clientId, 'login', true)
+        if (!rateCheck.allowed) {
+            res.status(429).json({ error: 'Too many login attempts. Please try again later.' })
+            return
+        }
+
         try {
             const body = req.body || {}
             const email = typeof body.email === 'string' ? body.email : ''
             const password = typeof body.password === 'string' ? body.password : ''
-            
+
             if (!email || !password) {
                 res.status(400).json({ error: 'Email and password are required' })
                 return
@@ -141,6 +186,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             }>('SELECT * FROM users WHERE email = $1', [email])
 
             if (!user) {
+                // Record failed attempt for brute-force protection
+                recordFailedAttempt(clientId, 'login')
                 res.status(401).json({ error: 'Invalid email or password' })
                 return
             }
@@ -160,6 +207,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             }
 
             if (!isValid) {
+                // Record failed attempt for brute-force protection
+                recordFailedAttempt(clientId, 'login')
                 res.status(401).json({ error: 'Invalid email or password' })
                 return
             }

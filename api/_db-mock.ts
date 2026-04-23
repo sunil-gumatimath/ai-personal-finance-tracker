@@ -84,7 +84,7 @@ function initializeSampleData() {
   const sampleUser: MockUser = {
     id: userId,
     email: 'demo@example.com',
-    encrypted_password: 'mock_hash_password',
+    encrypted_password: 'mock_hash_3641fe70b3aef002cc2811c1fa08bfe49d5f76c374ea0a88f5667ffc0fa50bf3',
     full_name: 'Demo User',
     avatar_url: null,
     created_at: new Date().toISOString(),
@@ -97,7 +97,7 @@ function initializeSampleData() {
   const secondarySampleUser: MockUser = {
     id: secondaryUserId,
     email: 'user@example.com',
-    encrypted_password: 'mock_hash_demo123',
+    encrypted_password: 'mock_hash_43f5f9d548c669218734c5c71bef336124f06e62b44235784b31ee24041e7da3',
     full_name: 'Sample User',
     avatar_url: null,
     created_at: new Date().toISOString(),
@@ -209,18 +209,19 @@ function generateUUID(): string {
   })
 }
 
-// Helper to hash password (simple mock for development)
+import { createHash } from 'crypto'
+
+// Helper to hash password - NEVER store plaintext, even in mock mode
 async function mockHashPassword(password: string): Promise<string> {
-  // In development, we'll use a simple hash (NOT FOR PRODUCTION)
-  return `mock_hash_${password}`
+  return `mock_hash_${createHash('sha256').update(`mock_dev_salt_v1_${password}`).digest('hex')}`
 }
 
 // Helper to verify password
 async function mockVerifyPassword(password: string, hash: string): Promise<boolean> {
   if (hash.startsWith('mock_hash_')) {
-    return hash === `mock_hash_${password}`
+    return hash === `mock_hash_${createHash('sha256').update(`mock_dev_salt_v1_${password}`).digest('hex')}`
   }
-  return password === hash // Fallback for testing
+  return false // Never fall back to plaintext comparison
 }
 
 export async function query<T = unknown>(

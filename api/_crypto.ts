@@ -1,12 +1,21 @@
-import { webcrypto } from 'crypto'
+import { webcrypto, createHash } from 'crypto'
 
 const subtle = webcrypto.subtle
 const encoder = new TextEncoder()
 
+/**
+ * Deterministic mock hash for development mode.
+ * Uses SHA-256 so passwords are NEVER stored in plaintext,
+ * even when running without a database.
+ */
+function mockHash(password: string): string {
+  return createHash('sha256').update(`mock_dev_salt_v1_${password}`).digest('hex')
+}
+
 export async function hashPassword(password: string): Promise<string> {
   // Check if we're in mock mode (no database URL)
   if (!process.env.NEON_DATABASE_URL) {
-    return `mock_hash_${password}`
+    return `mock_hash_${mockHash(password)}`
   }
 
   const salt = webcrypto.getRandomValues(new Uint8Array(16))
@@ -40,7 +49,7 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   // Check if we're in mock mode
   if (!process.env.NEON_DATABASE_URL) {
-    return storedHash === `mock_hash_${password}`
+    return storedHash === `mock_hash_${mockHash(password)}`
   }
 
   if (!storedHash.startsWith('$pbkdf2$')) return false

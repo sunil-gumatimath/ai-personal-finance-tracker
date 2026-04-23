@@ -75,14 +75,23 @@ export function getCookie(req: { headers?: { cookie?: string } }, name: string) 
   return undefined
 }
 
+/**
+ * Cookie security: Secure flag is ON by default.
+ * Only disable it explicitly in development by setting ALLOW_INSECURE_COOKIES=true.
+ */
+function isSecureCookie(): string {
+  const allowInsecure = process.env.ALLOW_INSECURE_COOKIES === 'true'
+  return !allowInsecure ? '; Secure' : ''
+}
+
 export function setAuthCookie(res: { setHeader: (k: string, v: string | string[]) => void }, token: string) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  const secure = isSecureCookie()
   const cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ONE_DAY_SECONDS}${secure}`
   res.setHeader('Set-Cookie', cookie)
 }
 
 export function clearAuthCookie(res: { setHeader: (k: string, v: string | string[]) => void }) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  const secure = isSecureCookie()
   const cookie = `${TOKEN_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
   res.setHeader('Set-Cookie', cookie)
 }
