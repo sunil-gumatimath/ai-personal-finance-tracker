@@ -111,7 +111,7 @@ function initializeSampleData() {
     user_id: userId,
     full_name: 'Demo User',
     currency: 'USD',
-    preferences: { geminiApiKey: 'demo-key' },
+    preferences: { geminiApiKey: '' },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
