@@ -1,4 +1,8 @@
-import { Pool, PoolClient } from 'pg'
+import { Pool, PoolClient, neonConfig } from '@neondatabase/serverless'
+import ws from 'ws'
+
+// Configure neon serverless to use ws for better stability in some environments
+neonConfig.webSocketConstructor = ws
 
 // Lazy initialization of the pool
 let pool: Pool | null = null
