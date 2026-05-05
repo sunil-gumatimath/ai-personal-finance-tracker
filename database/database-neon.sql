@@ -47,7 +47,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE users (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
-  encrypted_password TEXT NOT NULL, -- In production, use proper hashing (bcrypt, argon2)
+  encrypted_password TEXT, -- Nullable: Neon Auth manages passwords externally
   full_name TEXT,
   avatar_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
