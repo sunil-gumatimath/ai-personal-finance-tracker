@@ -1,26 +1,41 @@
-type ApiError = { error: string }
+import type {
+  AuthResponse,
+  LogoutResponse,
+  ProfileResponse,
+  ProfileUpdateResponse,
+  ProfileUpdatePayload,
+  AccountsListResponse,
+  AccountResponse,
+  AccountCreatePayload,
+  AccountUpdatePayload,
+  LinkedCountResponse,
+  CategoriesListResponse,
+  CategoryResponse,
+  CategoryPayload,
+  TransactionsListResponse,
+  TransactionResponse,
+  TransactionCreatePayload,
+  TransactionUpdatePayload,
+  BudgetsListResponse,
+  BudgetResponse,
+  BudgetPayload,
+  GoalsListResponse,
+  GoalResponse,
+  GoalPayload,
+  DebtsListResponse,
+  DebtResponse,
+  DebtPayload,
+  DebtPaymentsListResponse,
+  DebtPaymentResponse,
+  DebtPaymentPayload,
+  AiInsightsResponse,
+  AiChatResponse,
+  NotificationData,
+  NotificationActionResponse,
+  OkResponse,
+} from '@/types'
 
-// Import notification types from the hook file
-type NotificationData = {
-  preferences: {
-    notifications: boolean
-    emailAlerts: boolean
-    budgetAlerts: boolean
-  }
-  budgetAlerts: Array<{
-    id: string
-    type: 'budget'
-    category: string
-    color: string
-    spent: number
-    limit: number
-    percentage: number
-    status: 'ok' | 'warning' | 'over'
-    message: string | null
-  }>
-  recentActivity: Record<string, unknown>[]
-  unreadCount: number
-}
+type ApiError = { error: string }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -39,68 +54,63 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   auth: {
-    me: () => apiFetch<{ user: unknown }>('/api/auth?action=me'),
+    me: () => apiFetch<AuthResponse>('/api/auth?action=me'),
     login: (email: string, password: string) =>
-      apiFetch<{ user: unknown }>('/api/auth?action=login', {
+      apiFetch<AuthResponse>('/api/auth?action=login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       }),
     signup: (email: string, password: string, fullName: string) =>
-      apiFetch<{ user: unknown }>('/api/auth?action=signup', {
+      apiFetch<AuthResponse>('/api/auth?action=signup', {
         method: 'POST',
         body: JSON.stringify({ email, password, fullName }),
       }),
-    logout: () => apiFetch<{ ok: boolean }>('/api/auth?action=logout', { method: 'POST' }),
+    logout: () => apiFetch<LogoutResponse>('/api/auth?action=logout', { method: 'POST' }),
   },
   profile: {
-    get: () => apiFetch<{ preferences: unknown; currency: string | null }>('/api/profile'),
-    update: (payload: {
-      preferences?: Record<string, unknown>
-      currency?: string
-      full_name?: string
-      avatar_url?: string | null
-    }) =>
-      apiFetch<{ ok: boolean; preferences: unknown; currency: string | null }>('/api/profile', {
+    get: () => apiFetch<ProfileResponse>('/api/profile'),
+    update: (payload: ProfileUpdatePayload) =>
+      apiFetch<ProfileUpdateResponse>('/api/profile', {
         method: 'PATCH',
         body: JSON.stringify(payload),
       }),
   },
   accounts: {
-    list: () => apiFetch<{ accounts: unknown[] }>('/api/accounts'),
-    create: (data: Record<string, unknown>) =>
-      apiFetch<{ account: unknown }>('/api/accounts', {
+    list: () => apiFetch<AccountsListResponse>('/api/accounts'),
+    create: (data: AccountCreatePayload) =>
+      apiFetch<AccountResponse>('/api/accounts', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Record<string, unknown>) =>
-      apiFetch<{ account: unknown }>(`/api/accounts?id=${encodeURIComponent(id)}`, {
+    update: (id: string, data: AccountUpdatePayload) =>
+      apiFetch<AccountResponse>(`/api/accounts?id=${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
     delete: (id: string, cascade: boolean) =>
-      apiFetch<{ ok: boolean }>(`/api/accounts?id=${encodeURIComponent(id)}&cascade=${cascade ? '1' : '0'}`, {
+      apiFetch<OkResponse>(`/api/accounts?id=${encodeURIComponent(id)}&cascade=${cascade ? '1' : '0'}`, {
         method: 'DELETE',
       }),
     linkedCount: (id: string) =>
-      apiFetch<{ count: number }>(`/api/accounts?action=linked-count&accountId=${encodeURIComponent(id)}`),
+      apiFetch<LinkedCountResponse>(`/api/accounts?action=linked-count&accountId=${encodeURIComponent(id)}`),
   },
   categories: {
     list: (type?: string) =>
-      apiFetch<{ categories: unknown[] }>(
+      apiFetch<CategoriesListResponse>(
         `/api/categories${type ? `?type=${encodeURIComponent(type)}` : ''}`,
       ),
-    create: (data: Record<string, unknown>) =>
-      apiFetch<{ category: unknown }>('/api/categories', {
+    create: (data: CategoryPayload) =>
+      apiFetch<CategoryResponse>('/api/categories', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Record<string, unknown>) =>
-      apiFetch<{ category: unknown }>(`/api/categories?id=${encodeURIComponent(id)}`, {
+    update: (id: string, data: Partial<CategoryPayload>) =>
+      apiFetch<CategoryResponse>(`/api/categories?id=${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
     delete: (id: string) =>
-      apiFetch<{ ok: boolean }>(`/api/categories?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      apiFetch<OkResponse>(`/api/categories?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   transactions: {
     list: (params?: { limit?: number; since?: string }) => {
@@ -108,68 +118,68 @@ export const api = {
       if (params?.limit) qs.set('limit', String(params.limit))
       if (params?.since) qs.set('since', params.since)
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
-      return apiFetch<{ transactions: unknown[] }>(`/api/transactions${suffix}`)
+      return apiFetch<TransactionsListResponse>(`/api/transactions${suffix}`)
     },
-    create: (data: Record<string, unknown>) =>
-      apiFetch<{ transaction: unknown }>('/api/transactions', {
+    create: (data: TransactionCreatePayload) =>
+      apiFetch<TransactionResponse>('/api/transactions', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Record<string, unknown>) =>
-      apiFetch<{ transaction: unknown }>(`/api/transactions?id=${encodeURIComponent(id)}`, {
+    update: (id: string, data: TransactionUpdatePayload) =>
+      apiFetch<TransactionResponse>(`/api/transactions?id=${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
     delete: (id: string) =>
-      apiFetch<{ ok: boolean }>(`/api/transactions?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      apiFetch<OkResponse>(`/api/transactions?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   budgets: {
-    list: () => apiFetch<{ budgets: unknown[] }>('/api/budgets'),
-    create: (data: Record<string, unknown>) =>
-      apiFetch<{ budget: unknown }>('/api/budgets', {
+    list: () => apiFetch<BudgetsListResponse>('/api/budgets'),
+    create: (data: BudgetPayload) =>
+      apiFetch<BudgetResponse>('/api/budgets', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Record<string, unknown>) =>
-      apiFetch<{ budget: unknown }>(`/api/budgets?id=${encodeURIComponent(id)}`, {
+    update: (id: string, data: Partial<BudgetPayload>) =>
+      apiFetch<BudgetResponse>(`/api/budgets?id=${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
     delete: (id: string) =>
-      apiFetch<{ ok: boolean }>(`/api/budgets?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      apiFetch<OkResponse>(`/api/budgets?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   goals: {
-    list: () => apiFetch<{ goals: unknown[] }>('/api/goals'),
-    create: (data: Record<string, unknown>) =>
-      apiFetch<{ goal: unknown }>('/api/goals', {
+    list: () => apiFetch<GoalsListResponse>('/api/goals'),
+    create: (data: GoalPayload) =>
+      apiFetch<GoalResponse>('/api/goals', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Record<string, unknown>) =>
-      apiFetch<{ goal: unknown }>(`/api/goals?id=${encodeURIComponent(id)}`, {
+    update: (id: string, data: Partial<GoalPayload>) =>
+      apiFetch<GoalResponse>(`/api/goals?id=${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    delete: (id: string) => apiFetch<{ ok: boolean }>(`/api/goals?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    delete: (id: string) => apiFetch<OkResponse>(`/api/goals?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   debts: {
-    list: () => apiFetch<{ debts: unknown[] }>('/api/debts'),
-    create: (data: Record<string, unknown>) =>
-      apiFetch<{ debt: unknown }>('/api/debts', {
+    list: () => apiFetch<DebtsListResponse>('/api/debts'),
+    create: (data: DebtPayload) =>
+      apiFetch<DebtResponse>('/api/debts', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Record<string, unknown>) =>
-      apiFetch<{ debt: unknown }>(`/api/debts?id=${encodeURIComponent(id)}`, {
+    update: (id: string, data: Partial<DebtPayload>) =>
+      apiFetch<DebtResponse>(`/api/debts?id=${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    delete: (id: string) => apiFetch<{ ok: boolean }>(`/api/debts?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    delete: (id: string) => apiFetch<OkResponse>(`/api/debts?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
     payments: {
       list: (debtId: string) =>
-        apiFetch<{ payments: unknown[] }>(`/api/debts?action=payments&debtId=${encodeURIComponent(debtId)}`),
-      create: (data: Record<string, unknown>) =>
-        apiFetch<{ payment: unknown }>('/api/debts?action=payments', {
+        apiFetch<DebtPaymentsListResponse>(`/api/debts?action=payments&debtId=${encodeURIComponent(debtId)}`),
+      create: (data: DebtPaymentPayload) =>
+        apiFetch<DebtPaymentResponse>('/api/debts?action=payments', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
@@ -177,17 +187,17 @@ export const api = {
   },
   ai: {
     insights: {
-      list: () => apiFetch<{ insights: unknown[] }>('/api/ai/insights'),
+      list: () => apiFetch<AiInsightsResponse>('/api/ai/insights'),
       generate: (forceRefresh: boolean) =>
-        apiFetch<{ insights: unknown[] }>('/api/ai/insights', {
+        apiFetch<AiInsightsResponse>('/api/ai/insights', {
           method: 'POST',
           body: JSON.stringify({ forceRefresh }),
         }),
       dismiss: (id: string) =>
-        apiFetch<{ ok: boolean }>(`/api/ai/insights?id=${encodeURIComponent(id)}`, { method: 'PATCH' }),
+        apiFetch<OkResponse>(`/api/ai/insights?id=${encodeURIComponent(id)}`, { method: 'PATCH' }),
     },
     chat: (message: string) =>
-      apiFetch<{ response: string }>('/api/ai/chat', {
+      apiFetch<AiChatResponse>('/api/ai/chat', {
         method: 'POST',
         body: JSON.stringify({ message }),
       }),
@@ -195,15 +205,15 @@ export const api = {
   notifications: {
     list: () => apiFetch<NotificationData>('/api/notifications'),
     createBudgetAlert: (categoryId: string, message: string, severity: 'low' | 'medium' | 'high') =>
-      apiFetch<{ success: boolean; message: string }>('/api/notifications', {
+      apiFetch<NotificationActionResponse>('/api/notifications', {
         method: 'POST',
         body: JSON.stringify({
           type: 'budget_alert',
           data: { categoryId, message, severity }
         }),
       }),
-    updatePushSubscription: (subscription: unknown) =>
-      apiFetch<{ success: boolean; message: string }>('/api/notifications', {
+    updatePushSubscription: (subscription: PushSubscription) =>
+      apiFetch<NotificationActionResponse>('/api/notifications', {
         method: 'POST',
         body: JSON.stringify({
           type: 'push_notification',
