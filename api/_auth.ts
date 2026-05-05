@@ -11,10 +11,12 @@ export async function getAuthedUserId(req: { headers?: Record<string, string | s
   if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
   if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
   
-  const session = await authClient.getSession({
-    headers: incomingHeaders
+  const { data } = await authClient.getSession({
+    fetchOptions: {
+      headers: incomingHeaders
+    }
   })
-  return session?.user.id || null
+  return data?.user.id || null
 }
 
 export type AuthedUser = {

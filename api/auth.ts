@@ -22,16 +22,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
 
-            const session = await authClient.getSession({
-                headers: incomingHeaders
+            const { data } = await authClient.getSession({
+                fetchOptions: {
+                    headers: incomingHeaders
+                }
             })
 
-            if (!session) {
+            if (!data?.user) {
                 res.status(401).json({ error: 'Unauthorized' })
                 return
             }
 
-            const { user } = session
+            const { user } = data
             res.status(200).json({
                 user: {
                     id: user.id,
@@ -72,16 +74,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
 
-            const session = await authClient.getSession({
-                headers: incomingHeaders
+            const { data } = await authClient.getSession({
+                fetchOptions: {
+                    headers: incomingHeaders
+                }
             })
 
-            if (!session) {
+            if (!data?.user) {
                 res.status(401).json({ error: 'Unauthorized' })
                 return
             }
 
-            const { user } = session
+            const { user } = data
             const body = req.body || {}
             const fullName = body.fullName || user.name || 'Unknown'
 
