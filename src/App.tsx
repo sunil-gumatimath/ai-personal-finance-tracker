@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { PreferencesProvider } from '@/contexts/PreferencesContext'
@@ -57,6 +58,13 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Shared loading fallback for lazy-loaded pages
+const PageLoader = () => (
+  <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+  </div>
+)
+
 function AppRoutes() {
   return (
     <Routes>
@@ -86,7 +94,7 @@ function AppRoutes() {
         }
       />
 
-      {/* Protected Routes */}
+      {/* Protected Routes — lazy-loaded with Suspense */}
       <Route
         element={
           <ProtectedRoute>
@@ -94,15 +102,15 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/transactions" element={<Transactions />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/budgets" element={<Budgets />} />
-        <Route path="/goals" element={<Goals />} />
-        <Route path="/debts" element={<Debts />} />
-        <Route path="/categories" element={<Categories />} />
-        <Route path="/accounts" element={<Accounts />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+        <Route path="/transactions" element={<Suspense fallback={<PageLoader />}><Transactions /></Suspense>} />
+        <Route path="/calendar" element={<Suspense fallback={<PageLoader />}><Calendar /></Suspense>} />
+        <Route path="/budgets" element={<Suspense fallback={<PageLoader />}><Budgets /></Suspense>} />
+        <Route path="/goals" element={<Suspense fallback={<PageLoader />}><Goals /></Suspense>} />
+        <Route path="/debts" element={<Suspense fallback={<PageLoader />}><Debts /></Suspense>} />
+        <Route path="/categories" element={<Suspense fallback={<PageLoader />}><Categories /></Suspense>} />
+        <Route path="/accounts" element={<Suspense fallback={<PageLoader />}><Accounts /></Suspense>} />
+        <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
       </Route>
 
       {/* Catch all - redirect to dashboard */}
