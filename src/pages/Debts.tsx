@@ -197,7 +197,7 @@ export function Debts() {
                 interest_rate: parseFloat(formData.interest_rate) || 0,
                 minimum_payment: parseFloat(formData.minimum_payment) || 0,
                 due_day: formData.due_day ? parseInt(formData.due_day) : null,
-                start_date: formData.start_date || null,
+                start_date: formData.start_date || format(new Date(), 'yyyy-MM-dd'),
                 end_date: formData.end_date || null,
                 lender: formData.lender || null,
                 notes: formData.notes || null,
@@ -276,7 +276,7 @@ export function Debts() {
         try {
             await api.debts.update(debt.id, {
                 current_balance: 0,
-                is_active: false
+                is_active: false,
             })
             toast.success('Debt marked as paid off!')
             fetchDebts()
