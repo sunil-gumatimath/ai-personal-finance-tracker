@@ -36,6 +36,14 @@ serve({
         // Route /api/auth/login to api/auth/login.ts
         const apiPath = pathname.replace(/^\/api\//, "");
 
+        // Security: block path traversal attempts
+        if (apiPath.includes('..') || apiPath.includes('\0') || apiPath.includes('\\')) {
+            return new Response(JSON.stringify({ error: 'Invalid path' }), {
+                status: 400,
+                headers: { "Content-Type": "application/json", ...SECURITY_HEADERS },
+            });
+        }
+
         let filePath = "";
         const extraParams: Record<string, string> = {};
 

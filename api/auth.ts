@@ -194,16 +194,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
             const storedPassword = user.encrypted_password || ''
             let isValid = false
-            let isLegacy = false
 
             if (storedPassword.startsWith('$pbkdf2$')) {
                 isValid = await verifyPassword(password, storedPassword)
-            } else if (storedPassword === password) {
-                isValid = true
-                isLegacy = true
             } else if (storedPassword.startsWith('mock_hash_')) {
-                // Mock database password verification
-                isValid = storedPassword === `mock_hash_${password}`
+                // Mock database password verification — use the same crypto module
+                isValid = await verifyPassword(password, storedPassword)
             }
 
             if (!isValid) {
@@ -211,14 +207,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 recordFailedAttempt(clientId, 'login')
                 res.status(401).json({ error: 'Invalid email or password' })
                 return
-            }
-
-            if (isLegacy) {
-                const newHash = await hashPassword(password)
-                await queryOne('UPDATE users SET encrypted_password = $1 WHERE id = $2 RETURNING id', [
-                    newHash,
-                    user.id,
-                ])
             }
 
             await queryOne('UPDATE users SET last_sign_in_at = NOW() WHERE id = $1 RETURNING id', [
