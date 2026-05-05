@@ -60,6 +60,51 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return
     }
 
+    // Handle /api/auth?action=sync
+    if (action === 'sync') {
+        if (req.method !== 'POST') {
+            res.status(405).json({ error: 'Method not allowed' })
+            return
+        }
+
+        try {
+            const incomingHeaders = new Headers()
+            if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
+            if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
+
+            const session = await authClient.getSession({
+                headers: incomingHeaders
+            })
+
+            if (!session) {
+                res.status(401).json({ error: 'Unauthorized' })
+                return
+            }
+
+            const { user } = session
+            const body = req.body || {}
+            const fullName = body.fullName || user.name || 'Unknown'
+
+            // Ensure user exists in our users table
+            await queryOne(
+                'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
+                [user.id, user.email, fullName]
+            )
+
+            // Ensure profile exists in our database
+            await queryOne(
+                'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING',
+                [user.id, fullName, 'USD'],
+            )
+
+            res.status(200).json({ ok: true })
+        } catch (error) {
+            console.error('Sync error:', error)
+            res.status(500).json({ error: 'Server error' })
+        }
+        return
+    }
+
     // Handle /api/auth?action=signup
     if (action === 'signup') {
         if (req.method !== 'POST') {

@@ -89,6 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
                 setUser(authedUser)
                 setSession({ user: authedUser, access_token: data.token })
+                
+                // Sync user to our database in case it's missing
+                await api.auth.sync(data.user.name || 'Unknown').catch(err => {
+                    console.error('Failed to sync user profile:', err)
+                })
             }
             return { error: null }
         } catch (err) {
@@ -104,6 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(true)
             const { error } = await authClient.signUp.email({ email, password, name: fullName })
             if (error) throw error
+
+            // Sync user to our database
+            await api.auth.sync(fullName).catch(err => {
+                console.error('Failed to sync user profile:', err)
+            })
 
             return { error: null }
         } catch (err) {

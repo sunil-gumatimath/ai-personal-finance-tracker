@@ -37,7 +37,7 @@ import type {
 
 type ApiError = { error: string }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
     credentials: 'include',
@@ -64,6 +64,11 @@ export const api = {
       apiFetch<AuthResponse>('/api/auth?action=signup', {
         method: 'POST',
         body: JSON.stringify({ email, password, fullName }),
+      }),
+    sync: (fullName: string) =>
+      apiFetch<OkResponse>('/api/auth?action=sync', {
+        method: 'POST',
+        body: JSON.stringify({ fullName }),
       }),
     logout: () => apiFetch<LogoutResponse>('/api/auth?action=logout', { method: 'POST' }),
   },
