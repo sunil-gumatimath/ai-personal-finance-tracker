@@ -1,15 +1,13 @@
-import { Pool, PoolClient, neonConfig } from '@neondatabase/serverless'
-import ws from 'ws'
+import { neon, neonConfig } from '@neondatabase/serverless'
 
-// Configure neon serverless to use ws for better stability in some environments
-neonConfig.webSocketConstructor = ws
+// Use fetch for serverless environments (HTTP driver)
+// No WebSocket polyfill needed for HTTP
 
-// Lazy initialization of the pool
-let pool: Pool | null = null
+let sql: ReturnType<typeof neon> | null = null
 let useMock = false
 
-function getPool(): Pool {
-  if (pool) return pool
+function getSql(): ReturnType<typeof neon> {
+  if (sql) return sql
 
   const connectionString = process.env.NEON_DATABASE_URL
   const useMockExplicitly = process.env.USE_MOCK_DB === 'true'
@@ -25,20 +23,8 @@ function getPool(): Pool {
     throw new Error('MOCK_MODE')
   }
 
-  pool = new Pool({
-    connectionString,
-    ssl: {
-      rejectUnauthorized: true, // Neon requires SSL
-    },
-  })
-
-  // Error handling for idle clients
-  pool.on('error', (err) => {
-    console.error('Unexpected error on idle client', err)
-    // Don't exit, just log
-  })
-
-  return pool
+  sql = neon(connectionString, { fullResults: true })
+  return sql
 }
 
 export async function query<T = unknown>(
@@ -46,9 +32,11 @@ export async function query<T = unknown>(
   params?: unknown[],
 ): Promise<{ rows: T[]; rowCount: number }> {
   try {
-    const db = getPool()
-    const result = await db.query(queryText, params)
-    return { rows: result.rows as T[], rowCount: result.rowCount || 0 }
+    const db = getSql()
+    // Use .query() for conventional query strings with $1 placeholders
+    const result = await db.query(queryText, params as any[])
+    // The HTTP driver with fullResults: true returns { rows, rowCount, fields, etc }
+    return { rows: result.rows as T[], rowCount: result.rowCount || result.rows.length || 0 }
   } catch (error) {
     if (error instanceof Error && error.message === 'MOCK_MODE') {
       // Use mock database
@@ -68,23 +56,13 @@ export async function queryOne<T = unknown>(
   return rows[0] || null
 }
 
-export async function transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function transaction<T>(callback: (client: any) => Promise<T>): Promise<T> {
   if (useMock) {
     const { transaction: mockTransaction } = await import('./_db-mock.js')
     return await mockTransaction<T>(callback)
   }
 
-  const db = getPool()
-  const client = await db.connect()
-  try {
-    await client.query('BEGIN')
-    const result = await callback(client)
-    await client.query('COMMIT')
-    return result
-  } catch (e) {
-    await client.query('ROLLBACK')
-    throw e
-  } finally {
-    client.release()
-  }
+  // Interactive transactions are not supported by the HTTP driver in the same way.
+  // Since this app currently doesn't use them, we will just throw an error or mock it.
+  throw new Error("Interactive transactions are not supported over HTTP driver.");
 }
