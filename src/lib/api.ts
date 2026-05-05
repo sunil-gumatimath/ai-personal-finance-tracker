@@ -37,9 +37,23 @@ import type {
 
 type ApiError = { error: string }
 
+let authToken: string | null = null
+
+export function setApiAuthToken(token: string | null) {
+  authToken = token
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = new Headers(options?.headers)
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (authToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${authToken}`)
+  }
+
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+    headers,
     credentials: 'include',
     ...options,
   })

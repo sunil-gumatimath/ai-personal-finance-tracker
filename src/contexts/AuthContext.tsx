@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { api } from '@/lib/api'
+import { api, setApiAuthToken } from '@/lib/api'
 import { authClient } from '@/lib/auth'
 
 // Define types for Auth
@@ -61,9 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
                 setUser(authedUser)
                 setSession({ user: authedUser, access_token: sessionData.data.session.token })
+                setApiAuthToken(sessionData.data.session.token)
             } else {
                 setUser(null)
                 setSession(null)
+                setApiAuthToken(null)
             }
             setLoading(false)
         }
@@ -89,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
                 setUser(authedUser)
                 setSession({ user: authedUser, access_token: data.token })
+                setApiAuthToken(data.token)
                 
                 // Sync user to our database in case it's missing
                 await api.auth.sync(data.user.name || 'Unknown').catch(err => {
@@ -128,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await authClient.signOut()
         setUser(null)
         setSession(null)
+        setApiAuthToken(null)
     }
 
     const resetPassword = async (email: string) => {
