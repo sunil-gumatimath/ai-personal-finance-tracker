@@ -98,6 +98,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             }
 
             if (data?.user) {
+                // Ensure user exists in our users table (required for foreign key in profiles)
+                await queryOne(
+                    'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
+                    [data.user.id, email, fullName]
+                )
+
                 // Ensure profile exists in our database
                 await queryOne(
                     'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING RETURNING user_id',

@@ -1,7 +1,7 @@
 import { PoolClient } from '@neondatabase/serverless'
 
 export async function query<T = unknown>(_queryText: string, _params?: unknown[]): Promise<{ rows: T[]; rowCount: number }> {
-  console.log('🏗️ Mock DB: Returning empty results for query:', _queryText)
+  console.log('🏗️ Mock DB: Returning empty results for query:', _queryText, _params)
   return { rows: [], rowCount: 0 }
 }
 
