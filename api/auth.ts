@@ -1,6 +1,5 @@
+import { authClient } from './_auth.js'
 import { queryOne } from './_db.js'
-import { verifyPassword, hashPassword } from './_crypto.js'
-import { createToken, setAuthCookie, clearAuthCookie, getAuthedUser } from './_auth.js'
 import { checkRateLimit, recordFailedAttempt } from './_rate-limiter.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
 
@@ -19,20 +18,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         try {
-            const user = await getAuthedUser(req)
-            if (!user) {
+            const incomingHeaders = new Headers()
+            if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
+            if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
+
+            const session = await authClient.getSession({
+                headers: incomingHeaders
+            })
+
+            if (!session) {
                 res.status(401).json({ error: 'Unauthorized' })
                 return
             }
 
+            const { user } = session
             res.status(200).json({
                 user: {
                     id: user.id,
                     email: user.email,
-                    user_metadata: { full_name: user.full_name, avatar_url: user.avatar_url },
+                    user_metadata: { full_name: user.name, avatar_url: user.image },
                     app_metadata: {},
                     aud: 'authenticated',
-                    created_at: user.created_at,
+                    created_at: user.createdAt,
                 },
             })
         } catch (error) {
@@ -49,14 +56,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             return
         }
 
-        clearAuthCookie(res)
         res.status(200).json({ ok: true })
-        return
-    }
-
-    // Handle unimplemented password reset
-    if (action === 'reset-password' || action === 'forgot-password') {
-        res.status(501).json({ error: 'Password reset is not yet implemented. Please contact support.' })
         return
     }
 
@@ -67,7 +67,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             return
         }
 
-        // Rate limit signup attempts
         const clientId = getClientId(req)
         const rateCheck = checkRateLimit(clientId, 'signup', true)
         if (!rateCheck.allowed) {
@@ -86,64 +85,38 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
-            // Validate input lengths
-            if (email.length > 255) {
-                res.status(400).json({ error: 'Email exceeds maximum length of 255 characters' })
-                return
-            }
-            if (fullName.length > 100) {
-                res.status(400).json({ error: 'Full name exceeds maximum length of 100 characters' })
-                return
-            }
-            if (password.length < 6) {
-                res.status(400).json({ error: 'Password must be at least 6 characters' })
-                return
-            }
-            if (password.length > 128) {
-                res.status(400).json({ error: 'Password exceeds maximum length of 128 characters' })
-                return
-            }
-
-            const existing = await queryOne<{ id: string }>('SELECT id FROM users WHERE email = $1', [
+            const { data, error } = await authClient.signUp.email({
                 email,
-            ])
-            if (existing) {
-                res.status(409).json({ error: 'User already exists' })
-                return
-            }
-
-            const hashedPassword = await hashPassword(password)
-            const newUser = await queryOne<{
-                id: string
-                email: string
-                full_name: string
-                avatar_url: string | null
-                created_at: string
-            }>(
-                'INSERT INTO users (email, encrypted_password, full_name) VALUES ($1, $2, $3) RETURNING *',
-                [email, hashedPassword, fullName],
-            )
-
-            if (!newUser) {
-                res.status(500).json({ error: 'Failed to create user' })
-                return
-            }
-
-            await queryOne(
-                'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) RETURNING user_id',
-                [newUser.id, fullName, 'USD'],
-            )
-
-            res.status(201).json({
-                user: {
-                    id: newUser.id,
-                    email: newUser.email,
-                    user_metadata: { full_name: newUser.full_name, avatar_url: newUser.avatar_url },
-                    app_metadata: {},
-                    aud: 'authenticated',
-                    created_at: newUser.created_at,
-                },
+                password,
+                name: fullName,
             })
+
+            if (error) {
+                console.error('Neon Auth signup error:', error)
+                res.status(400).json({ error: error.message || 'Signup failed' })
+                return
+            }
+
+            if (data?.user) {
+                // Ensure profile exists in our database
+                await queryOne(
+                    'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING RETURNING user_id',
+                    [data.user.id, fullName, 'USD'],
+                )
+
+                res.status(201).json({
+                    user: {
+                        id: data.user.id,
+                        email: data.user.email,
+                        user_metadata: { full_name: data.user.name, avatar_url: data.user.image },
+                        app_metadata: {},
+                        aud: 'authenticated',
+                        created_at: data.user.createdAt,
+                    },
+                })
+            } else {
+                res.status(500).json({ error: 'Failed to create user' })
+            }
         } catch (error) {
             console.error('Signup error:', error)
             res.status(500).json({ error: 'Server error' })
@@ -151,14 +124,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return
     }
 
-    // Handle /api/auth?action=login (default POST action)
+    // Handle /api/auth?action=login
     if (action === 'login' || req.method === 'POST') {
         if (req.method !== 'POST') {
             res.status(405).json({ error: 'Method not allowed' })
             return
         }
 
-        // Rate limit login attempts
         const clientId = getClientId(req)
         const rateCheck = checkRateLimit(clientId, 'login', true)
         if (!rateCheck.allowed) {
@@ -176,56 +148,31 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
-            const user = await queryOne<{
-                id: string
-                email: string
-                encrypted_password?: string
-                full_name: string
-                avatar_url: string | null
-                created_at: string
-            }>('SELECT * FROM users WHERE email = $1', [email])
-
-            if (!user) {
-                // Record failed attempt for brute-force protection
-                recordFailedAttempt(clientId, 'login')
-                res.status(401).json({ error: 'Invalid email or password' })
-                return
-            }
-
-            const storedPassword = user.encrypted_password || ''
-            let isValid = false
-
-            if (storedPassword.startsWith('$pbkdf2$')) {
-                isValid = await verifyPassword(password, storedPassword)
-            } else if (storedPassword.startsWith('mock_hash_')) {
-                // Mock database password verification — use the same crypto module
-                isValid = await verifyPassword(password, storedPassword)
-            }
-
-            if (!isValid) {
-                // Record failed attempt for brute-force protection
-                recordFailedAttempt(clientId, 'login')
-                res.status(401).json({ error: 'Invalid email or password' })
-                return
-            }
-
-            await queryOne('UPDATE users SET last_sign_in_at = NOW() WHERE id = $1 RETURNING id', [
-                user.id,
-            ])
-
-            const token = createToken({ sub: user.id, email: user.email })
-            setAuthCookie(res, token)
-
-            res.status(200).json({
-                user: {
-                    id: user.id,
-                    email: user.email,
-                    user_metadata: { full_name: user.full_name, avatar_url: user.avatar_url },
-                    app_metadata: {},
-                    aud: 'authenticated',
-                    created_at: user.created_at,
-                },
+            const { data, error } = await authClient.signIn.email({
+                email,
+                password,
             })
+
+            if (error) {
+                recordFailedAttempt(clientId, 'login')
+                res.status(401).json({ error: 'Invalid email or password' })
+                return
+            }
+
+            if (data?.user) {
+                res.status(200).json({
+                    user: {
+                        id: data.user.id,
+                        email: data.user.email,
+                        user_metadata: { full_name: data.user.name, avatar_url: data.user.image },
+                        app_metadata: {},
+                        aud: 'authenticated',
+                        created_at: data.user.createdAt,
+                    },
+                })
+            } else {
+                res.status(401).json({ error: 'Invalid email or password' })
+            }
         } catch (error) {
             console.error('Login error:', error)
             res.status(500).json({ error: 'Server error' })
