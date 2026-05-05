@@ -53,7 +53,7 @@ export function useNotifications() {
     }
   }
 
-  const updatePushSubscription = async (subscription: unknown) => {
+  const updatePushSubscription = async (subscription: PushSubscription) => {
     try {
       await api.notifications.updatePushSubscription(subscription)
     } catch (err) {
