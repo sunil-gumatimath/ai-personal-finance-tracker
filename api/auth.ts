@@ -224,9 +224,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             } else {
                 res.status(401).json({ error: 'Invalid email or password' })
             }
-        } catch (error) {
-            console.error('Login error:', error)
-            res.status(500).json({ error: 'Server error' })
+        } catch (error: any) {
+            console.error('Login error detailed:', {
+                message: error?.message,
+                stack: error?.stack,
+                name: error?.name,
+                cause: error?.cause,
+                full: error
+            })
+            res.status(500).json({ error: `Server error: ${error?.message || 'Unknown'}` })
         }
         return
     }
