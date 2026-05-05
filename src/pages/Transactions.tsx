@@ -50,7 +50,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
-import type { Transaction, Category, Account } from '@/types'
+import type { Transaction, Category, Account, TransactionCreatePayload } from '@/types'
 
 export function Transactions() {
     const { user } = useAuth()
@@ -120,7 +120,7 @@ export function Transactions() {
         if (!user) return
 
         try {
-            const transactionData: Record<string, unknown> = {
+            const transactionData: TransactionCreatePayload = {
                 type: formData.type,
                 amount: parseFloat(formData.amount),
                 description: formData.description || null,
@@ -128,12 +128,8 @@ export function Transactions() {
                 account_id: formData.account_id,
                 date: formData.date,
                 is_recurring: formData.is_recurring,
-                recurring_frequency: formData.is_recurring ? formData.recurring_frequency || null : null,
-            }
-
-            // Add to_account_id for transfer transactions
-            if (formData.type === 'transfer') {
-                transactionData.to_account_id = formData.to_account_id || null
+                recurring_frequency: formData.is_recurring ? (formData.recurring_frequency || null) as TransactionCreatePayload['recurring_frequency'] : null,
+                to_account_id: formData.type === 'transfer' ? (formData.to_account_id || null) : null,
             }
 
             if (editingTransaction) {
