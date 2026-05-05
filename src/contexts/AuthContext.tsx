@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
+import { authClient } from '@/lib/auth'
 
 // Define types for Auth
 type UserMetadata = {
@@ -41,33 +42,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
 
+    const sessionData = authClient.useSession()
+
     useEffect(() => {
-        const checkUser = async () => {
-            try {
-                const res = await api.auth.me()
-                const authedUser = res.user as User
+        if (!sessionData.isPending) {
+            if (sessionData.data) {
+                const neonUser = sessionData.data.user
+                const authedUser: User = {
+                    id: neonUser.id,
+                    email: neonUser.email,
+                    user_metadata: { 
+                        full_name: neonUser.name || '', 
+                        avatar_url: neonUser.image 
+                    },
+                    app_metadata: {},
+                    aud: 'authenticated',
+                    created_at: neonUser.createdAt.toISOString()
+                }
                 setUser(authedUser)
-                setSession({ user: authedUser, access_token: 'server-session' })
-            } catch {
+                setSession({ user: authedUser, access_token: sessionData.data.session.token })
+            } else {
                 setUser(null)
                 setSession(null)
-            } finally {
-                setLoading(false)
             }
+            setLoading(false)
         }
-
-        checkUser()
-    }, [])
-
-
+    }, [sessionData.data, sessionData.isPending])
 
     const signIn = async (email: string, password: string) => {
         try {
             setLoading(true)
-            const res = await api.auth.login(email, password)
-            const authedUser = res.user as User
-            setUser(authedUser)
-            setSession({ user: authedUser, access_token: 'server-session' })
+            const { data, error } = await authClient.signIn.email({ email, password })
+            if (error) throw error
+            
+            if (data?.user) {
+                const authedUser: User = {
+                    id: data.user.id,
+                    email: data.user.email,
+                    user_metadata: { 
+                        full_name: data.user.name || '', 
+                        avatar_url: data.user.image 
+                    },
+                    app_metadata: {},
+                    aud: 'authenticated',
+                    created_at: data.user.createdAt.toISOString()
+                }
+                setUser(authedUser)
+                setSession({ user: authedUser, access_token: data.token })
+            }
             return { error: null }
         } catch (err) {
             console.error('Sign in error:', err)
@@ -80,7 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signUp = async (email: string, password: string, fullName: string) => {
         try {
             setLoading(true)
-            await api.auth.signup(email, password, fullName)
+            const { error } = await authClient.signUp.email({ email, password, name: fullName })
+            if (error) throw error
+
             return { error: null }
         } catch (err) {
             console.error('Sign up error:', err)
@@ -91,24 +115,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const signOut = async () => {
-        await api.auth.logout()
+        await authClient.signOut()
         setUser(null)
         setSession(null)
     }
 
     const resetPassword = async (email: string) => {
-        // TODO: Implement real password reset
-        console.log('Password reset requested for:', email)
-        return { error: null }
+        try {
+            // Neon Auth (via better-auth) uses emailOtp for forgot password flow.
+            // The reset link is usually configured in the Neon Console.
+            const { error } = await authClient.forgetPassword.emailOtp({ 
+                email
+            })
+            return { error: (error as unknown) as Error }
+        } catch (err) {
+            return { error: err as Error }
+        }
     }
 
     const updateProfile = async (data: { full_name?: string; avatar_url?: string }) => {
         if (!user) return { error: new Error('No user logged in') }
 
         try {
+            // Update in our database for custom preferences/currency etc.
             await api.profile.update({
                 full_name: data.full_name,
                 avatar_url: data.avatar_url,
+            })
+
+            // Update in Neon Auth
+            await authClient.updateUser({
+                name: data.full_name,
+                image: data.avatar_url
             })
 
             const updatedUser = {
