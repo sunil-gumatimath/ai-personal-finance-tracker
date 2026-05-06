@@ -4,7 +4,12 @@ import { queryOne } from './_db.js'
 /**
  * Neon Auth client initialized with the URL from environment variables.
  */
-export const authClient = createAuthClient(process.env.NEON_AUTH_URL || '')
+const authUrl = process.env.NEON_AUTH_URL;
+if (!authUrl && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️ NEON_AUTH_URL is not set in production. Authentication will fail.');
+}
+
+export const authClient = createAuthClient(authUrl || '')
 
 export async function getAuthedUserId(req: { headers?: Record<string, string | string[] | undefined> }): Promise<string | null> {
   const incomingHeaders = new Headers()

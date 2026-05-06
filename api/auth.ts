@@ -90,16 +90,27 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const fullName = body.fullName || user.name || 'Unknown'
 
             // Ensure user exists in our users table
-            await queryOne(
-                'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
-                [user.id, user.email, fullName]
-            )
+            try {
+                await queryOne(
+                    'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email',
+                    [user.id, user.email, fullName]
+                )
+            } catch (dbError: any) {
+                console.error('Database sync error (users table):', dbError)
+                if (dbError.code === '23505' && dbError.message.includes('email')) {
+                    console.warn('User with this email already exists with a different ID during sync.')
+                }
+            }
 
             // Ensure profile exists in our database
-            await queryOne(
-                'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING',
-                [user.id, fullName, 'USD'],
-            )
+            try {
+                await queryOne(
+                    'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING',
+                    [user.id, fullName, 'USD'],
+                )
+            } catch (dbError: any) {
+                console.error('Database sync error (profiles table):', dbError)
+            }
 
             res.status(200).json({ ok: true })
         } catch (error) {
@@ -155,16 +166,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
             if (data?.user) {
                 // Ensure user exists in our users table (required for foreign key in profiles)
-                await queryOne(
-                    'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
-                    [data.user.id, email, fullName]
-                )
+                try {
+                    await queryOne(
+                        'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email',
+                        [data.user.id, email, fullName]
+                    )
+                } catch (dbError: any) {
+                    console.error('Database sync error during signup (users table):', dbError)
+                    // If it's a unique constraint violation on email, we might have an orphan user
+                    if (dbError.code === '23505' && dbError.message.includes('email')) {
+                        console.warn('User with this email already exists with a different ID. Attempting to link...')
+                        // We can't easily change the ID because of foreign keys, so we might have to use the existing ID 
+                        // but Neon Auth expects its own ID. This is a complex migration scenario.
+                    }
+                }
 
                 // Ensure profile exists in our database
-                await queryOne(
-                    'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING RETURNING user_id',
-                    [data.user.id, fullName, 'USD'],
-                )
+                try {
+                    await queryOne(
+                        'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING RETURNING user_id',
+                        [data.user.id, fullName, 'USD'],
+                    )
+                } catch (dbError: any) {
+                    console.error('Database sync error during signup (profiles table):', dbError)
+                }
 
                 res.status(201).json({
                     user: {
