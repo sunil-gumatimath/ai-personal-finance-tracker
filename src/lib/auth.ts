@@ -18,8 +18,7 @@ const rewriteAuthUrl =
   `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}/neon-auth/auth`
 
 const authUrl =
-  import.meta.env.VITE_NEON_AUTH_URL ||
-  (import.meta.env.PROD ? VERCEL_NEON_AUTH_ORIGIN_FALLBACK : rewriteAuthUrl)
+  import.meta.env.VITE_NEON_AUTH_URL || rewriteAuthUrl
 
 // If neither is available (extremely unlikely), log a loud error.
 if (!authUrl) console.error('❌ Neon Auth URL is missing. Signup/Login will fail.');
