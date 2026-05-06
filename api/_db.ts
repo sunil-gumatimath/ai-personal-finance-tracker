@@ -1,4 +1,4 @@
-import { neon, neonConfig } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless'
 
 // Use fetch for serverless environments (HTTP driver)
 // No WebSocket polyfill needed for HTTP
@@ -33,10 +33,14 @@ export async function query<T = unknown>(
 ): Promise<{ rows: T[]; rowCount: number }> {
   try {
     const db = getSql()
-    // The neon client from @neondatabase/serverless is a function, not an object with a .query method
-    const result = await db(queryText, params as any[])
-    // The HTTP driver with fullResults: true returns { rows, rowCount, fields, etc }
-    return { rows: result.rows as T[], rowCount: result.rowCount || result.rows.length || 0 }
+    // `neon()` returns a tagged-template function; for dynamic SQL strings use `unsafe`.
+    const result = await (db as any).unsafe(queryText, (params ?? []) as any[])
+
+    const rows = ((result && result.rows) ? result.rows : result) as T[]
+    const rowCount =
+      result && typeof result.rowCount === 'number' ? result.rowCount : Array.isArray(rows) ? rows.length : 0
+
+    return { rows, rowCount }
   } catch (error) {
     if (error instanceof Error && error.message === 'MOCK_MODE') {
       // Use mock database
