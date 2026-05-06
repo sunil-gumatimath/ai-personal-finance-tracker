@@ -3,6 +3,55 @@ import path from "path";
 import type { ApiRequest, ApiResponse } from "./_types.js";
 import { checkRateLimit } from "./_rate-limiter.js";
 
+if (process.env.NODE_ENV !== "production") {
+  // Bypass sporadic local DNS issues for Neon Auth and Database by intercepting fetch
+  const originalFetch = globalThis.fetch;
+  const NEON_AUTH_DOMAIN = 'ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech';
+  const NEON_DB_DOMAIN = 'ep-odd-block-a13wgvy0-pooler.ap-southeast-1.aws.neon.tech';
+  
+  const NEON_AUTH_IPS = ['18.142.78.60', '18.139.181.85', '13.228.33.46'];
+  const NEON_DB_IPS = ['52.220.170.93', '13.228.184.177', '13.228.46.236'];
+  
+  let authIpIndex = 0;
+  let dbIpIndex = 0;
+  
+  globalThis.fetch = async function(input: RequestInfo | URL, init?: RequestInit & { tls?: any }) {
+      let url = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request).url);
+      
+      let targetDomain = '';
+      let targetIp = '';
+      
+      if (url.includes(NEON_AUTH_DOMAIN)) {
+          targetDomain = NEON_AUTH_DOMAIN;
+          targetIp = NEON_AUTH_IPS[authIpIndex];
+          authIpIndex = (authIpIndex + 1) % NEON_AUTH_IPS.length;
+      } else if (url.includes(NEON_DB_DOMAIN)) {
+          targetDomain = NEON_DB_DOMAIN;
+          targetIp = NEON_DB_IPS[dbIpIndex];
+          dbIpIndex = (dbIpIndex + 1) % NEON_DB_IPS.length;
+      }
+      
+      if (targetDomain) {
+          const newUrl = url.replace(targetDomain, targetIp);
+          
+          init = init || {};
+          const headers = new Headers(init.headers || {});
+          headers.set('Host', targetDomain);
+          init.headers = headers;
+          
+          // @ts-ignore - Bun specific tls option to handle IP-based HTTPS with SNI
+          init.tls = {
+              rejectUnauthorized: false,
+              servername: targetDomain
+          };
+          
+          return originalFetch(newUrl, init);
+      }
+      
+      return originalFetch(input, init);
+  };
+}
+
 const PORT = process.env.PORT || 3001;
 
 console.log(`🚀 API Server starting on http://localhost:${PORT}`);

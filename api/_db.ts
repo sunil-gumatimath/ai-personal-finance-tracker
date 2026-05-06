@@ -33,8 +33,8 @@ export async function query<T = unknown>(
 ): Promise<{ rows: T[]; rowCount: number }> {
   try {
     const db = getSql()
-    // Use .query() for conventional query strings with $1 placeholders
-    const result = await db.query(queryText, params as any[])
+    // The neon client from @neondatabase/serverless is a function, not an object with a .query method
+    const result = await db(queryText, params as any[])
     // The HTTP driver with fullResults: true returns { rows, rowCount, fields, etc }
     return { rows: result.rows as T[], rowCount: result.rowCount || result.rows.length || 0 }
   } catch (error) {
@@ -43,7 +43,7 @@ export async function query<T = unknown>(
       const { query: mockQuery } = await import('./_db-mock.js')
       return await mockQuery<T>(queryText, params)
     }
-    console.error('Database query error:', error)
+    console.error('Database query error:', error, 'Query:', queryText, 'Params:', params)
     throw error // Re-throw to be handled by the API endpoint
   }
 }

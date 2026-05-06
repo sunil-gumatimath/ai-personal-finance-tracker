@@ -134,10 +134,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
+            const incomingHeaders = new Headers()
+            if (req.headers?.origin) incomingHeaders.set('origin', req.headers.origin as string)
+            if (req.headers?.host) incomingHeaders.set('host', req.headers.host as string)
+
             const { data, error } = await authClient.signUp.email({
                 email,
                 password,
                 name: fullName,
+                fetchOptions: {
+                    headers: incomingHeaders
+                }
             })
 
             if (error) {
@@ -172,15 +179,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             } else {
                 res.status(500).json({ error: 'Failed to create user' })
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Signup error:', error)
+            if (error?.status === 400 || error?.status === 409 || error?.message?.includes('already exists')) {
+                res.status(400).json({ error: error?.message || 'Invalid registration details' })
+                return;
+            }
             res.status(500).json({ error: 'Server error' })
         }
         return
     }
 
     // Handle /api/auth?action=login
-    if (action === 'login' || req.method === 'POST') {
+    if (action === 'login') {
         if (req.method !== 'POST') {
             res.status(405).json({ error: 'Method not allowed' })
             return
@@ -203,9 +214,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
+            const incomingHeaders = new Headers()
+            if (req.headers?.origin) incomingHeaders.set('origin', req.headers.origin as string)
+            if (req.headers?.host) incomingHeaders.set('host', req.headers.host as string)
+
             const { data, error } = await authClient.signIn.email({
                 email,
                 password,
+                fetchOptions: {
+                    headers: incomingHeaders
+                }
             })
 
             if (error) {
@@ -229,13 +247,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 res.status(401).json({ error: 'Invalid email or password' })
             }
         } catch (error: any) {
-            console.error('Login error detailed:', {
-                message: error?.message,
-                stack: error?.stack,
-                name: error?.name,
-                cause: error?.cause,
-                full: error
-            })
+            console.error('Login error detailed:', error, error?.cause);
+            try {
+                const fs = await import('fs');
+                fs.appendFileSync('error.log', JSON.stringify({ message: error.message, stack: error.stack, cause: error.cause }) + '\n');
+            } catch(e) {}
+            
+            // better-auth throws APIError for 400/401 responses
+            if (error?.message === 'Invalid email or password' || error?.status === 401 || error?.status === 400) {
+                res.status(401).json({ error: 'Invalid email or password' })
+                return;
+            }
+            
             res.status(500).json({ error: `Server error: ${error?.message || 'Unknown'}` })
         }
         return
