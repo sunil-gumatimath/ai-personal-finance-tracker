@@ -5,12 +5,11 @@ import { queryOne } from './_db.js'
  * Neon Auth client initialized with the URL from environment variables.
  */
 const VERCEL_NEON_AUTH_ORIGIN_FALLBACK =
-  'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth'
+  'https://ep-odd-block-a13wgvy0.apirest.ap-southeast-1.aws.neon.tech/neondb/rest/v1/auth'
 
 const authUrl =
   process.env.NEON_AUTH_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/neon-auth/auth` : undefined) ||
-  (process.env.NODE_ENV === 'production' ? VERCEL_NEON_AUTH_ORIGIN_FALLBACK : undefined)
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/neon-auth/auth` : VERCEL_NEON_AUTH_ORIGIN_FALLBACK)
 if (!authUrl && process.env.NODE_ENV === 'production') {
   console.warn('⚠️ NEON_AUTH_URL is not set in production. Authentication will fail.');
 }

@@ -5,8 +5,8 @@
     "outputDirectory": "dist",
     "rewrites": [
         {
-            "source": "/neon-auth/:path*",
-            "destination": "https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/:path*"
+            "source": "/neon-auth/auth/:path*",
+            "destination": "https://ep-odd-block-a13wgvy0.apirest.ap-southeast-1.aws.neon.tech/neondb/rest/v1/auth/:path*"
         },
         {
             "source": "/api/:path*",

@@ -7,11 +7,13 @@ import { BetterAuthReactAdapter } from "@neondatabase/auth/react/adapters"
  * This keeps auth cookies on the same domain as the app.
  * You can still override with `VITE_NEON_AUTH_URL` if needed.
  */
+const isProduction = typeof window !== 'undefined' && !window.location.hostname.includes('localhost')
+
 const rewriteAuthUrl =
   `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}/neon-auth/auth`
 
 const authUrl =
-  import.meta.env.VITE_NEON_AUTH_URL || rewriteAuthUrl
+  isProduction ? rewriteAuthUrl : (import.meta.env.VITE_NEON_AUTH_URL || rewriteAuthUrl)
 
 // If neither is available (extremely unlikely), log a loud error.
 if (!authUrl) console.error('❌ Neon Auth URL is missing. Signup/Login will fail.');
