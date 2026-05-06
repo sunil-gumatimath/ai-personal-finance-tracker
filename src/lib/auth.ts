@@ -3,15 +3,16 @@ import { BetterAuthReactAdapter } from "@neondatabase/auth/react/adapters"
 
 /**
  * Neon Auth client for the frontend.
- * The VITE_NEON_AUTH_URL should be set in your .env file.
+ * In production on Vercel, `/neon-auth/*` is rewritten to Neon Auth (see `vercel.json`).
+ * You can still override with `VITE_NEON_AUTH_URL` if needed.
  */
-const authUrl = import.meta.env.DEV ? 
-  `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}/neon-auth/auth` : 
-  (import.meta.env.VITE_NEON_AUTH_URL || "");
+const defaultAuthUrl =
+  `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}/neon-auth/auth`
 
-if (!authUrl && !import.meta.env.DEV) {
-  console.error('❌ VITE_NEON_AUTH_URL is missing! Signup and Login will fail in production.');
-}
+const authUrl = import.meta.env.VITE_NEON_AUTH_URL || defaultAuthUrl;
+
+// If neither is available (extremely unlikely), log a loud error.
+if (!authUrl) console.error('❌ Neon Auth URL is missing. Signup/Login will fail.');
 
 export const authClient = createAuthClient(
   authUrl,

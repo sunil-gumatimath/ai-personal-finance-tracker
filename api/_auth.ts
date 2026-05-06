@@ -4,7 +4,9 @@ import { queryOne } from './_db.js'
 /**
  * Neon Auth client initialized with the URL from environment variables.
  */
-const authUrl = process.env.NEON_AUTH_URL;
+const authUrl =
+  process.env.NEON_AUTH_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/neon-auth/auth` : undefined);
 if (!authUrl && process.env.NODE_ENV === 'production') {
   console.warn('⚠️ NEON_AUTH_URL is not set in production. Authentication will fail.');
 }
