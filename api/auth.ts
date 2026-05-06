@@ -90,15 +90,43 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const fullName = body.fullName || user.name || 'Unknown'
 
             // Ensure user exists in our users table
+            // Handle both ID conflict and email conflict (legacy user migration)
             try {
                 await queryOne(
-                    'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email',
+                    `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3)
+                     ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email`,
                     [user.id, user.email, fullName]
                 )
             } catch (dbError: any) {
-                console.error('Database sync error (users table):', dbError)
-                if (dbError.code === '23505' && dbError.message.includes('email')) {
-                    console.warn('User with this email already exists with a different ID during sync.')
+                if (dbError.code === '23505' && dbError.message?.includes('email')) {
+                    // A legacy user with this email exists under a different ID.
+                    // Migrate all their data to the new Neon Auth ID.
+                    console.warn('Migrating legacy user to Neon Auth ID:', user.id)
+                    try {
+                        const legacy = await queryOne<{ id: string }>(
+                            'SELECT id FROM users WHERE email = $1 AND id != $2', [user.email, user.id]
+                        )
+                        if (legacy) {
+                            const oldId = legacy.id
+                            // Temporarily rename email to avoid unique constraint during insert
+                            await queryOne(`UPDATE users SET email = 'migrating_' || email WHERE id = $1`, [oldId])
+                            await queryOne(
+                                `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, full_name = EXCLUDED.full_name`,
+                                [user.id, user.email, fullName]
+                            )
+                            // Migrate all child table references
+                            const childTables = ['debt_payments', 'debts', 'ai_insights', 'goals', 'budgets', 'transactions', 'categories', 'accounts', 'profiles']
+                            for (const table of childTables) {
+                                await queryOne(`UPDATE ${table} SET user_id = $1 WHERE user_id = $2`, [user.id, oldId])
+                            }
+                            await queryOne('DELETE FROM users WHERE id = $1', [oldId])
+                            console.log('Legacy user migration complete.')
+                        }
+                    } catch (migrationError) {
+                        console.error('Legacy user migration failed:', migrationError)
+                    }
+                } else {
+                    console.error('Database sync error (users table):', dbError)
                 }
             }
 
@@ -166,18 +194,40 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
             if (data?.user) {
                 // Ensure user exists in our users table (required for foreign key in profiles)
+                // Handle email conflict from legacy users
                 try {
                     await queryOne(
-                        'INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email',
+                        `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3)
+                         ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email`,
                         [data.user.id, email, fullName]
                     )
                 } catch (dbError: any) {
-                    console.error('Database sync error during signup (users table):', dbError)
-                    // If it's a unique constraint violation on email, we might have an orphan user
-                    if (dbError.code === '23505' && dbError.message.includes('email')) {
-                        console.warn('User with this email already exists with a different ID. Attempting to link...')
-                        // We can't easily change the ID because of foreign keys, so we might have to use the existing ID 
-                        // but Neon Auth expects its own ID. This is a complex migration scenario.
+                    if (dbError.code === '23505' && dbError.message?.includes('email')) {
+                        // Legacy user migration during signup
+                        console.warn('Migrating legacy user during signup for Neon Auth ID:', data.user.id)
+                        try {
+                            const legacy = await queryOne<{ id: string }>(
+                                'SELECT id FROM users WHERE email = $1 AND id != $2', [email, data.user.id]
+                            )
+                            if (legacy) {
+                                const oldId = legacy.id
+                                await queryOne(`UPDATE users SET email = 'migrating_' || email WHERE id = $1`, [oldId])
+                                await queryOne(
+                                    `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, full_name = EXCLUDED.full_name`,
+                                    [data.user.id, email, fullName]
+                                )
+                                const childTables = ['debt_payments', 'debts', 'ai_insights', 'goals', 'budgets', 'transactions', 'categories', 'accounts', 'profiles']
+                                for (const table of childTables) {
+                                    await queryOne(`UPDATE ${table} SET user_id = $1 WHERE user_id = $2`, [data.user.id, oldId])
+                                }
+                                await queryOne('DELETE FROM users WHERE id = $1', [oldId])
+                                console.log('Legacy user migration during signup complete.')
+                            }
+                        } catch (migrationError) {
+                            console.error('Legacy user migration during signup failed:', migrationError)
+                        }
+                    } else {
+                        console.error('Database sync error during signup (users table):', dbError)
                     }
                 }
 
