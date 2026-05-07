@@ -3,6 +3,11 @@
     "installCommand": "bun install",
     "framework": null,
     "outputDirectory": "dist",
+    "functions": {
+        "api/**/*.ts": {
+            "runtime": "bun@1"
+        }
+    },
     "rewrites": [
         {
             "source": "/neon-auth/auth/:path*",
