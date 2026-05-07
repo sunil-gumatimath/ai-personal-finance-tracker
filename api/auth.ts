@@ -38,6 +38,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
 
+            // Set proper Origin header for Neon Auth CORS
+            const appOrigin = process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : 'http://localhost:5173'
+            incomingHeaders.set('Origin', appOrigin)
+
             const { data } = await authClient.getSession({
                 fetchOptions: {
                     headers: incomingHeaders
@@ -89,6 +95,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const incomingHeaders = new Headers()
             if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
+
+            // Set proper Origin header for Neon Auth CORS
+            const appOrigin = process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : 'http://localhost:5173'
+            incomingHeaders.set('Origin', appOrigin)
 
             const { data } = await authClient.getSession({
                 fetchOptions: {
@@ -191,10 +203,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
+            // Set proper Origin header for Neon Auth CORS
+            const appOrigin = process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : 'http://localhost:5173'
+
             const { data, error } = await authClient.signUp.email({
                 email,
                 password,
                 name: fullName,
+                fetchOptions: {
+                    headers: {
+                        'Origin': appOrigin
+                    }
+                }
             })
 
             if (error) {
@@ -312,9 +334,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
             console.log('Login attempt for email:', email, 'Auth URL diagnostics:', getAuthUrlDiagnostics())
 
+            // Set proper Origin header for Neon Auth CORS
+            const appOrigin = process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : 'http://localhost:5173'
+
             const { data, error } = await authClient.signIn.email({
                 email,
                 password,
+                fetchOptions: {
+                    headers: {
+                        'Origin': appOrigin
+                    }
+                }
             })
 
             if (error) {
