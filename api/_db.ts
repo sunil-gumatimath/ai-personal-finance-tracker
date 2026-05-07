@@ -1,4 +1,14 @@
 import { neon } from '@neondatabase/serverless'
+import type { PoolClient } from '@neondatabase/serverless'
+
+type QueryResult<T> = T[] | { rows: T[]; rowCount?: number }
+type UnsafeSql = ReturnType<typeof neon> & {
+  unsafe: <T = unknown>(queryText: string, params: unknown[]) => Promise<QueryResult<T>>
+}
+
+function hasRows<T>(result: QueryResult<T>): result is { rows: T[]; rowCount?: number } {
+  return !Array.isArray(result) && Array.isArray(result.rows)
+}
 
 // Use fetch for serverless environments (HTTP driver)
 // No WebSocket polyfill needed for HTTP
@@ -34,11 +44,10 @@ export async function query<T = unknown>(
   try {
     const db = getSql()
     // `neon()` returns a tagged-template function; for dynamic SQL strings use `unsafe`.
-    const result = await (db as any).unsafe(queryText, (params ?? []) as any[])
+    const result = await (db as UnsafeSql).unsafe<T>(queryText, params ?? [])
 
-    const rows = ((result && result.rows) ? result.rows : result) as T[]
-    const rowCount =
-      result && typeof result.rowCount === 'number' ? result.rowCount : Array.isArray(rows) ? rows.length : 0
+    const rows = hasRows(result) ? result.rows : result
+    const rowCount = hasRows(result) && typeof result.rowCount === 'number' ? result.rowCount : rows.length
 
     return { rows, rowCount }
   } catch (error) {
@@ -60,7 +69,7 @@ export async function queryOne<T = unknown>(
   return rows[0] || null
 }
 
-export async function transaction<T>(callback: (client: any) => Promise<T>): Promise<T> {
+export async function transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
   if (useMock) {
     const { transaction: mockTransaction } = await import('./_db-mock.js')
     return await mockTransaction<T>(callback)
@@ -68,5 +77,5 @@ export async function transaction<T>(callback: (client: any) => Promise<T>): Pro
 
   // Interactive transactions are not supported by the HTTP driver in the same way.
   // Since this app currently doesn't use them, we will just throw an error or mock it.
-  throw new Error("Interactive transactions are not supported over HTTP driver.");
+  throw new Error('Interactive transactions are not supported over HTTP driver.')
 }

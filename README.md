@@ -209,7 +209,7 @@ The project is optimized for deployment on Vercel:
 
 Notes:
 - API route files under `api/` are deployed as Vercel functions.
-- The Bun local API shim lives in `scripts/api-server.ts` and is not deployed.
+- The Bun local API shim lives in `api/_server.ts` and is not deployed.
 
 ### Docker
 

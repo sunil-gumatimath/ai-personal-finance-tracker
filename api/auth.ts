@@ -3,6 +3,22 @@ import { queryOne } from './_db.js'
 import { checkRateLimit, recordFailedAttempt } from './_rate-limiter.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
 
+type ErrorWithDetails = {
+  code?: unknown
+  message?: unknown
+  status?: unknown
+  cause?: unknown
+  stack?: unknown
+}
+
+function asErrorDetails(error: unknown): ErrorWithDetails {
+  return typeof error === 'object' && error !== null ? error : {}
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 function getClientId(req: ApiRequest): string {
   return req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || 'unknown'
 }
@@ -97,8 +113,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                      ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email`,
                     [user.id, user.email, fullName]
                 )
-            } catch (dbError: any) {
-                if (dbError.code === '23505' && dbError.message?.includes('email')) {
+            } catch (dbError: unknown) {
+                const details = asErrorDetails(dbError)
+                const message = typeof details.message === 'string' ? details.message : ''
+                if (details.code === '23505' && message.includes('email')) {
                     // A legacy user with this email exists under a different ID.
                     // Migrate all their data to the new Neon Auth ID.
                     console.warn('Migrating legacy user to Neon Auth ID:', user.id)
@@ -136,7 +154,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                     'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING',
                     [user.id, fullName, 'USD'],
                 )
-            } catch (dbError: any) {
+            } catch (dbError: unknown) {
                 console.error('Database sync error (profiles table):', dbError)
             }
 
@@ -206,8 +224,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                          ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email`,
                         [data.user.id, email, fullName]
                     )
-                } catch (dbError: any) {
-                    if (dbError.code === '23505' && dbError.message?.includes('email')) {
+                } catch (dbError: unknown) {
+                    const details = asErrorDetails(dbError)
+                    const message = typeof details.message === 'string' ? details.message : ''
+                    if (details.code === '23505' && message.includes('email')) {
                         // Legacy user migration during signup
                         console.warn('Migrating legacy user during signup for Neon Auth ID:', data.user.id)
                         try {
@@ -242,7 +262,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                         'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING RETURNING user_id',
                         [data.user.id, fullName, 'USD'],
                     )
-                } catch (dbError: any) {
+                } catch (dbError: unknown) {
                     console.error('Database sync error during signup (profiles table):', dbError)
                 }
 
@@ -260,10 +280,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             } else {
                 res.status(500).json({ error: 'Failed to create user' })
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const details = asErrorDetails(error)
+            const message = getErrorMessage(error)
             console.error('Signup error:', error)
-            if (error?.status === 400 || error?.status === 409 || error?.message?.includes('already exists')) {
-                res.status(400).json({ error: error?.message || 'Invalid registration details' })
+            if (details.status === 400 || details.status === 409 || message.includes('already exists')) {
+                res.status(400).json({ error: message || 'Invalid registration details' })
                 return;
             }
             res.status(500).json({ error: 'Server error' })
@@ -349,15 +371,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             } else {
                 res.status(401).json({ error: 'Invalid email or password' })
             }
-        } catch (error: any) {
-            console.error('Login error detailed:', error, error?.cause, getAuthUrlDiagnostics());
-            try {
-                const fs = await import('fs');
-                fs.appendFileSync('error.log', JSON.stringify({ message: error.message, stack: error.stack, cause: error.cause }) + '\n');
-            } catch(e) {}
+        } catch (error: unknown) {
+            const details = asErrorDetails(error)
+            const message = getErrorMessage(error)
+            console.error('Login error detailed:', error, details.cause, getAuthUrlDiagnostics());
             
             // better-auth throws APIError for 400/401 responses
-            if (error?.message?.includes('Email not verified')) {
+            if (message.includes('Email not verified')) {
                 res.status(403).json({
                     error: 'Email not verified. Please verify your email before signing in.',
                     diagnostics: getAuthUrlDiagnostics(),
@@ -365,19 +385,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return;
             }
 
-            if (error?.message === 'Invalid email or password' || error?.status === 401 || error?.status === 400) {
-                const message = error?.message?.includes('missing authentication credentials')
-                    ? error.message
+            if (message === 'Invalid email or password' || details.status === 401 || details.status === 400) {
+                const responseMessage = message.includes('missing authentication credentials')
+                    ? message
                     : 'Invalid email or password'
                 res.status(401).json({
-                    error: message,
+                    error: responseMessage,
                     diagnostics: getAuthUrlDiagnostics(),
                 })
                 return;
             }
             
             res.status(500).json({
-                error: `Server error: ${error?.message || 'Unknown'}`,
+                error: `Server error: ${message || 'Unknown'}`,
                 diagnostics: getAuthUrlDiagnostics(),
             })
         }

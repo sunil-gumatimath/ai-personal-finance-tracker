@@ -3,6 +3,13 @@ import path from "path";
 import type { ApiRequest, ApiResponse } from "./_types.js";
 import { checkRateLimit } from "./_rate-limiter.js";
 
+type BunRequestInit = RequestInit & {
+  tls?: {
+    rejectUnauthorized: boolean;
+    servername: string;
+  };
+};
+
 if (process.env.NODE_ENV !== "production") {
   // Bypass sporadic local DNS issues for Neon Auth and Database by intercepting fetch
   const originalFetch = globalThis.fetch;
@@ -15,8 +22,8 @@ if (process.env.NODE_ENV !== "production") {
   let authIpIndex = 0;
   let dbIpIndex = 0;
   
-  globalThis.fetch = async function(input: RequestInfo | URL, init?: RequestInit & { tls?: any }) {
-      let url = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request).url);
+  globalThis.fetch = async function(input: RequestInfo | URL, init?: BunRequestInit) {
+      const url = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request).url);
       
       let targetDomain = '';
       let targetIp = '';
@@ -34,18 +41,17 @@ if (process.env.NODE_ENV !== "production") {
       if (targetDomain) {
           const newUrl = url.replace(targetDomain, targetIp);
           
-          init = init || {};
-          const headers = new Headers(init.headers || {});
+          const requestInit = init || {};
+          const headers = new Headers(requestInit.headers || {});
           headers.set('Host', targetDomain);
-          init.headers = headers;
+          requestInit.headers = headers;
           
-          // @ts-ignore - Bun specific tls option to handle IP-based HTTPS with SNI
-          init.tls = {
+          requestInit.tls = {
               rejectUnauthorized: false,
               servername: targetDomain
           };
           
-          return originalFetch(newUrl, init);
+          return originalFetch(newUrl, requestInit);
       }
       
       return originalFetch(input, init);
