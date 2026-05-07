@@ -17,8 +17,7 @@ function normalizeNeonAuthUrl(url: string): string {
 }
 
 const authUrl = normalizeNeonAuthUrl(
-  process.env.NEON_AUTH_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/neon-auth/auth` : VERCEL_NEON_AUTH_ORIGIN_FALLBACK),
+  process.env.NEON_AUTH_URL || VERCEL_NEON_AUTH_ORIGIN_FALLBACK,
 )
 
 if (!authUrl && process.env.NODE_ENV === 'production') {
@@ -33,13 +32,13 @@ export function getAuthUrlDiagnostics() {
     return {
       host: url.host,
       path: url.pathname,
-      source: process.env.NEON_AUTH_URL ? 'NEON_AUTH_URL' : process.env.VERCEL_URL ? 'VERCEL_URL' : 'fallback',
+      source: process.env.NEON_AUTH_URL ? 'NEON_AUTH_URL' : 'fallback',
     }
   } catch {
     return {
       host: 'invalid',
       path: 'invalid',
-      source: process.env.NEON_AUTH_URL ? 'NEON_AUTH_URL' : process.env.VERCEL_URL ? 'VERCEL_URL' : 'fallback',
+      source: process.env.NEON_AUTH_URL ? 'NEON_AUTH_URL' : 'fallback',
     }
   }
 }

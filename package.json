@@ -8,6 +8,7 @@
     "api": "bun --watch api/_server.ts",
     "vite": "bunx --bun vite",
     "build": "bun run tsc -b && bunx --bun vite build",
+    "build:npm": "tsc -b && vite build",
     "lint": "bunx eslint .",
     "preview": "bunx --bun vite preview",
     "typecheck": "bunx tsc --noEmit"
