@@ -5,7 +5,7 @@
     "outputDirectory": "dist",
     "functions": {
         "api/**/*.ts": {
-            "runtime": "bun@1"
+            "runtime": "nodejs20.x"
         }
     },
     "rewrites": [
