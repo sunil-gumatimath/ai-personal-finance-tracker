@@ -3,11 +3,6 @@
     "installCommand": "bun install",
     "framework": null,
     "outputDirectory": "dist",
-    "functions": {
-        "api/**/*.ts": {
-            "runtime": "nodejs20.x"
-        }
-    },
     "rewrites": [
         {
             "source": "/neon-auth/auth/:path*",
