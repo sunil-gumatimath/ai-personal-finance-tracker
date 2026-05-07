@@ -24,6 +24,9 @@ if (!authUrl && process.env.NODE_ENV === 'production') {
   console.warn('⚠️ NEON_AUTH_URL is not set in production. Authentication will fail.');
 }
 
+console.log('🔐 Neon Auth URL:', authUrl)
+console.log('🔐 NEON_AUTH_URL env var:', process.env.NEON_AUTH_URL ? 'SET' : 'NOT SET')
+
 export const authClient = createAuthClient(authUrl || '')
 
 export function getAuthUrlDiagnostics() {
@@ -47,12 +50,6 @@ export async function getAuthedUserId(req: { headers?: Record<string, string | s
   const incomingHeaders = new Headers()
   if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
   if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
-
-  // Set proper Origin header for Neon Auth CORS
-  const appOrigin = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:5173'
-  incomingHeaders.set('Origin', appOrigin)
 
   const { data } = await authClient.getSession({
     fetchOptions: {
