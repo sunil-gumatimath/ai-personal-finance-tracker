@@ -69,8 +69,9 @@ const HSTS_HEADER: Record<string, string> = process.env.NODE_ENV === "production
   ? { "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload" }
   : {};
 
-// Endpoints that require stricter rate limiting
-const RATE_LIMITED_PREFIXES = ["/api/auth", "/api/ai/chat", "/api/ai/insights"];
+// Endpoints that require stricter rate limiting.
+// Auth has action-specific limits inside api/auth.ts, so it is not limited here.
+const RATE_LIMITED_PREFIXES = ["/api/ai/chat", "/api/ai/insights"];
 
 serve({
     port: PORT,
@@ -174,7 +175,7 @@ serve({
                 "Access-Control-Allow-Origin": corsOrigin,
                 "Access-Control-Allow-Credentials": "true",
                 "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Cookie",
+                "Access-Control-Allow-Headers": "Content-Type, Cookie, Authorization",
                 ...SECURITY_HEADERS,
                 ...HSTS_HEADER,
             });

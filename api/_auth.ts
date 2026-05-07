@@ -5,16 +5,44 @@ import { queryOne } from './_db.js'
  * Neon Auth client initialized with the URL from environment variables.
  */
 const VERCEL_NEON_AUTH_ORIGIN_FALLBACK =
-  'https://ep-odd-block-a13wgvy0.apirest.ap-southeast-1.aws.neon.tech/neondb/rest/v1/auth'
+  'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth'
 
-const authUrl =
+function normalizeNeonAuthUrl(url: string): string {
+  // Older setup instructions used the Neon Data API host. Neon Auth must use
+  // the neonauth host, otherwise login returns "missing authentication credentials".
+  return url
+    .replace('.apirest.', '.neonauth.')
+    .replace('/neondb/rest/v1/auth', '/neondb/auth')
+    .replace('/neondb/rest/v1', '/neondb/auth')
+}
+
+const authUrl = normalizeNeonAuthUrl(
   process.env.NEON_AUTH_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/neon-auth/auth` : VERCEL_NEON_AUTH_ORIGIN_FALLBACK)
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/neon-auth/auth` : VERCEL_NEON_AUTH_ORIGIN_FALLBACK),
+)
+
 if (!authUrl && process.env.NODE_ENV === 'production') {
   console.warn('⚠️ NEON_AUTH_URL is not set in production. Authentication will fail.');
 }
 
 export const authClient = createAuthClient(authUrl || '')
+
+export function getAuthUrlDiagnostics() {
+  try {
+    const url = new URL(authUrl)
+    return {
+      host: url.host,
+      path: url.pathname,
+      source: process.env.NEON_AUTH_URL ? 'NEON_AUTH_URL' : process.env.VERCEL_URL ? 'VERCEL_URL' : 'fallback',
+    }
+  } catch {
+    return {
+      host: 'invalid',
+      path: 'invalid',
+      source: process.env.NEON_AUTH_URL ? 'NEON_AUTH_URL' : process.env.VERCEL_URL ? 'VERCEL_URL' : 'fallback',
+    }
+  }
+}
 
 export async function getAuthedUserId(req: { headers?: Record<string, string | string[] | undefined> }): Promise<string | null> {
   const incomingHeaders = new Headers()

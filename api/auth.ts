@@ -1,4 +1,4 @@
-import { authClient } from './_auth.js'
+import { authClient, getAuthUrlDiagnostics } from './_auth.js'
 import { queryOne } from './_db.js'
 import { checkRateLimit, recordFailedAttempt } from './_rate-limiter.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
@@ -187,12 +187,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             })
 
             if (error) {
-                console.error('Neon Auth signup error:', error)
-                res.status(400).json({ error: error.message || 'Signup failed' })
+                console.error('Neon Auth signup error:', error, getAuthUrlDiagnostics())
+                res.status(400).json({
+                    error: error.message || 'Signup failed',
+                    diagnostics: getAuthUrlDiagnostics(),
+                })
                 return
             }
 
             if (data?.user) {
+                const token = data.token
+
                 // Ensure user exists in our users table (required for foreign key in profiles)
                 // Handle email conflict from legacy users
                 try {
@@ -242,6 +247,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 }
 
                 res.status(201).json({
+                    token,
                     user: {
                         id: data.user.id,
                         email: data.user.email,
@@ -303,12 +309,34 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
             if (error) {
                 recordFailedAttempt(clientId, 'login')
-                res.status(401).json({ error: 'Invalid email or password' })
+                console.error('Neon Auth login error:', error, getAuthUrlDiagnostics())
+                const message = error.message?.includes('missing authentication credentials')
+                    ? error.message
+                    : 'Invalid email or password'
+                res.status(401).json({
+                    error: message,
+                    diagnostics: getAuthUrlDiagnostics(),
+                })
                 return
             }
 
             if (data?.user) {
+                try {
+                    await queryOne(
+                        `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3)
+                         ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email`,
+                        [data.user.id, data.user.email, data.user.name || 'Unknown']
+                    )
+                    await queryOne(
+                        'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING',
+                        [data.user.id, data.user.name || 'Unknown', 'USD'],
+                    )
+                } catch (dbError) {
+                    console.error('Database sync error during login:', dbError)
+                }
+
                 res.status(200).json({
+                    token: data.token,
                     user: {
                         id: data.user.id,
                         email: data.user.email,
@@ -322,19 +350,36 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 res.status(401).json({ error: 'Invalid email or password' })
             }
         } catch (error: any) {
-            console.error('Login error detailed:', error, error?.cause);
+            console.error('Login error detailed:', error, error?.cause, getAuthUrlDiagnostics());
             try {
                 const fs = await import('fs');
                 fs.appendFileSync('error.log', JSON.stringify({ message: error.message, stack: error.stack, cause: error.cause }) + '\n');
             } catch(e) {}
             
             // better-auth throws APIError for 400/401 responses
+            if (error?.message?.includes('Email not verified')) {
+                res.status(403).json({
+                    error: 'Email not verified. Please verify your email before signing in.',
+                    diagnostics: getAuthUrlDiagnostics(),
+                })
+                return;
+            }
+
             if (error?.message === 'Invalid email or password' || error?.status === 401 || error?.status === 400) {
-                res.status(401).json({ error: 'Invalid email or password' })
+                const message = error?.message?.includes('missing authentication credentials')
+                    ? error.message
+                    : 'Invalid email or password'
+                res.status(401).json({
+                    error: message,
+                    diagnostics: getAuthUrlDiagnostics(),
+                })
                 return;
             }
             
-            res.status(500).json({ error: `Server error: ${error?.message || 'Unknown'}` })
+            res.status(500).json({
+                error: `Server error: ${error?.message || 'Unknown'}`,
+                diagnostics: getAuthUrlDiagnostics(),
+            })
         }
         return
     }

@@ -53,9 +53,9 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   }
 
   const res = await fetch(path, {
+    ...options,
     headers,
     credentials: 'include',
-    ...options,
   })
 
   if (!res.ok) {

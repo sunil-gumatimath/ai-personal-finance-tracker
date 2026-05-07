@@ -6,7 +6,7 @@
     "rewrites": [
         {
             "source": "/neon-auth/auth/:path*",
-            "destination": "https://ep-odd-block-a13wgvy0.apirest.ap-southeast-1.aws.neon.tech/neondb/rest/v1/auth/:path*"
+            "destination": "https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth/:path*"
         },
         {
             "source": "/api/:path*",
