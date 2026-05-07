@@ -122,7 +122,7 @@ export function Signup() {
                                         variant="ghost"
                                         size="icon"
                                         className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                        onClick={() => setShowPassword(!showPassword)}
+                                        onClick={() => setShowPassword((current) => !current)}
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -133,11 +133,10 @@ export function Signup() {
                                 </div>
                                 {formData.password && (
                                     <ul className="mt-2 space-y-1">
-                                        {passwordRequirements.map((req, index) => (
+                                        {passwordRequirements.map((req) => (
                                             <li
-                                                key={index}
-                                                className={`flex items-center gap-2 text-xs ${req.met ? 'text-green-500' : 'text-muted-foreground'
-                                                    }`}
+                                                key={req.text}
+                                                className={`flex items-center gap-2 text-xs ${req.met ? 'text-green-500' : 'text-muted-foreground'}`}
                                             >
                                                 <Check
                                                     className={`h-3 w-3 ${req.met ? 'opacity-100' : 'opacity-30'}`}
