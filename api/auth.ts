@@ -1,4 +1,4 @@
-import { authClient, getAuthUrlDiagnostics } from './_auth.js'
+import { authClient, getAuthUrlDiagnostics, getAuthOrigin } from './_auth.js'
 import { queryOne } from './_db.js'
 import { checkRateLimit, recordFailedAttempt } from './_rate-limiter.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
@@ -37,6 +37,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const incomingHeaders = new Headers()
             if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
+
+            // Neon Auth requires Origin header even for server-side calls
+            incomingHeaders.set('Origin', getAuthOrigin())
 
             const { data } = await authClient.getSession({
                 fetchOptions: {
@@ -89,6 +92,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const incomingHeaders = new Headers()
             if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
+
+            // Neon Auth requires Origin header even for server-side calls
+            incomingHeaders.set('Origin', getAuthOrigin())
 
             const { data } = await authClient.getSession({
                 fetchOptions: {
@@ -191,10 +197,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
+            // Neon Auth requires Origin header even for server-side calls
             const { data, error } = await authClient.signUp.email({
                 email,
                 password,
                 name: fullName,
+                fetchOptions: {
+                    headers: {
+                        'Origin': getAuthOrigin()
+                    }
+                }
             })
 
             if (error) {
@@ -312,9 +324,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
             console.log('Login attempt for email:', email, 'Auth URL diagnostics:', getAuthUrlDiagnostics())
 
+            // Neon Auth requires Origin header even for server-side calls
             const { data, error } = await authClient.signIn.email({
                 email,
                 password,
+                fetchOptions: {
+                    headers: {
+                        'Origin': getAuthOrigin()
+                    }
+                }
             })
 
             if (error) {

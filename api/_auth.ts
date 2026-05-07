@@ -29,6 +29,19 @@ console.log('🔐 NEON_AUTH_URL env var:', process.env.NEON_AUTH_URL ? 'SET' : '
 
 export const authClient = createAuthClient(authUrl || '')
 
+// Extract the origin (scheme + host) from the auth URL for Origin header
+export function getAuthOrigin(): string {
+  try {
+    const url = new URL(authUrl)
+    const origin = `${url.protocol}//${url.host}`
+    console.log('🔐 Auth Origin:', origin)
+    return origin
+  } catch {
+    console.log('🔐 Auth Origin: FALLBACK')
+    return 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech'
+  }
+}
+
 export function getAuthUrlDiagnostics() {
   try {
     const url = new URL(authUrl)
@@ -50,6 +63,9 @@ export async function getAuthedUserId(req: { headers?: Record<string, string | s
   const incomingHeaders = new Headers()
   if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
   if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
+
+  // Neon Auth requires Origin header even for server-side calls
+  incomingHeaders.set('Origin', getAuthOrigin())
 
   const { data } = await authClient.getSession({
     fetchOptions: {
