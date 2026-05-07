@@ -45,13 +45,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/neon-auth': {
-        target: 'https://18.142.78.60/neondb',
+        target: 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth',
         changeOrigin: true,
         secure: false,
-        headers: {
-          Host: 'ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech'
-        },
-        rewrite: (path) => path.replace(/^\/neon-auth/, ''),
+        rewrite: (path) => path.replace(/^\/neon-auth\/auth/, ''),
       },
     },
   },

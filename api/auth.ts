@@ -191,17 +191,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
-            const incomingHeaders = new Headers()
-            if (req.headers?.origin) incomingHeaders.set('origin', req.headers.origin as string)
-            if (req.headers?.host) incomingHeaders.set('host', req.headers.host as string)
-
             const { data, error } = await authClient.signUp.email({
                 email,
                 password,
                 name: fullName,
-                fetchOptions: {
-                    headers: incomingHeaders
-                }
             })
 
             if (error) {
@@ -317,16 +310,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
-            const incomingHeaders = new Headers()
-            if (req.headers?.origin) incomingHeaders.set('origin', req.headers.origin as string)
-            if (req.headers?.host) incomingHeaders.set('host', req.headers.host as string)
+            console.log('Login attempt for email:', email, 'Auth URL diagnostics:', getAuthUrlDiagnostics())
 
             const { data, error } = await authClient.signIn.email({
                 email,
                 password,
-                fetchOptions: {
-                    headers: incomingHeaders
-                }
             })
 
             if (error) {

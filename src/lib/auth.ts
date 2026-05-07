@@ -9,14 +9,19 @@ import { BetterAuthReactAdapter } from "@neondatabase/auth/react/adapters"
  */
 const isProduction = typeof window !== 'undefined' && !window.location.hostname.includes('localhost')
 
+const directNeonAuthUrl = 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth'
 const rewriteAuthUrl =
   `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}/neon-auth/auth`
 
-const authUrl =
-  isProduction ? rewriteAuthUrl : (import.meta.env.VITE_NEON_AUTH_URL || rewriteAuthUrl)
+// Use direct URL in local development if VITE_NEON_AUTH_URL is not set
+// Use rewrite URL in production for cookie domain alignment
+const authUrl = import.meta.env.VITE_NEON_AUTH_URL ||
+  (isProduction ? rewriteAuthUrl : directNeonAuthUrl)
 
 // If neither is available (extremely unlikely), log a loud error.
 if (!authUrl) console.error('❌ Neon Auth URL is missing. Signup/Login will fail.');
+
+console.log('Frontend auth URL:', authUrl, 'Is production:', isProduction)
 
 export const authClient = createAuthClient(
   authUrl,
