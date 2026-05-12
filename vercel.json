@@ -7,7 +7,7 @@
             "destination": "https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth/:path*"
         },
         {
-            "source": "/((?!api).*)",
+            "source": "/:path*",
             "destination": "/index.html"
         }
     ]
