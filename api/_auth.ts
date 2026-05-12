@@ -30,15 +30,33 @@ console.log('🔐 NEON_AUTH_URL env var:', process.env.NEON_AUTH_URL ? 'SET' : '
 
 export const authClient = createAuthClient(authUrl || '')
 
-// Extract the origin (scheme + host) from the auth URL for Origin header
-export function getAuthOrigin(): string {
+// Extract the origin (scheme + host) from the auth URL or request headers
+export function getAuthOrigin(req?: { headers?: Record<string, string | string[] | undefined> }): string {
+  // First priority: use the App's origin from headers if available
+  if (req?.headers) {
+    const host = req.headers['host']
+    const proto = req.headers['x-forwarded-proto'] || 'https'
+    if (host) {
+      const origin = `${proto}://${host}`
+      console.log('🔐 Auth Origin (from request):', origin)
+      return origin
+    }
+  }
+
+  // Second priority: use the configured App URL
+  if (process.env.VITE_APP_URL) {
+    console.log('🔐 Auth Origin (from env):', process.env.VITE_APP_URL)
+    return process.env.VITE_APP_URL
+  }
+
+  // Fallback: extract from the auth URL (likely the Neon domain, which might be rejected)
   try {
     const url = new URL(authUrl)
     const origin = `${url.protocol}//${url.host}`
-    console.log('🔐 Auth Origin:', origin)
+    console.log('🔐 Auth Origin (fallback to authUrl):', origin)
     return origin
   } catch {
-    console.log('🔐 Auth Origin: FALLBACK')
+    console.log('🔐 Auth Origin: ABSOLUTE FALLBACK')
     return 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech'
   }
 }
@@ -79,7 +97,7 @@ export async function getAuthedUserId(req: { headers?: Record<string, string | s
   const incomingHeaders = new Headers()
   if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
   if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
-  incomingHeaders.set('Origin', getAuthOrigin())
+  incomingHeaders.set('Origin', getAuthOrigin(req))
 
   try {
     const result = await authClient.getSession({

@@ -40,7 +40,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
 
             // Neon Auth requires Origin header even for server-side calls
-            incomingHeaders.set('Origin', getAuthOrigin())
+            incomingHeaders.set('Origin', getAuthOrigin(req))
 
             const { data } = await authClient.getSession({
                 fetchOptions: {
@@ -95,7 +95,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
 
             // Neon Auth requires Origin header even for server-side calls
-            incomingHeaders.set('Origin', getAuthOrigin())
+            incomingHeaders.set('Origin', getAuthOrigin(req))
 
             const { data } = await authClient.getSession({
                 fetchOptions: {
@@ -205,7 +205,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 name: fullName,
                 fetchOptions: {
                     headers: {
-                        'Origin': getAuthOrigin()
+                        'Origin': getAuthOrigin(req)
                     }
                 }
             })
@@ -334,7 +334,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 password,
                 fetchOptions: {
                     headers: {
-                        'Origin': getAuthOrigin()
+                        'Origin': getAuthOrigin(req)
                     }
                 }
             })
@@ -361,12 +361,46 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                          ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email`,
                         [data.user.id, data.user.email, data.user.name || 'Unknown']
                     )
+                } catch (dbError: unknown) {
+                    const details = asErrorDetails(dbError)
+                    const message = typeof details.message === 'string' ? details.message : ''
+                    if (details.code === '23505' && message.includes('email')) {
+                        // Legacy user migration during login
+                        console.warn('Migrating legacy user during login for Neon Auth ID:', data.user.id)
+                        try {
+                            const legacy = await queryOne<{ id: string }>(
+                                'SELECT id FROM users WHERE email = $1 AND id != $2', [data.user.email, data.user.id]
+                            )
+                            if (legacy) {
+                                const oldId = legacy.id
+                                await queryOne(`UPDATE users SET email = 'migrating_' || email WHERE id = $1`, [oldId])
+                                await queryOne(
+                                    `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, full_name = EXCLUDED.full_name`,
+                                    [data.user.id, data.user.email, data.user.name || 'Unknown']
+                                )
+                                const childTables = ['debt_payments', 'debts', 'ai_insights', 'goals', 'budgets', 'transactions', 'categories', 'accounts', 'profiles']
+                                for (const table of childTables) {
+                                    await queryOne(`UPDATE ${table} SET user_id = $1 WHERE user_id = $2`, [data.user.id, oldId])
+                                }
+                                await queryOne('DELETE FROM users WHERE id = $1', [oldId])
+                                console.log('Legacy user migration during login complete.')
+                            }
+                        } catch (migrationError) {
+                            console.error('Legacy user migration during login failed:', migrationError)
+                        }
+                    } else {
+                        console.error('Database sync error during login (users table):', dbError)
+                    }
+                }
+
+                // Ensure profile exists in our database
+                try {
                     await queryOne(
                         'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING',
                         [data.user.id, data.user.name || 'Unknown', 'USD'],
                     )
-                } catch (dbError) {
-                    console.error('Database sync error during login:', dbError)
+                } catch (dbError: unknown) {
+                    console.error('Database sync error during login (profiles table):', dbError)
                 }
 
                 if (data.token) {
