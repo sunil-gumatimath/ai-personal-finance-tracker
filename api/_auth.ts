@@ -1,5 +1,6 @@
 import { createAuthClient } from '@neondatabase/auth'
 import { queryOne } from './_db.js'
+import { getUserIdFromToken, storeSession } from './_session-store.js'
 
 /**
  * Neon Auth client initialized with the URL from environment variables.
@@ -60,19 +61,39 @@ export function getAuthUrlDiagnostics() {
 }
 
 export async function getAuthedUserId(req: { headers?: Record<string, string | string[] | undefined> }): Promise<string | null> {
+  // Get the auth token from the Authorization header
+  const authHeader = req.headers?.authorization
+  const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : null
+
+  // First try: local session store (fast, works when Neon Auth session API is down)
+  if (token) {
+    const localUserId = getUserIdFromToken(token)
+    if (localUserId) {
+      return localUserId
+    }
+  }
+
+  // Second try: Neon Auth session API (may fail if session endpoint is unavailable)
   const incomingHeaders = new Headers()
   if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
   if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
-
-  // Neon Auth requires Origin header even for server-side calls
   incomingHeaders.set('Origin', getAuthOrigin())
 
-  const { data } = await authClient.getSession({
-    fetchOptions: {
-      headers: incomingHeaders
+  try {
+    const result = await authClient.getSession({
+      fetchOptions: { headers: incomingHeaders }
+    })
+    if (result.data?.user?.id) {
+      if (token) storeSession(token, result.data.user.id)
+      return result.data.user.id
     }
-  })
-  return data?.user.id || null
+  } catch (err) {
+    console.error('[getAuthedUserId] getSession threw:', err)
+  }
+
+  return null
 }
 
 export type AuthedUser = {
