@@ -45,8 +45,11 @@ export interface UserPreferences {
     notifications?: boolean
     emailAlerts?: boolean
     budgetAlerts?: boolean
+    aiProvider?: string
     geminiApiKey?: string
     geminiModel?: string
+    openrouterApiKey?: string
+    openrouterModel?: string
 }
 
 export interface ProfileResponse {
