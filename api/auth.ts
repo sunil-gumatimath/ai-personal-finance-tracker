@@ -1,6 +1,7 @@
 import { authClient, getAuthUrlDiagnostics, getAuthOrigin } from './_auth.js'
 import { queryOne } from './_db.js'
 import { checkRateLimit, recordFailedAttempt } from './_rate-limiter.js'
+import { storeSession } from './_session-store.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
 
 type ErrorWithDetails = {
@@ -218,8 +219,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return
             }
 
-            if (data?.user) {
+                if (data?.user) {
                 const token = data.token
+                if (token) {
+                  storeSession(token, data.user.id)
+                }
 
                 // Ensure user exists in our users table (required for foreign key in profiles)
                 // Handle email conflict from legacy users
@@ -363,6 +367,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                     )
                 } catch (dbError) {
                     console.error('Database sync error during login:', dbError)
+                }
+
+                if (data.token) {
+                  storeSession(data.token, data.user.id)
                 }
 
                 res.status(200).json({
