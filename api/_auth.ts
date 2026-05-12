@@ -109,15 +109,26 @@ export async function getAuthedUserId(req: { headers?: Record<string, string | s
   incomingHeaders.set('Origin', getAuthOrigin(req))
 
   try {
+    const origin = getAuthOrigin(req)
+    console.log('[getAuthedUserId] Requesting session with Origin:', origin)
+    
     const result = await authClient.getSession({
-      fetchOptions: { headers: incomingHeaders }
+      fetchOptions: { 
+        headers: incomingHeaders 
+      }
     })
+
     if (result.data?.user?.id) {
+      console.log('[getAuthedUserId] Session valid for user:', result.data.user.id)
       if (token) storeSession(token, result.data.user.id)
       return result.data.user.id
+    } else if (result.error) {
+      console.error('[getAuthedUserId] Session error details:', JSON.stringify(result.error, null, 2))
+    } else {
+      console.log('[getAuthedUserId] No user found in session result.')
     }
   } catch (err) {
-    console.error('[getAuthedUserId] getSession threw:', err)
+    console.error('[getAuthedUserId] getSession CRITICAL error:', err)
   }
 
   return null
