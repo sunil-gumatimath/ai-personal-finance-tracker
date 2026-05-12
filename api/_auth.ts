@@ -34,10 +34,13 @@ export const authClient = createAuthClient(authUrl || '')
 export function getAuthOrigin(req?: { headers?: Record<string, string | string[] | undefined> }): string {
   // First priority: use the App's origin from headers if available
   if (req?.headers) {
+    // Note: req.headers keys are lowercase in Node/Bun
     const host = req.headers['host']
     const proto = req.headers['x-forwarded-proto'] || 'https'
-    if (host) {
-      const origin = `${proto}://${host}`
+    if (host && typeof host === 'string') {
+      // Remove any trailing slashes and ensure lowercase
+      const cleanHost = host.trim().replace(/\/$/, '').toLowerCase()
+      const origin = `${proto}://${cleanHost}`
       console.log('🔐 Auth Origin (from request):', origin)
       return origin
     }
@@ -45,11 +48,17 @@ export function getAuthOrigin(req?: { headers?: Record<string, string | string[]
 
   // Second priority: use the configured App URL
   if (process.env.VITE_APP_URL) {
-    console.log('🔐 Auth Origin (from env):', process.env.VITE_APP_URL)
-    return process.env.VITE_APP_URL
+    const origin = process.env.VITE_APP_URL.trim().replace(/\/$/, '')
+    console.log('🔐 Auth Origin (from env):', origin)
+    return origin
   }
 
-  // Fallback: extract from the auth URL (likely the Neon domain, which might be rejected)
+  // Production Fallback (Explicitly trust the Vercel domain)
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://personal-finance-tracker-ted.vercel.app'
+  }
+
+  // Final Fallback: extract from the auth URL
   try {
     const url = new URL(authUrl)
     const origin = `${url.protocol}//${url.host}`
@@ -57,7 +66,7 @@ export function getAuthOrigin(req?: { headers?: Record<string, string | string[]
     return origin
   } catch {
     console.log('🔐 Auth Origin: ABSOLUTE FALLBACK')
-    return 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech'
+    return 'https://personal-finance-tracker-ted.vercel.app'
   }
 }
 
