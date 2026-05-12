@@ -1,215 +1,161 @@
 # AI Personal Finance Tracker
 
-A premium, AI-powered personal finance management platform designed for clarity and growth. Track expenses, manage portfolios, and achieve financial goals with sophisticated design, intelligent insights, and an intuitive user experience.
+A premium, AI-powered personal finance management platform for tracking transactions, budgets, goals, accounts, debts, and financial health. The app combines a responsive React interface with Bun-powered API routes, Neon PostgreSQL storage, persisted AI insights, and configurable AI providers.
 
-> **New to the app?** Check out [HowToUse.md](./HowToUse.md) for a comprehensive user guide.
+> **New to the app?** Start with [HowToUse.md](./HowToUse.md) for the user guide.
 
 ## Features
 
 ### AI-Powered Intelligence
-- AI Financial Coach: Real-time personalized insights powered by Google Gemini (with per-user model selection from 1.5 Flash up to 3.1 Pro), providing spending alerts and actionable coaching tips.
-- Persisted Intelligence: AI-generated financial insights are now stored in the database, providing a consistent coaching history across sessions.
-- Interactive AI Chat: Natural language conversations about your finances with context-aware responses and smart recommendations.
-- Anomaly Detection: Automatic identification of unusual spending patterns and financial outliers.
+- **AI Financial Coach**: Personalized coaching cards, spending alerts, kudos, and anomaly detection.
+- **AI Assistant Chat**: Natural-language conversations about balances, budgets, goals, debt, categories, trends, and spending questions.
+- **Provider Choice**: Configure either Google Gemini or OpenRouter in Settings.
+- **Model Selection**: Choose Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 1.5 Pro, or Gemini 1.5 Flash; OpenRouter accepts custom model slugs such as `openrouter/free`.
+- **Persisted Insights**: AI insights are stored in the database, can be dismissed, and are reused to avoid unnecessary regeneration.
 
-### Dashboard Excellence
-- Side-by-Side Analytics: Balanced layout featuring a redesigned Financial Health Score and Spending Flow (Budget Overview) in a unified view.
-- Interactive Monitoring: Instant updates to savings rate, budget adherence, and emergency fund progress with real-time feedback.
-- Actionable Intelligence: AI-generated next steps for improving financial health, integrated with full currency support.
-
-### Advanced Analytics
-- Intelligence Dashboard: Comprehensive financial overview with interactive Shadcn UI charts including:
-  - Income vs Expenses area chart with 6-month trends.
-  - Interactive spending breakdown pie chart with category-specific insights.
-  - Month-over-month comparison metrics.
-  - Dynamic stat cards with percentage changes.
-- Enhanced Spending Flow: Visual spending breakdown featuring interactive legends, hover-triggered details, and category progress tracking.
-- Health Score Visualization: Advanced animated gauge with score-specific gradients and detailed breakdown tooltips.
-- Activity Calendar: High-fidelity visualization of daily financial events to identify spending patterns.
-- Budget Analytics: Visual progress tracking with threshold alerts and spending forecasts.
-
+### Dashboard & Analytics
+- Financial health score with savings-rate, budget-adherence, and emergency-fund pillars.
+- Side-by-side health and spending-flow overview for fast decision making.
+- Income vs. expenses chart, spending breakdowns, recent transactions, and budget progress.
+- Activity calendar for daily income and expense patterns.
+- Currency-aware analytics across the app.
 
 ### Core Financial Management
-- Transaction Engine: Precision recording of income, expenses, and internal transfers with CSV export and recurring logic support.
-- Budgeting System: Define and monitor spending limits per category with visual progress analytics.
-- Wealth Goals: Set sophisticated savings targets with deadline-based tracking and contribution history.
-- Debts & Loans: Comprehensive debt tracking with payment history, interest calculations, payoff projections, and smart payoff strategies (Snowball and Avalanche methods).
-- Unified Account View: Seamless management of diverse asset types including Checking, Savings, Credit, Investments, and Cash.
-- Adaptive Categories: Flexible, hierarchical category system with customizable visual identifiers.
-- Activity Calendar: Daily financial activity visualization with color-coded income/expense indicators and month-by-month navigation.
-- Password Recovery: Secure forgot password functionality with email-based reset process.
-
+- Transaction engine for income, expenses, and internal transfers.
+- Recurring transaction metadata and CSV export.
+- Category-based budgets with visual threshold states.
+- Savings goals with contribution tracking.
+- Debt and loan management with payment history, interest/principal breakdowns, payoff projections, and Snowball/Avalanche strategy comparisons.
+- Multi-account tracking for checking, savings, credit, investments, and cash.
+- Custom categories with colors and icons.
+- Password reset flow.
 
 ### Premium User Experience
-- Eye Protection Light Mode: Specialized warm-ivory theme designed to reduce blue light strain and provide a comfortable reading experience.
-- Dark Mode Excellence: Sophisticated dark theme with OKLCH color model and refined UI elements.
-- Responsive Design: Fully mobile-responsive interface optimized for all screen sizes.
-- PWA Ready: Progressive Web App capabilities for native-like performance and offline access.
-- Global Preferences: Multi-currency support (USD, INR, EUR, GBP, JPY), regional date formats, and customizable settings.
+- Responsive design for desktop and mobile.
+- Light, dark, and system themes.
+- Progressive Web App support through Vite PWA.
+- Multi-currency support: USD, INR, EUR, GBP, and JPY.
+- Regional date-format preferences.
+- Security-focused API defaults, including auth rate limiting, security headers, strict CORS handling, and sanitized error responses.
 
 ## Tech Stack
 
 | Category | Technologies |
-|----------|-------------|
-| Frontend | React 18, TypeScript, Vite 7 |
-| Styling | Tailwind CSS 4, Shadcn UI (Radix UI) |
-| State Management | React Context API |
-| Database | Neon (PostgreSQL) with Serverless Adapter |
-| AI Integration | Google Gemini (multi-model: 1.5 Flash → 3.1 Pro), React Markdown |
-| Charts | Shadcn UI Charts (Recharts) |
-| Icons | Hugeicons React, Lucide React |
-| Runtime | Bun 1.3.x |
-| Deployment | Vercel, Docker & Nginx |
-
-## Key Highlights
-
-### Financial Health Score
-- Three-Pillar Scoring: Savings rate (40%), budget adherence (30%), and emergency fund progress (30%).
-- Animated Visualization: Interactive ring progress with dynamic gradients reflecting financial standing.
-- Detailed Breakdown: Comprehensive modal displaying individual pillar performance and month-over-month trends.
-- Action Plan: prioritized, actionable steps to improve financial standing, localized to user currency.
-
-### Recent Improvements
-- **Security Hardening**: Added rate limiting on auth endpoints, security headers (CSP, HSTS, X-Frame-Options), strict CORS origin validation, and sanitized error messages that never leak internal details or SQL info.
-- **Per-User Gemini Model Selection**: Choose your preferred Gemini model (1.5 Flash through 3.1 Pro) directly in Settings, with model-specific billing awareness.
-- **Mock Database Mode**: Run the full stack locally without a Neon account by setting `USE_MOCK_DB=true`.
-- Debts & Loans Module: Comprehensive debt tracking with support for mortgages, car loans, student loans, credit cards, and more. Includes payment recording, interest calculations, payoff projections, and Snowball/Avalanche strategy comparison.
-- Enhanced Financial Health Score: Redesigned with animated ring progress, interactive metric cards, score history trends, and a detailed breakdown visualization with tooltips.
-- Advanced Spending Flow: Implemented interactive legends, category-specific details on hover, animated entry sequences, and budget progress indicators.
-- Database-Stored AI Insights: Financial coaching insights are now persisted in the Neon database, ensuring persistence and improved context for growth tips.
-- Side-by-Side Dashboard: Refined layout placing Health Score and Spending Flow side-by-side for a more efficient and balanced financial overview.
-- Global Preference Integration: Deep integration of currency and regional settings across all analytics and AI insights.
-- Refined Branding & UX: Polished typography, emerald-themed visual identity, and removal of gamification elements (badges) to focus on core data.
-- Clean Documentation: Updated project documentation with professional formatting.
-- Bun Runtime Optimization: Fully optimized for Bun, delivering sub-second hot-reloads and efficient build processes.
+| --- | --- |
+| Runtime / Package Manager | Bun 1.3.x |
+| Frontend | React 18, TypeScript 5.9, Vite 7 |
+| Routing | React Router DOM 7 |
+| Styling | Tailwind CSS 4, Radix UI / Shadcn-style components |
+| State | React Context API and custom hooks |
+| Database | Neon PostgreSQL with `@neondatabase/serverless` |
+| Auth | Neon Auth client plus local session fallback for development resilience |
+| AI | Google Gemini, OpenRouter, React Markdown |
+| Charts | Recharts via Shadcn-style chart components |
+| Icons | Lucide React, Hugeicons React |
+| Deployment | Vercel functions, Docker, Nginx |
 
 ## Prerequisites
 
 - Bun 1.3.x or later
-- A Neon account
-- Vercel CLI (for local fullstack dev)
+- A Neon project for persistent PostgreSQL storage, unless using mock database mode
+- A Gemini API key or OpenRouter API key for AI features
+- Vercel CLI only if you want to test using `vercel dev`
 
 ## Quick Start
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/sunil-gumatimath/ai-personal-finance-tracker.git
    cd ai-personal-finance-tracker
    ```
 
 2. **Install dependencies:**
+
    ```bash
    bun install
    ```
 
-3. **Environment Setup:**
+3. **Create `.env` in the project root:**
 
-   Create a `.env` file in the root directory:
    ```env
-   # Required
+   # Production / persistent database
    NEON_DATABASE_URL=your_neon_database_url
    AUTH_SECRET=your_long_random_secret
 
-   # Optional — local development without a Neon database
+   # Optional, if your Neon Auth origin differs from the configured fallback
+   NEON_AUTH_URL=your_neon_auth_url
+   VITE_NEON_AUTH_URL=your_neon_auth_url
+
+   # Local development without Neon
    USE_MOCK_DB=true
-
-   # Optional — allow insecure cookies on http://localhost (never in production)
-   ALLOW_INSECURE_COOKIES=true
-
-   # Optional — global Gemini API key for AI features (can also be set per-user in Settings)
-   GEMINI_API_KEY=your_gemini_api_key
    ```
-   For local fullstack dev, `vercel dev` will read this file automatically.
 
-4. **Database Setup:**
-    - Create a new project in [Neon](https://neon.tech)
-    - Execute the SQL statements in `database/database-neon.sql` in your Neon SQL Editor
-    - Execute the SQL statements in `database/database-debts.sql` to add debt tracking functionality
-    - After your first login, run `SELECT seed_my_data();` to populate demo data
+4. **Database setup for Neon:**
 
-5. **AI Integration (Optional):**
-   - Visit [Google AI Studio](https://aistudio.google.com)
-   - Create an API Key
-   - Add it in **Settings > AI Integration** within the app
+   - Create a Neon project.
+   - Run `database/database-neon.sql` in the Neon SQL editor.
+   - Run `database/database-debts.sql` to add debt tracking tables and helpers.
+   - After first login, optionally run `SELECT seed_my_data();` for demo data.
 
-6. **Start Development (Fullstack):**
+5. **AI setup:**
+
+   - Gemini: create a key in [Google AI Studio](https://aistudio.google.com).
+   - OpenRouter: create a key in [OpenRouter](https://openrouter.ai/keys).
+   - Add the key inside **Settings > Preferences > AI Integration**. Keys are saved in your profile preferences rather than hardcoded in the source.
+
+6. **Start local fullstack development:**
+
    ```bash
-   vercel dev
+   bun run dev
    ```
-   This runs both the Vite frontend and the `/api` serverless routes locally.
-   This is the closest behavior to production on Vercel.
+
+   This starts the Bun API server on port 3001 and the Vite frontend with `/api` proxying.
 
 ## Development Commands
 
-**Fullstack (Vercel API routes) local dev:**
-```bash
-vercel dev
-```
-
-**Frontend only:**
-```bash
-bun run vite
-```
-
-**Local API server only (Bun runtime):**
-```bash
-bun run api
-```
-
-**Type checking:**
-```bash
-bun run typecheck
-```
-
-**Linting:**
-```bash
-bun run lint
-```
-
-**Build for production:**
-```bash
-bun run build
-```
+| Command | Description |
+| --- | --- |
+| `bun run dev` | Start API and Vite together for local fullstack development |
+| `bun run api` | Start only the Bun API server with watch mode |
+| `bun run vite` | Start only the frontend dev server |
+| `bun run typecheck` | Run TypeScript type checking |
+| `bun run lint` | Run ESLint |
+| `bun run build` | Typecheck and build for production |
+| `bun run preview` | Preview the production Vite build |
 
 ## AI Features
 
-The application includes powerful AI-driven insights powered by Google Gemini (with per-user model selection):
-
 ### AI Financial Coach
-- Appears on the dashboard with real-time insights.
-- Provides spending alerts and coaching tips.
-- Automatically rotates through multiple insights.
-- Click Chat to open the full AI Assistant.
+- Appears on the dashboard.
+- Generates coaching, anomaly, and kudo insights.
+- Stores active insights in `ai_insights` so they persist across sessions.
+- Supports dismissal and refresh behavior.
 
 ### AI Assistant
-- Natural language conversations about your finances.
-- **Persistent Memory**: Chat history is preserved across sessions (per browser).
-- **Data-Driven Insights**: Responses are generated based on your real-time transaction history and account balances.
-- Ask questions like:
-  - "How much did I spend on dining last month?"
-  - "What are my top spending categories?"
-  - "Give me tips to save more money."
-  - "Am I on track with my budget?"
+- Opens from the dashboard AI experience.
+- Uses current financial context to answer questions about balances, spending, income, goals, budgets, debt, and net worth.
+- Supports Gemini and OpenRouter preferences.
+- Shows structured finance-oriented responses with React Markdown rendering.
 
-Note: AI features require a Gemini API key. Add it in **Settings > Preferences**.
+AI features require a valid provider key. Add it in **Settings > Preferences > AI Integration**.
 
 ## Deployment
 
-### Vercel (Recommended)
+### Vercel
 
-The project is optimized for deployment on Vercel:
-
-1. Push your code to GitHub
-2. Import the repository in [Vercel](https://vercel.com)
+1. Push the repository to GitHub.
+2. Import it in [Vercel](https://vercel.com).
 3. Configure environment variables:
    - `NEON_DATABASE_URL`
    - `AUTH_SECRET`
-   - `GEMINI_API_KEY` (optional, only if you want AI features enabled globally)
-4. Deploy with Bun runtime for optimal performance
+   - `NEON_AUTH_URL` if needed by your Neon Auth project
+   - Optional provider-level AI keys only if you later add global server-side key support. The current UI is designed around per-user keys in Settings.
+4. Deploy.
 
 Notes:
-- API route files under `api/` are deployed as Vercel functions.
-- The Bun local API shim lives in `api/_server.ts` and is not deployed.
+- API files under `api/` are Vercel-compatible route handlers.
+- `api/_server.ts` is the local Bun API shim and is not the primary production entrypoint.
 
 ### Docker
 
@@ -219,76 +165,52 @@ Build and run with Docker Compose:
 docker-compose up --build
 ```
 
-Access the application at `http://localhost:8080`
+Then open `http://localhost:8080`.
 
 ## Project Structure
 
-```
+```text
 ├── src/
-│   ├── components/     # Reusable UI components (39 files)
-│   ├── contexts/       # React Context providers (Auth, Preferences)
-│   ├── hooks/          # Custom React hooks (6 files)
-│   ├── lib/            # Utilities and helpers (8 files)
-│   ├── pages/          # Main application pages (13 files)
-│   │   ├── Dashboard.tsx      # Financial overview with AI insights
-│   │   ├── Transactions.tsx   # Transaction management with CSV export
-│   │   ├── Budgets.tsx        # Budget tracking and analytics
-│   │   ├── Goals.tsx          # Savings goals management
-│   │   ├── Debts.tsx          # Debt tracking and payoff strategies
-│   │   ├── Accounts.tsx       # Account management
-│   │   ├── Categories.tsx     # Category customization
-│   │   ├── Calendar.tsx       # Daily financial activity view
-│   │   ├── Settings.tsx       # User preferences and AI integration
-│   │   ├── Login.tsx          # User authentication
-│   │   ├── Signup.tsx         # User registration
-│   │   └── ForgotPassword.tsx # Password recovery
-│   └── types/          # TypeScript type definitions (3 files)
-├── api/               # Backend API endpoints (21 files)
-│   ├── auth.ts         # Authentication (login, signup, password reset)
-│   ├── accounts.ts     # Account management
-│   ├── transactions.ts # Transaction CRUD operations
-│   ├── budgets.ts      # Budget management
-│   ├── goals.ts        # Goals tracking
-│   ├── debts.ts        # Debt management
-│   ├── categories.ts   # Category operations
-│   ├── profile.ts      # User profile management
-│   ├── notifications.ts # Budget alerts and notifications
-│   └── ai/            # AI-powered features
-│       ├── chat.ts     # Natural language AI assistant
-│       ├── insights.ts  # Financial coaching insights
-│       └── query-processor.js # NLP query processing
-├── database/          # Database schema and migrations
-│   ├── database-neon.sql    # Main database schema
-│   └── database-debts.sql   # Debt tracking tables
-├── public/            # Static assets and PWA files
-├── scripts/           # Utility scripts (5 files)
-└── docs/             # Additional documentation
+│   ├── components/       # Dashboard, layout, shared UI, theme, and error-boundary components
+│   ├── contexts/         # Auth and preferences providers
+│   ├── hooks/            # Financial health, insights, notifications, preferences, and responsive helpers
+│   ├── lib/              # API client, auth, crypto, AI query utilities, Gemini helpers, and shared utilities
+│   ├── pages/            # Dashboard, Transactions, Budgets, Goals, Debts, Accounts, Categories, Calendar, Settings, auth pages
+│   └── types/            # API, database, preferences, and shared TypeScript types
+├── api/                  # Bun/Vercel API handlers and shared backend utilities
+│   ├── ai/               # AI chat and AI insights endpoints
+│   ├── _ai-provider.ts   # Gemini/OpenRouter provider routing
+│   ├── _db.ts            # Neon/mock database adapter
+│   ├── _server.ts        # Local Bun API server
+│   └── *.ts              # Accounts, auth, budgets, categories, debts, goals, notifications, profile, transactions
+├── database/             # Neon schema, seed helpers, and debt tables
+├── public/               # Static assets and PWA icons
+└── scripts/              # Local dev and utility scripts
 ```
 
 ## Database Schema
 
-The application uses Neon (PostgreSQL) with the following data model:
+The app uses Neon PostgreSQL with these primary tables:
 
 | Table | Description |
-| ------- | ------------- |
-| **profiles** | User profiles with currency preferences and personal information (stored in JSONB) |
-| **accounts** | Financial accounts (checking, savings, credit, investment, cash) with balances |
-| **categories** | Transaction categories for income and expenses with custom colors and icons |
-| **transactions** | Financial transactions with support for recurring entries and categorization |
-| **budgets** | Spending limits per category with weekly, monthly, or yearly periods |
-| **goals** | Savings goals with target amounts, deadlines, and progress tracking |
-| **debts** | Debt and loan tracking with interest rates, payment schedules, and payoff projections |
-| **debt_payments** | Payment history for debts with principal/interest breakdown |
-| **ai_insights** | Persisted financial insights including anomalies, coaching tips, and kudos |
-| **users** | Core authentication table for secure user management |
+| --- | --- |
+| `profiles` | User profile, currency, regional preferences, and AI settings stored in JSONB |
+| `accounts` | Checking, savings, credit, investment, and cash accounts |
+| `categories` | Income and expense categories with custom colors and icons |
+| `transactions` | Income, expense, transfer, and recurring transaction records |
+| `budgets` | Category spending limits for weekly, monthly, and yearly periods |
+| `goals` | Savings goals, target dates, and progress |
+| `debts` | Loans, cards, and other debts with interest and payoff metadata |
+| `debt_payments` | Debt payment history with principal and interest breakdown |
+| `ai_insights` | Persisted AI-generated anomalies, coaching tips, and kudos |
+| `users` | Authentication user records |
 
-**Security:** All tables include Row Level Security (RLS) policies to ensure data privacy and user isolation.
+All user-owned tables are designed around user isolation through Row Level Security policies and user-scoped API queries.
 
 ## Support
 
-For questions or issues, please open an issue on GitHub or check out the [HowToUse.md](./HowToUse.md) guide.
+For questions or issues, open a GitHub issue or use [HowToUse.md](./HowToUse.md) for feature guidance.
 
 ## License
 
 This project is free and open-source software licensed under the MIT License.
-

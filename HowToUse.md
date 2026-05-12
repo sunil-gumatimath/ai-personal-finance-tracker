@@ -1,93 +1,168 @@
 # How to Use FinanceTrack
 
-Welcome to **FinanceTrack**, your personal companion for managing money, tracking expenses, and reaching your financial goals. This guide will help you understand every feature of the application.
+Welcome to **FinanceTrack**, your personal finance companion for tracking transactions, managing budgets, monitoring goals, paying down debt, and getting AI-powered financial guidance.
 
 ## Getting Started
 
-### 1. Sign Up & Login
-*   **New Users**: Click "Sign Up" on the login page. Enter your **Full Name**, **Email**, and a secure **Password**.
-*   **Returning Users**: Simply log in with your credentials.
-*   **Security**: Your data is private. Only YOU can see your financial records.
+### 1. Sign Up, Log In, and Reset Passwords
+- **New users**: Choose **Sign Up**, then enter your full name, email, and password.
+- **Returning users**: Log in with your existing email and password.
+- **Forgot password**: Use the password reset flow on the login screen.
+- **Privacy**: Your records are scoped to your account. Other users cannot view your finances.
+
+### 2. Configure Your Preferences
+Open **Settings** after your first login and review:
+- Theme: Light, Dark, or System.
+- Currency: USD, INR, EUR, GBP, or JPY.
+- Date format: choose the format that matches your region.
+- AI provider: Gemini or OpenRouter, if you want AI insights and chat.
 
 ---
 
-## Dashboard (Your Home Base)
-The Dashboard gives you a complete overview of your financial health at a glance.
-*   **Stats Cards**: See your Total Balance, Monthly Income, Expenses, and Net Savings instantly.
-*   **Spending Chart**: A visual graph showing your income vs. expenses over the last 6 months.
-*   **Category Breakdown**: A pie chart showing where most of your money is going (e.g., Food, Rent).
-*   **Recent Transactions**: The 5 most recent activities on your account.
+## Dashboard
+
+The Dashboard is your home base for a fast overview of your finances.
+
+- **Stats cards**: Total balance, monthly income, monthly expenses, and savings.
+- **Financial Health Score**: A score based on savings rate, budget adherence, and emergency fund progress.
+- **Spending Flow / Budget Overview**: Category-level spending progress and budget awareness.
+- **Income vs. Expenses Chart**: Trend view across recent months.
+- **Recent Transactions**: Quickly review your newest financial activity.
+- **AI Coach**: AI-generated coaching cards, kudos, and spending alerts when AI is configured.
+- **AI Assistant**: Chat about your balances, spending, budgets, goals, debt, and trends.
 
 ---
 
 ## Features Guide
 
 ### 1. Transactions
-This is where you record your day-to-day spending and income.
-*   **Add Transaction**: Click the "+ Add Transaction" button.
-    *   Choose **Income** (earned) or **Expense** (spent).
-    *   Enter Amount, Date, Description, and Category.
-    *   **Recurring**: Toggle "Recurring Transaction" for bills like Rent or Netflix (Daily/Weekly/Monthly).
-*   **Export Data**: Click **"Export CSV"** to download your visible transactions to a spreadsheet.
-*   **Filter & Search**: Use the search bar to find specific payments (e.g., "Netflix") or filter by category.
-*   **Edit/Delete**: Made a mistake? Click the three dots (...) on any transaction to fix or remove it.
+Use **Transactions** to record money moving in and out.
 
-### 2. Calendar View
-Visualize your finances day-by-day.
-*   **Overview**: Days with activity show colored indicators with totals (Green for Income, Red for Expense).
-*   **Details**: Click on any day to see the specific list of transactions for that date.
-*   **Navigate**: Use arrows to switch between months or click "Today" to jump to the current month.
+- **Add transaction**:
+  - Choose **Income**, **Expense**, or **Transfer**.
+  - Enter amount, date, description, account, and category when applicable.
+  - For transfers, choose both the source and destination account.
+- **Recurring metadata**: Mark repeating items such as rent, subscriptions, or salary as recurring and choose the frequency.
+- **Search and filter**: Search by description or category and filter by transaction type.
+- **Edit or delete**: Use the row actions to correct or remove entries.
+- **Export CSV**: Download the currently visible transactions for use in spreadsheets.
+
+### 2. Calendar
+Use **Calendar** to visualize activity by day.
+
+- Days with activity show income and expense indicators.
+- Click a date to inspect transactions for that day.
+- Navigate month by month or jump back to today.
 
 ### 3. Budgets
-Stop overspending by setting monthly limits.
-*   **Create a Budget**: Set a limit for a specific category (e.g., "$500 for Groceries").
-*   **Track Progress**: The bar changes color based on your spending percentage:
-    *   **Green**: Safe zone (Under 80%).
-    *   **Yellow**: Approaching limit (80% or more).
-    *   **Red**: Over budget (100% or more).
+Use **Budgets** to set limits by category.
+
+- Create limits for weekly, monthly, or yearly spending periods.
+- Watch progress bars change as you approach or exceed limits.
+- Use dashboard budget insights to identify categories that need attention.
 
 ### 4. Goals
-Save for big dreams like a vacation, new car, or emergency fund.
-*   **Set a Goal**: Name your goal and set a target amount (e.g., "New Laptop - $1,500").
-*   **Contribute**: Click "Add Money" to log savings towards this goal.
-*   **Visualize**: Watch the progress circle fill up as you get closer to 100%.
+Use **Goals** to track savings targets.
 
-### 5. Categories
-Organize your money your way.
-*   The app comes with defaults (Food, Rent, Salary), but you can add your own custom categories with valid colors and icons.
+- Create a goal with a name, target amount, and deadline.
+- Add contributions as you save.
+- Monitor progress visually until the goal is complete.
+
+### 5. Debts
+Use **Debts** to manage loans, cards, and payoff planning.
+
+- Add debt types such as mortgage, car loan, student loan, personal loan, credit card, medical, or other.
+- Track original amount, current balance, interest rate, minimum payment, due day, lender, and notes.
+- Record payments with amount, principal, interest, date, and notes.
+- Mark debts as paid off when the balance reaches zero.
+- Compare payoff strategies such as Snowball and Avalanche to prioritize repayment.
 
 ### 6. Accounts
-Manage multiple money sources.
-*   Track **Cash**, **Bank Accounts**, **Credit Cards**, or **Savings** separately.
-*   Manually update balances ensuring they match your real-world bank apps.
+Use **Accounts** to manage where your money is held.
+
+- Track checking, savings, credit, investment, and cash accounts.
+- Keep balances aligned with your real-world accounts.
+- Use transfers to move money between accounts without treating the movement as income or expense.
+
+### 7. Categories
+Use **Categories** to organize transactions.
+
+- Start from built-in categories such as food, rent, and salary.
+- Add your own categories with colors and icons.
+- Use category names consistently for better budgets, charts, and AI answers.
 
 ---
 
-## Mobile App (PWA)
-You can install FinanceTrack on your phone for a native app experience.
-*   **iOS**: Open in Safari -> Tap Share -> "Add to Home Screen".
-*   **Android**: Open in Chrome -> Tap Menu -> "Install App".
-*   **Offline Mode**: View your data and dashboard even without an internet connection.
+## AI Features
+
+### AI Provider Setup
+Go to **Settings > Preferences > AI Integration**.
+
+- Choose **Gemini (Google)** or **OpenRouter (Multi-Model)**.
+- Paste the matching API key:
+  - Gemini keys usually start with `AIza`.
+  - OpenRouter keys usually start with `sk-or-`.
+- Select a Gemini model or enter an OpenRouter model slug such as `openrouter/free`.
+- Save your preferences.
+
+### AI Coach
+The AI Coach can provide:
+- Spending alerts.
+- Anomaly detection.
+- Positive reinforcement when you are doing well.
+- Next-step coaching based on your recent financial data.
+
+### AI Assistant
+Ask natural-language questions such as:
+- “How much did I spend on food last month?”
+- “What is my total account balance?”
+- “Am I on track with my savings goals?”
+- “How much debt do I have left?”
+- “What is my net worth?”
+- “Compare my spending this month vs last month.”
 
 ---
 
 ## Settings
-Customize the app to fit your needs.
 
 ### Profile
-*   Update your **Full Name**.
-*   View your registered **Email**.
+- Update your full name.
+- View your registered email.
 
 ### Preferences
-*   **Theme**: Choose between **Light**, **Dark**, or **System** (matches your device).
-*   **Currency**: Select your preferred currency (USD $, EUR €, GBP £, INR ₹, JPY ¥).
-*   **Date Format**: Choose how dates are displayed (e.g., MM/DD/YYYY or DD/MM/YYYY).
+- Theme: Light, Dark, or System.
+- Currency: USD, INR, EUR, GBP, or JPY.
+- Date format: choose your preferred display style.
+
+### AI Integration
+- Choose Gemini or OpenRouter.
+- Save your API key and model preference.
+- Use AI-powered dashboard insights and assistant chat.
 
 ### Notifications
-*   **Push Notifications**: Enable browser notifications.
-*   **Email Alerts**: Toggle weekly summary emails.
-*   **Budget Alerts**: Get notified when you are approaching your budget limits.
+- Enable browser notifications when supported.
+- Configure budget and summary alert preferences.
 
 ### Security
-*   **Password**: Request a password reset email.
-*   **Sign Out**: Securely log out of your account.
+- Request password reset emails.
+- Sign out securely when finished.
+
+---
+
+## Mobile App / PWA
+
+FinanceTrack can be installed as a Progressive Web App.
+
+- **iOS**: Open the app in Safari, tap Share, then choose **Add to Home Screen**.
+- **Android**: Open the app in Chrome, open the menu, then choose **Install App**.
+- **Desktop browsers**: Use the install icon in the address bar when available.
+
+---
+
+## Tips for Best Results
+
+- Add accounts before entering transactions so every record has a source.
+- Keep categories clean and consistent for better reporting.
+- Review budgets weekly to prevent overspending.
+- Record debt payments with principal and interest when possible.
+- Configure AI only with keys you control; do not paste someone else’s API key.
