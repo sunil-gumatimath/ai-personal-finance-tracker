@@ -27,6 +27,17 @@ function getClientId(req: ApiRequest): string {
 export default async function handler(req: ApiRequest, res: ApiResponse) {
     const action = req.query?.action
 
+    // DEBUG: Inspect headers in production
+    if (action === 'debug') {
+        return res.status(200).json({
+            headers: req.headers,
+            calculatedOrigin: getAuthOrigin(req),
+            envOrigin: process.env.VITE_APP_URL,
+            nodeEnv: process.env.NODE_ENV,
+            diagnostics: getAuthUrlDiagnostics()
+        })
+    }
+
     // Handle /api/auth?action=me
     if (action === 'me') {
         if (req.method !== 'GET') {
