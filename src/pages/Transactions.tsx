@@ -88,10 +88,10 @@ export function Transactions() {
                 api.accounts.list(),
             ])
 
-            setTransactions((transactionsRes.transactions || []) as Transaction[])
-            setCategories((categoriesRes.categories || []) as Category[])
+            setTransactions((Array.isArray(transactionsRes.transactions) ? transactionsRes.transactions : []) as Transaction[])
+            setCategories((Array.isArray(categoriesRes.categories) ? categoriesRes.categories : []) as Category[])
             setAccounts(
-                ((accountsRes.accounts || []) as Account[]).filter(a => a.is_active),
+                (Array.isArray(accountsRes.accounts) ? accountsRes.accounts : []).filter((a: Account) => a.is_active),
             )
         } catch (error) {
             console.error('Error fetching data:', error)

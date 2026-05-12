@@ -51,6 +51,7 @@ export function AppSidebar() {
         if (!name) return 'U'
         return name
             .split(' ')
+            .filter(Boolean)
             .map((n) => n[0])
             .join('')
             .toUpperCase()

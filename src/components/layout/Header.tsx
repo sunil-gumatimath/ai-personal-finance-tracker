@@ -38,11 +38,13 @@ export function Header() {
     // Get user initials for avatar fallback
     const getUserInitials = () => {
         const fullName = user?.user_metadata?.full_name || user?.email || 'User'
-        const parts = fullName.split(' ')
-        if (parts.length >= 2) {
-            return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-        }
-        return fullName.substring(0, 2).toUpperCase()
+        return fullName
+            .split(' ')
+            .filter(Boolean)
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2)
     }
 
     const handleSignOut = async () => {

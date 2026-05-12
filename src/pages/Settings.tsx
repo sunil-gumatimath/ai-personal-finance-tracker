@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 
@@ -89,6 +90,13 @@ export function Settings() {
     fullName: user?.user_metadata?.full_name || "",
     email: user?.email || "",
   });
+
+  useEffect(() => {
+    setProfileData({
+      fullName: user?.user_metadata?.full_name || "",
+      email: user?.email || "",
+    })
+  }, [user?.user_metadata?.full_name, user?.email])
 
   const [aiSettings, setAiSettings] = useState({
     aiProvider: preferences.aiProvider || ("gemini" as "gemini" | "openrouter"),
@@ -237,6 +245,18 @@ export function Settings() {
               <h3 className="text-sm font-medium">Account Details</h3>
             </div>
             <div className="p-4 space-y-4">
+              <div className="flex items-center gap-4 mb-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={user?.user_metadata?.avatar_url || undefined} alt={user?.user_metadata?.full_name || 'User avatar'} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-lg font-medium">
+                    {(user?.user_metadata?.full_name || user?.email || 'U').split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">{user?.user_metadata?.full_name || 'User'}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+              </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="fullName" className="text-xs">

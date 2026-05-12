@@ -46,7 +46,7 @@ export async function query<T = unknown>(
     // `neon()` returns a tagged-template function; for dynamic SQL strings use `unsafe`.
     const result = await (db as UnsafeSql).unsafe<T>(queryText, params ?? [])
 
-    const rows = hasRows(result) ? result.rows : result
+    const rows = hasRows(result) ? result.rows : (Array.isArray(result) ? result : [])
     const rowCount = hasRows(result) && typeof result.rowCount === 'number' ? result.rowCount : rows.length
 
     return { rows, rowCount }
