@@ -1,50 +1,53 @@
-import { getAuthedUserId } from '../_auth.js'
-import { query, queryOne } from '../_db.js'
-import { generateFinancialAdvice } from '../_gemini.js'
-import type { ApiRequest, ApiResponse } from '../_types.js'
+import { getAuthedUserId } from "../_auth.js";
+import { query, queryOne } from "../_db.js";
+import {
+  generateWithProvider,
+  type AIProviderPreferences,
+} from "../_ai-provider.js";
+import type { ApiRequest, ApiResponse } from "../_types.js";
 
 type Insight = {
-  id: string
-  type: 'anomaly' | 'coaching' | 'kudo'
-  title: string
-  description: string
-  category?: string
-  amount?: number
-  impact?: number
-  date?: string
-  is_dismissed?: boolean
-  created_at?: string
-}
+  id: string;
+  type: "anomaly" | "coaching" | "kudo";
+  title: string;
+  description: string;
+  category?: string;
+  amount?: number;
+  impact?: number;
+  date?: string;
+  is_dismissed?: boolean;
+  created_at?: string;
+};
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  const userId = await getAuthedUserId(req)
+  const userId = await getAuthedUserId(req);
   if (!userId) {
-    res.status(401).json({ error: 'Unauthorized' })
-    return
+    res.status(401).json({ error: "Unauthorized" });
+    return;
   }
 
   // Handle ID-based operations (PATCH for dismiss)
-  const id = req.query?.id
-  if (id && typeof id === 'string') {
-    if (req.method === 'PATCH') {
+  const id = req.query?.id;
+  if (id && typeof id === "string") {
+    if (req.method === "PATCH") {
       try {
-        await query('UPDATE ai_insights SET is_dismissed = true WHERE id = $1 AND user_id = $2', [
-          id,
-          userId,
-        ])
-        res.status(200).json({ ok: true })
+        await query(
+          "UPDATE ai_insights SET is_dismissed = true WHERE id = $1 AND user_id = $2",
+          [id, userId],
+        );
+        res.status(200).json({ ok: true });
       } catch (error) {
-        console.error('AI insight PATCH error:', error)
-        res.status(500).json({ error: 'Server error' })
+        console.error("AI insight PATCH error:", error);
+        res.status(500).json({ error: "Server error" });
       }
-      return
+      return;
     }
 
-    res.status(405).json({ error: 'Method not allowed' })
-    return
+    res.status(405).json({ error: "Method not allowed" });
+    return;
   }
 
-  if (req.method === 'GET') {
+  if (req.method === "GET") {
     try {
       const { rows } = await query<Insight>(
         `
@@ -55,18 +58,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         ORDER BY created_at DESC
         `,
         [userId],
-      )
-      res.status(200).json({ insights: rows })
+      );
+      res.status(200).json({ insights: rows });
     } catch (error) {
-      console.error('AI insights GET error:', error)
-      res.status(500).json({ error: 'Server error' })
+      console.error("AI insights GET error:", error);
+      res.status(500).json({ error: "Server error" });
     }
-    return
+    return;
   }
 
-  if (req.method === 'POST') {
+  if (req.method === "POST") {
     try {
-      const { forceRefresh } = req.body || {}
+      const { forceRefresh } = req.body || {};
       if (!forceRefresh) {
         const { rows } = await query<Insight>(
           `
@@ -77,41 +80,52 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           ORDER BY created_at DESC
           `,
           [userId],
-        )
+        );
         if (rows.length > 0) {
-          res.status(200).json({ insights: rows })
-          return
+          res.status(200).json({ insights: rows });
+          return;
         }
       }
 
-      const profile = await queryOne<{ preferences: Record<string, unknown> | null; currency: string | null }>(
-        'SELECT preferences, currency FROM profiles WHERE user_id = $1',
-        [userId],
-      )
-      const prefs = profile?.preferences || {}
-      const currency = typeof prefs.currency === 'string' ? prefs.currency : (profile?.currency || 'USD')
+      const profile = await queryOne<{
+        preferences: Record<string, unknown> | null;
+        currency: string | null;
+      }>("SELECT preferences, currency FROM profiles WHERE user_id = $1", [
+        userId,
+      ]);
+      const rawPrefs = profile?.preferences || {};
+      const prefs = rawPrefs as AIProviderPreferences;
+      const currency =
+        typeof rawPrefs["currency"] === "string"
+          ? (rawPrefs["currency"] as string)
+          : profile?.currency || "USD";
       const currencyLocales: Record<string, string> = {
-        USD: 'en-US',
-        INR: 'en-IN',
-        EUR: 'de-DE',
-        GBP: 'en-GB',
-        JPY: 'ja-JP',
-      }
+        USD: "en-US",
+        INR: "en-IN",
+        EUR: "de-DE",
+        GBP: "en-GB",
+        JPY: "ja-JP",
+      };
       const formatCurrency = (amount: number) =>
-        new Intl.NumberFormat(currencyLocales[currency] || 'en-US', {
-          style: 'currency',
+        new Intl.NumberFormat(currencyLocales[currency] || "en-US", {
+          style: "currency",
           currency,
-        }).format(amount)
-      const apiKey = typeof prefs.geminiApiKey === 'string' ? prefs.geminiApiKey : undefined
-      const modelName = typeof prefs.geminiModel === 'string' ? prefs.geminiModel : undefined
+        }).format(amount);
+      const provider =
+        typeof prefs.aiProvider === "string" ? prefs.aiProvider : "gemini";
+      const hasGeminiKey =
+        typeof prefs.geminiApiKey === "string" && prefs.geminiApiKey.length > 0;
+      const hasOpenRouterKey =
+        typeof prefs.openrouterApiKey === "string" &&
+        prefs.openrouterApiKey.length > 0;
 
       type TransactionWithCategory = {
-        type: string
-        amount: number | string | null
-        description: string | null
-        date: string
-        category: { name?: string } | null
-      }
+        type: string;
+        amount: number | string | null;
+        description: string | null;
+        date: string;
+        category: { name?: string } | null;
+      };
 
       const { rows: transactions } = await query<TransactionWithCategory>(
         `
@@ -123,44 +137,62 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         ORDER BY t.date DESC
         `,
         [userId],
-      )
+      );
 
-      const newInsights: Omit<Insight, 'id'>[] = []
-      const categoryStats = new Map<string, { total: number; count: number; transactions: TransactionWithCategory[] }>()
+      const newInsights: Omit<Insight, "id">[] = [];
+      const categoryStats = new Map<
+        string,
+        {
+          total: number;
+          count: number;
+          transactions: TransactionWithCategory[];
+        }
+      >();
 
       for (const t of transactions || []) {
-        if (t.type === 'expense' && t.category) {
-          const catName = t.category.name || 'Uncategorized'
-          const stats = categoryStats.get(catName) || { total: 0, count: 0, transactions: [] }
-          stats.total += Number(t.amount || 0)
-          stats.count += 1
-          stats.transactions.push(t)
-          categoryStats.set(catName, stats)
+        if (t.type === "expense" && t.category) {
+          const catName = t.category.name || "Uncategorized";
+          const stats = categoryStats.get(catName) || {
+            total: 0,
+            count: 0,
+            transactions: [],
+          };
+          stats.total += Number(t.amount || 0);
+          stats.count += 1;
+          stats.transactions.push(t);
+          categoryStats.set(catName, stats);
         }
       }
 
       categoryStats.forEach((stats, categoryName) => {
-        const average = stats.total / stats.count
-        const recentTransactions = stats.transactions.slice(0, 3)
-        recentTransactions.forEach(t => {
-          const amount = Number(t.amount || 0)
+        const average = stats.total / stats.count;
+        const recentTransactions = stats.transactions.slice(0, 3);
+        recentTransactions.forEach((t) => {
+          const amount = Number(t.amount || 0);
           if (amount > average * 1.8 && amount > 50) {
             newInsights.push({
-              type: 'anomaly',
-              title: 'Unusual Spending',
+              type: "anomaly",
+              title: "Unusual Spending",
               description: `You spent ${formatCurrency(amount)} on ${t.description || categoryName}, which is higher than your typical ${formatCurrency(average)} average.`,
               category: categoryName,
               amount,
               date: t.date,
-            })
+            });
           }
-        })
-      })
+        });
+      });
 
-      if (apiKey && transactions.length > 0) {
-        const spendingSummary = Array.from(categoryStats.entries()).map(([cat, stats]) => {
-          return { category: cat, average: stats.total / stats.count }
-        })
+      const effectiveProvider =
+        !hasGeminiKey && hasOpenRouterKey ? "openrouter" : provider;
+      const hasKey =
+        effectiveProvider === "openrouter" ? hasOpenRouterKey : hasGeminiKey;
+
+      if (hasKey && transactions.length > 0) {
+        const spendingSummary = Array.from(categoryStats.entries()).map(
+          ([cat, stats]) => {
+            return { category: cat, average: stats.total / stats.count };
+          },
+        );
 
         const prompt = `
 I am a personal finance AI agent. Analyze the following spending data:
@@ -175,35 +207,39 @@ Generate 2-3 specific, actionable financial insights focusing on:
 Return ONLY a JSON array:
 [{"type": "coaching" | "kudo", "title": "Title", "description": "Description"}]
 No markdown, no extra text, and NO emojis.
-        `
+        `;
 
         try {
-          const aiResponse = await generateFinancialAdvice(prompt, apiKey, modelName)
+          const aiResponse = await generateWithProvider(prompt, prefs);
           if (aiResponse) {
-            const cleaned = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim()
+            const cleaned = aiResponse
+              .replace(/```json/g, "")
+              .replace(/```/g, "")
+              .trim();
             const aiInsights = JSON.parse(cleaned) as Array<{
-              type: 'coaching' | 'kudo'
-              title: string
-              description: string
-            }>
-            aiInsights.forEach(insight => {
-              newInsights.push({ ...insight, type: insight.type })
-            })
+              type: "coaching" | "kudo";
+              title: string;
+              description: string;
+            }>;
+            aiInsights.forEach((insight) => {
+              newInsights.push({ ...insight, type: insight.type });
+            });
           }
         } catch (e) {
-          console.error('Failed to generate AI insights:', e)
+          console.error("Failed to generate AI insights:", e);
         }
       }
 
       if (newInsights.length === 0) {
         newInsights.push({
-          type: 'coaching',
-          title: 'Financial Health Tip',
-          description: 'Try the 50/30/20 rule: 50% for needs, 30% for wants, and 20% for savings.',
-        })
+          type: "coaching",
+          title: "Financial Health Tip",
+          description:
+            "Try the 50/30/20 rule: 50% for needs, 30% for wants, and 20% for savings.",
+        });
       }
 
-      const saved: Insight[] = []
+      const saved: Insight[] = [];
       for (const insight of newInsights) {
         const { rows } = await query<Insight>(
           `
@@ -220,17 +256,17 @@ No markdown, no extra text, and NO emojis.
             insight.amount || null,
             insight.date || null,
           ],
-        )
-        if (rows[0]) saved.push(rows[0])
+        );
+        if (rows[0]) saved.push(rows[0]);
       }
 
-      res.status(200).json({ insights: saved })
+      res.status(200).json({ insights: saved });
     } catch (error) {
-      console.error('AI insights POST error:', error)
-      res.status(500).json({ error: 'Server error' })
+      console.error("AI insights POST error:", error);
+      res.status(500).json({ error: "Server error" });
     }
-    return
+    return;
   }
 
-  res.status(405).json({ error: 'Method not allowed' })
+  res.status(405).json({ error: "Method not allowed" });
 }
