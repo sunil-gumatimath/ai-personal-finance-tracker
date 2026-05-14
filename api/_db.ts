@@ -3,7 +3,7 @@ import type { PoolClient } from '@neondatabase/serverless'
 
 type QueryResult<T> = T[] | { rows: T[]; rowCount?: number }
 type UnsafeSql = ReturnType<typeof neon> & {
-  unsafe: <T = unknown>(queryText: string, params: unknown[]) => Promise<QueryResult<T>>
+  query: <T = unknown>(queryText: string, params: unknown[]) => Promise<QueryResult<T>>
 }
 
 function hasRows<T>(result: QueryResult<T>): result is { rows: T[]; rowCount?: number } {
@@ -43,8 +43,8 @@ export async function query<T = unknown>(
 ): Promise<{ rows: T[]; rowCount: number }> {
   try {
     const db = getSql()
-    // `neon()` returns a tagged-template function; for dynamic SQL strings use `unsafe`.
-    const result = await (db as UnsafeSql).unsafe<T>(queryText, params ?? [])
+    // `neon()` returns a tagged-template function; for dynamic SQL strings use `query`.
+    const result = await (db as UnsafeSql).query<T>(queryText, params ?? [])
 
     const rows = hasRows(result) ? result.rows : (Array.isArray(result) ? result : [])
     const rowCount = hasRows(result) && typeof result.rowCount === 'number' ? result.rowCount : rows.length
