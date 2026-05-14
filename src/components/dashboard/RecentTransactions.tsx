@@ -112,7 +112,7 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
                                             {transaction.description || transaction.category?.name || 'Transaction'}
                                         </p>
                                         {isAnomaly && (
-                                            <Badge variant="destructive" className="h-4 px-1 text-[8px] font-black uppercase tracking-tighter animate-pulse">
+                                            <Badge variant="destructive" className="h-4 px-1 text-[8px] font-bold uppercase tracking-tight animate-pulse">
                                                 Anomaly
                                             </Badge>
                                         )}

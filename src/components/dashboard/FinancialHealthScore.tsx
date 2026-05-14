@@ -167,7 +167,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                 Health Score
                             </CardTitle>
                             <div className={cn(
-                                "flex items-center gap-1.5 text-[10px] font-black px-2 py-1 rounded-full border",
+                                "flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full border",
                                 getScoreColor(score),
                                 getScoreBadgeStyle(score)
                             )}>
@@ -237,7 +237,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                     {/* Center content */}
                                     <div className="absolute inset-0 flex items-center justify-center flex-col">
                                         <span
-                                            className="text-4xl font-black tracking-tight"
+                                            className="text-4xl font-bold tracking-tight"
                                             style={{ color: getGaugeFillColor(score) }}
                                         >
                                             {score}
@@ -354,7 +354,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                             {getScoreStatus(score)}
                                         </span>
                                     </div>
-                                    <span className={cn("text-7xl font-black tracking-tighter", getScoreColor(score))}>
+                                    <span className={cn("text-7xl font-bold tracking-tight", getScoreColor(score))}>
                                         {score}
                                     </span>
                                     <p className="text-sm font-medium text-muted-foreground mt-2 uppercase tracking-widest">
@@ -471,7 +471,7 @@ function EnhancedMetricBar({ icon: Icon, label, value, weight, description, deta
                                     {weight}%
                                 </span>
                                 <span className={cn(
-                                    "font-black transition-all tabular-nums",
+                                    "font-bold transition-all tabular-nums",
                                     colors.text,
                                     isHovered && "scale-110"
                                 )}>

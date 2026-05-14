@@ -245,27 +245,31 @@ export function Budgets() {
 
             {/* Budget Cards */}
             {budgets.length === 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                        <div className="rounded-full bg-muted p-4">
-                            <Target className="h-8 w-8 text-muted-foreground" />
+                <div className="group relative overflow-hidden rounded-xl border-2 border-dashed border-border/50 bg-card/50 backdrop-blur-sm">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex flex-col items-center justify-center py-16 text-center">
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
+                            <div className="relative flex h-16 w-16 items-center justify-center rounded-xl bg-background/50 text-primary border border-border/50">
+                                <Target className="h-8 w-8" />
+                            </div>
                         </div>
-                        <h3 className="mt-4 text-lg font-semibold">No budgets yet</h3>
-                        <p className="mt-2 text-sm text-muted-foreground text-center max-w-sm">
+                        <h3 className="text-xl font-bold tracking-tight mb-2">No budgets yet</h3>
+                        <p className="text-sm text-muted-foreground max-w-sm mb-8">
                             Create budgets to set spending limits for different categories and track your progress
                         </p>
                         <Button
-                            className="mt-4"
                             onClick={() => {
                                 resetForm()
                                 setIsDialogOpen(true)
                             }}
+                            className="gap-2"
                         >
-                            <Plus className="mr-2 h-4 w-4" />
+                            <Plus className="h-4 w-4" />
                             Create Your First Budget
                         </Button>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             ) : (
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {budgets.map((budget) => {
@@ -274,21 +278,20 @@ export function Budgets() {
                         const isOverBudget = spent > budget.amount
 
                         return (
-                            <Card key={budget.id} className="relative overflow-hidden">
-                                <CardHeader className="pb-2">
+                            <div key={budget.id} className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                                <div className="relative space-y-4">
                                     <div className="flex items-center justify-between">
-                                        <CardTitle className="text-lg">
+                                        <h3 className="text-base font-bold tracking-tight">
                                             {budget.category?.name || 'Unknown Category'}
-                                        </CardTitle>
+                                        </h3>
                                         <Badge variant={isOverBudget ? 'destructive' : 'secondary'}>
                                             {budget.period}
                                         </Badge>
                                     </div>
-                                    <CardDescription>
+                                    <p className="text-sm text-muted-foreground">
                                         {formatCurrency(spent)} of {formatCurrency(budget.amount)}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
+                                    </p>
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">Progress</span>
@@ -314,7 +317,7 @@ export function Budgets() {
                                             {formatCurrency(Math.abs(budget.amount - spent))}
                                         </span>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -340,8 +343,8 @@ export function Budgets() {
                                             Delete
                                         </Button>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </div>
                         )
                     })}
                 </div>

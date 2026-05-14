@@ -240,7 +240,7 @@ export function Settings() {
 
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-4">
-          <div className="rounded-lg border border-border/50 bg-card/50">
+          <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
             <div className="px-4 py-3 border-b border-border/50">
               <h3 className="text-sm font-medium">Account Details</h3>
             </div>
@@ -303,7 +303,7 @@ export function Settings() {
         {/* Preferences Tab */}
         <TabsContent value="preferences" className="space-y-4">
           {/* Interface */}
-          <div className="rounded-lg border border-border/50 bg-card/50">
+          <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
             <div className="px-4 py-3 border-b border-border/50">
               <h3 className="text-sm font-medium">Interface</h3>
             </div>
@@ -354,7 +354,7 @@ export function Settings() {
           </div>
 
           {/* AI Integration */}
-          <div className="rounded-lg border border-primary/20 bg-primary/[0.02]">
+          <div className="group relative overflow-hidden rounded-xl border border-primary/20 bg-primary/[0.02] backdrop-blur-sm">
             <div className="px-4 py-3 border-b border-primary/10 flex items-center gap-2">
               <Brain className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-medium">AI Integration</h3>
@@ -525,7 +525,7 @@ export function Settings() {
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-4">
-          <div className="rounded-lg border border-border/50 bg-card/50">
+          <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
             <div className="px-4 py-3 border-b border-border/50">
               <h3 className="text-sm font-medium">Notification Preferences</h3>
             </div>
@@ -586,7 +586,7 @@ export function Settings() {
 
         {/* Security Tab */}
         <TabsContent value="security" className="space-y-4">
-          <div className="rounded-lg border border-border/50 bg-card/50">
+          <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
             <div className="px-4 py-3 border-b border-border/50">
               <h3 className="text-sm font-medium">Password</h3>
             </div>
@@ -610,7 +610,7 @@ export function Settings() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-destructive/20 bg-destructive/[0.02]">
+          <div className="group relative overflow-hidden rounded-xl border border-destructive/20 bg-destructive/[0.02] backdrop-blur-sm">
             <div className="px-4 py-3 border-b border-destructive/10">
               <h3 className="text-xs font-medium text-destructive uppercase tracking-wide">
                 Danger Zone

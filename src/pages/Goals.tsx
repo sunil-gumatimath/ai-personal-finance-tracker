@@ -350,27 +350,31 @@ export function Goals() {
 
             {/* Goals Grid */}
             {goals.length === 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                        <div className="rounded-full bg-muted p-4">
-                            <Target className="h-8 w-8 text-muted-foreground" />
+                <div className="group relative overflow-hidden rounded-xl border-2 border-dashed border-border/50 bg-card/50 backdrop-blur-sm">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="relative flex flex-col items-center justify-center py-16 text-center">
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
+                            <div className="relative flex h-16 w-16 items-center justify-center rounded-xl bg-background/50 text-primary border border-border/50">
+                                <Target className="h-8 w-8" />
+                            </div>
                         </div>
-                        <h3 className="mt-4 text-lg font-semibold">No goals yet</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
+                        <h3 className="text-xl font-bold tracking-tight mb-2">No goals yet</h3>
+                        <p className="text-sm text-muted-foreground mb-8">
                             Start by creating your first financial goal
                         </p>
                         <Button
-                            className="mt-4"
                             onClick={() => {
                                 resetForm()
                                 setIsDialogOpen(true)
                             }}
+                            className="gap-2"
                         >
-                            <Plus className="mr-2 h-4 w-4" />
+                            <Plus className="h-4 w-4" />
                             Create Goal
                         </Button>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             ) : (
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {goals.map((goal) => {
@@ -380,10 +384,10 @@ export function Goals() {
                         const daysRemaining = getDaysRemaining(goal.deadline)
 
                         return (
-                            <Card
+                            <div
                                 key={goal.id}
                                 className={cn(
-                                    'relative overflow-hidden transition-all hover:shadow-lg',
+                                    'group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80',
                                     isCompleted && 'ring-2 ring-green-500/50'
                                 )}
                             >
@@ -395,11 +399,12 @@ export function Goals() {
                                         </Badge>
                                     </div>
                                 )}
-                                <CardHeader className="pb-2">
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                                <div className="relative space-y-4">
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-3">
                                             <div
-                                                className="rounded-full p-2.5"
+                                                className="rounded-xl p-2.5"
                                                 style={{ backgroundColor: `${goal.color}20` }}
                                             >
                                                 <GoalIcon
@@ -408,16 +413,16 @@ export function Goals() {
                                                 />
                                             </div>
                                             <div>
-                                                <CardTitle className="text-lg">{goal.name}</CardTitle>
+                                                <h3 className="text-base font-bold tracking-tight">{goal.name}</h3>
                                                 {goal.deadline && (
-                                                    <CardDescription className="flex items-center gap-1">
+                                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
                                                         {daysRemaining !== null && daysRemaining >= 0
                                                             ? `${daysRemaining} days left`
                                                             : daysRemaining !== null && daysRemaining < 0
                                                                 ? 'Overdue'
                                                                 : format(new Date(goal.deadline), 'MMM d, yyyy')}
-                                                    </CardDescription>
+                                                    </p>
                                                 )}
                                             </div>
                                         </div>
@@ -442,8 +447,6 @@ export function Goals() {
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">Progress</span>
@@ -480,8 +483,8 @@ export function Goals() {
                                             Add Money
                                         </Button>
                                     )}
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </div>
                         )
                     })}
                 </div>

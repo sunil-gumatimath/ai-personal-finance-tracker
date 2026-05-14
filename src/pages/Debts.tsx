@@ -527,15 +527,19 @@ export function Debts() {
 
                 <TabsContent value={activeTab} className="mt-6">
                     {displayedDebts.length === 0 ? (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                                <div className="rounded-full bg-muted p-4">
-                                    <CreditCard className="h-8 w-8 text-muted-foreground" />
+                        <div className="group relative overflow-hidden rounded-xl border-2 border-dashed border-border/50 bg-card/50 backdrop-blur-sm">
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                            <div className="relative flex flex-col items-center justify-center py-16 text-center">
+                                <div className="relative mb-6">
+                                    <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
+                                    <div className="relative flex h-16 w-16 items-center justify-center rounded-xl bg-background/50 text-primary border border-border/50">
+                                        <CreditCard className="h-8 w-8" />
+                                    </div>
                                 </div>
-                                <h3 className="mt-4 text-lg font-semibold">
+                                <h3 className="text-xl font-bold tracking-tight mb-2">
                                     {activeTab === 'active' ? 'No active debts' : 'No paid off debts yet'}
                                 </h3>
-                                <p className="mt-2 text-sm text-muted-foreground">
+                                <p className="text-sm text-muted-foreground mb-8">
                                     {activeTab === 'active'
                                         ? 'Add your debts to start tracking and planning payoffs'
                                         : 'Keep working on your debts - you got this!'
@@ -543,18 +547,18 @@ export function Debts() {
                                 </p>
                                 {activeTab === 'active' && (
                                     <Button
-                                        className="mt-4"
                                         onClick={() => {
                                             resetForm()
                                             setIsDialogOpen(true)
                                         }}
+                                        className="gap-2"
                                     >
-                                        <Plus className="mr-2 h-4 w-4" />
+                                        <Plus className="h-4 w-4" />
                                         Add Debt
                                     </Button>
                                 )}
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </div>
                     ) : (
                         <div className="space-y-4">
                             {displayedDebts.map((debt) => {
@@ -566,18 +570,19 @@ export function Debts() {
                                 const isExpanded = expandedDebt === debt.id
 
                                 return (
-                                    <Card
+                                    <div
                                         key={debt.id}
                                         className={cn(
-                                            'relative overflow-hidden transition-all',
+                                            'group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80',
                                             isPaidOff && 'ring-2 ring-green-500/50 opacity-75'
                                         )}
                                     >
-                                        <CardHeader className="pb-2">
+                                        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                                        <div className="relative space-y-4">
                                             <div className="flex items-start justify-between">
                                                 <div className="flex items-center gap-3 flex-1">
                                                     <div
-                                                        className="rounded-full p-2.5 shrink-0"
+                                                        className="rounded-xl p-2.5 shrink-0"
                                                         style={{ backgroundColor: `${debt.color}20` }}
                                                     >
                                                         <DebtIcon
@@ -587,14 +592,14 @@ export function Debts() {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                            <CardTitle className="text-lg truncate">{debt.name}</CardTitle>
+                                                            <h3 className="text-base font-bold tracking-tight truncate">{debt.name}</h3>
                                                             {isPaidOff && (
                                                                 <Badge className="bg-green-500 text-white shrink-0">
                                                                     Paid Off
                                                                 </Badge>
                                                             )}
                                                         </div>
-                                                        <CardDescription className="flex items-center gap-2 flex-wrap">
+                                                        <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                                                             <span>{debtTypes.find(t => t.value === debt.type)?.label}</span>
                                                             {debt.lender && (
                                                                 <>
@@ -608,7 +613,7 @@ export function Debts() {
                                                                     <span className="text-amber-500">{debt.interest_rate}% APR</span>
                                                                 </>
                                                             )}
-                                                        </CardDescription>
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1">
@@ -665,8 +670,7 @@ export function Debts() {
                                                     </DropdownMenu>
                                                 </div>
                                             </div>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
+
                                             {/* Progress bar */}
                                             <div className="space-y-2">
                                                 <div className="flex justify-between text-sm">
@@ -803,8 +807,8 @@ export function Debts() {
                                                     Record Payment
                                                 </Button>
                                             )}
-                                        </CardContent>
-                                    </Card>
+                                        </div>
+                                    </div>
                                 )
                             })}
                         </div>

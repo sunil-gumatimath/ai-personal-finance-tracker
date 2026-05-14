@@ -47,7 +47,7 @@ export async function ensureDefaultCategories(userId: string): Promise<void> {
       SELECT $1, defaults.name, defaults.type, defaults.color, defaults.icon
       FROM (VALUES ${valuePlaceholders}) AS defaults(name, type, color, icon)
       WHERE NOT EXISTS (
-        SELECT 1 FROM categories WHERE user_id = $1
+        SELECT 1 FROM categories WHERE user_id = $1 AND name = defaults.name
       )
     `,
     values,
