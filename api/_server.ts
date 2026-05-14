@@ -3,60 +3,9 @@ import path from "path";
 import type { ApiRequest, ApiResponse } from "./_types.js";
 import { checkRateLimit } from "./_rate-limiter.js";
 
-type BunRequestInit = RequestInit & {
-  tls?: {
-    rejectUnauthorized: boolean;
-    servername: string;
-  };
-};
-
-if (process.env.NODE_ENV !== "production") {
-  // Bypass sporadic local DNS issues for Neon Auth and Database by intercepting fetch
-  const originalFetch = globalThis.fetch;
-  const NEON_AUTH_DOMAIN = 'ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech';
-  const NEON_DB_DOMAIN = 'ep-odd-block-a13wgvy0-pooler.ap-southeast-1.aws.neon.tech';
-  
-  const NEON_AUTH_IPS = ['18.142.78.60', '18.139.181.85', '13.228.33.46'];
-  const NEON_DB_IPS = ['52.220.170.93', '13.228.184.177', '13.228.46.236'];
-  
-  let authIpIndex = 0;
-  let dbIpIndex = 0;
-  
-  globalThis.fetch = async function(input: RequestInfo | URL, init?: BunRequestInit) {
-      const url = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request).url);
-      
-      let targetDomain = '';
-      let targetIp = '';
-      
-      if (url.includes(NEON_AUTH_DOMAIN)) {
-          targetDomain = NEON_AUTH_DOMAIN;
-          targetIp = NEON_AUTH_IPS[authIpIndex];
-          authIpIndex = (authIpIndex + 1) % NEON_AUTH_IPS.length;
-      } else if (url.includes(NEON_DB_DOMAIN)) {
-          targetDomain = NEON_DB_DOMAIN;
-          targetIp = NEON_DB_IPS[dbIpIndex];
-          dbIpIndex = (dbIpIndex + 1) % NEON_DB_IPS.length;
-      }
-      
-      if (targetDomain) {
-          const newUrl = url.replace(targetDomain, targetIp);
-          
-          const requestInit = init || {};
-          const headers = new Headers(requestInit.headers || {});
-          headers.set('Host', targetDomain);
-          requestInit.headers = headers;
-          
-          requestInit.tls = {
-              rejectUnauthorized: false,
-              servername: targetDomain
-          };
-          
-          return originalFetch(newUrl, requestInit);
-      }
-      
-      return originalFetch(input, init);
-  };
-}
+// NOTE: Removed hardcoded IP-based fetch interceptor for Neon domains.
+// The IPs can rotate, causing queries to be sent to wrong servers.
+// If DNS issues recur, resolve fresh IPs or use a proper DNS cache.
 
 const PORT = process.env.PORT || 3001;
 
