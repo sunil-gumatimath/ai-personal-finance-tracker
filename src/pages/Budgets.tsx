@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import {
     Dialog,
