@@ -37,9 +37,17 @@ export function getAuthOrigin(req?: { headers?: Record<string, string | string[]
     // Note: req.headers keys are lowercase in Node/Bun
     const host = req.headers['host']
     const proto = req.headers['x-forwarded-proto'] || 'https'
+    
     if (host && typeof host === 'string') {
-      // Remove any trailing slashes and ensure lowercase
       const cleanHost = host.trim().replace(/\/$/, '').toLowerCase()
+      
+      // Local development check: always use the frontend port 5173
+      if (cleanHost.includes('localhost') || cleanHost.includes('127.0.0.1')) {
+        const origin = 'http://localhost:5173'
+        console.log('🔐 Auth Origin (Local Dev Override):', origin)
+        return origin
+      }
+      
       const origin = `${proto}://${cleanHost}`
       console.log('🔐 Auth Origin (from request):', origin)
       return origin
@@ -87,48 +95,83 @@ export function getAuthUrlDiagnostics() {
   }
 }
 
-export async function getAuthedUserId(req: { headers?: Record<string, string | string[] | undefined> }): Promise<string | null> {
-  // Get the auth token from the Authorization header
-  const authHeader = req.headers?.authorization
-  const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7).trim()
-    : null
+export async function getAuthedUserId(req: { method?: string; headers: Record<string, string | string[] | undefined> }): Promise<string | null> {
+  console.log('🔍 getAuthedUserId - Method:', req.method, 'Headers:', JSON.stringify({
+    authorization: req.headers['authorization'] ? 'Present' : 'Missing',
+    cookie: req.headers['cookie'] ? 'Present' : 'Missing'
+  }));
+
+  // Try Authorization header first
+  const authHeader = req.headers['authorization'] as string | undefined
+  let token = ''
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7)
+    console.log('🎫 Found Bearer token');
+  }
+
+  // If no auth header, try cookies (standard for Neon Auth / better-auth)
+  if (!token) {
+    const cookieHeader = req.headers['cookie'] as string | undefined
+    if (cookieHeader) {
+      const cookies = cookieHeader.split(';').reduce((acc: Record<string, string>, c: string) => {
+        const [k, v] = c.trim().split('=')
+        acc[k] = v
+        return acc
+      }, {})
+      
+      token = cookies['better-auth.session_token'] || cookies['session_token']
+      if (token) console.log('🍪 Found token in cookies');
+    }
+  }
 
   // First try: local session store (fast, works when Neon Auth session API is down)
   if (token) {
     const localUserId = getUserIdFromToken(token)
     if (localUserId) {
+      console.log('✅ Found userId in local session store:', localUserId);
       return localUserId
+    } else {
+      console.log('❓ Token not found in local session store');
     }
+  } else {
+    console.log('❌ No token found in headers or cookies');
   }
 
-  // Second try: Neon Auth session API (may fail if session endpoint is unavailable)
-  const incomingHeaders = new Headers()
-  if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
-  if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
-  incomingHeaders.set('Origin', getAuthOrigin(req))
-
+  // Second try: Verify with Neon Auth server
   try {
     const origin = getAuthOrigin(req)
-    console.log('[getAuthedUserId] Requesting session with Origin:', origin)
+    console.log('🌐 Using origin for verification:', origin);
     
-    const result = await authClient.getSession({
-      fetchOptions: { 
-        headers: incomingHeaders 
+    // Pass the incoming headers to the auth client
+    const incomingHeaders: Record<string, string> = {}
+    if (origin) incomingHeaders['Origin'] = origin
+    if (authHeader) incomingHeaders['Authorization'] = authHeader
+    if (req.headers['cookie']) {
+      const cookie = req.headers['cookie']
+      incomingHeaders['Cookie'] = Array.isArray(cookie) ? cookie.join('; ') : cookie
+    }
+
+    const { data, error } = await authClient.getSession({
+      fetchOptions: {
+        headers: incomingHeaders
       }
     })
 
-    if (result.data?.user?.id) {
-      console.log('[getAuthedUserId] Session valid for user:', result.data.user.id)
-      if (token) storeSession(token, result.data.user.id)
-      return result.data.user.id
-    } else if (result.error) {
-      console.error('[getAuthedUserId] Session error details:', JSON.stringify(result.error, null, 2))
+    if (data?.user?.id) {
+      const userId = data.user.id
+      console.log('✅ Verified session with Neon Auth:', userId);
+      // Store in local cache for next time
+      if (token) {
+        storeSession(token, userId)
+      }
+      return userId
+    } else if (error) {
+      console.error('❌ Neon Auth session error:', error)
     } else {
-      console.log('[getAuthedUserId] No user found in session result.')
+      console.log('❌ No user found in Neon Auth session result');
     }
-  } catch (err) {
-    console.error('[getAuthedUserId] getSession CRITICAL error:', err)
+  } catch (error) {
+    console.error('💥 Neon Auth verification CRITICAL error:', error)
   }
 
   return null
