@@ -1,4 +1,4 @@
-import { authClient, getAuthUrlDiagnostics, getAuthOrigin } from './_auth.js'
+import { authClient, getAuthUrlDiagnostics, getAuthOrigin, getAuthedUserId } from './_auth.js'
 import { queryOne } from './_db.js'
 import { checkRateLimit, recordFailedAttempt } from './_rate-limiter.js'
 import { storeSession } from './_session-store.js'
@@ -46,33 +46,39 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         try {
-            const incomingHeaders = new Headers()
-            if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
-            if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
-
-            // Neon Auth requires Origin header even for server-side calls
-            incomingHeaders.set('Origin', getAuthOrigin(req))
-
-            const { data } = await authClient.getSession({
-                fetchOptions: {
-                    headers: incomingHeaders
-                }
-            })
-
-            if (!data?.user) {
+            // Use the shared auth logic that checks Bearer tokens in the local session store
+            const userId = await getAuthedUserId(req)
+            if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' })
                 return
             }
 
-            const { user } = data
+            // Fetch user details from our database
+            console.log('👤 Looking up user in DB:', userId)
+            
+            // Diagnostic: raw count to verify DB connection
+            const countResult = await queryOne<{ count: string }>('SELECT COUNT(*) as count FROM users')
+            console.log('👤 Total users in DB:', countResult?.count)
+            
+            const dbUser = await queryOne<{ id: string; email: string; full_name: string; avatar_url: string | null; created_at: string }>(
+                'SELECT id, email, full_name, avatar_url, created_at FROM users WHERE id = $1',
+                [userId]
+            )
+            console.log('👤 DB lookup result:', dbUser ? `Found: ${dbUser.email}` : 'NOT FOUND', 'userId type:', typeof userId, 'value:', JSON.stringify(userId))
+
+            if (!dbUser) {
+                res.status(401).json({ error: 'User not found' })
+                return
+            }
+
             res.status(200).json({
                 user: {
-                    id: user.id,
-                    email: user.email,
-                    user_metadata: { full_name: user.name, avatar_url: user.image },
+                    id: dbUser.id,
+                    email: dbUser.email,
+                    user_metadata: { full_name: dbUser.full_name, avatar_url: dbUser.avatar_url },
                     app_metadata: {},
                     aud: 'authenticated',
-                    created_at: user.createdAt,
+                    created_at: dbUser.created_at,
                 },
             })
         } catch (error) {
@@ -101,76 +107,41 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         try {
-            const incomingHeaders = new Headers()
-            if (req.headers?.cookie) incomingHeaders.set('cookie', Array.isArray(req.headers.cookie) ? req.headers.cookie.join(';') : req.headers.cookie)
-            if (req.headers?.authorization) incomingHeaders.set('authorization', Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
-
-            // Neon Auth requires Origin header even for server-side calls
-            incomingHeaders.set('Origin', getAuthOrigin(req))
-
-            const { data } = await authClient.getSession({
-                fetchOptions: {
-                    headers: incomingHeaders
-                }
-            })
-
-            if (!data?.user) {
+            const userId = await getAuthedUserId(req)
+            if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' })
                 return
             }
 
-            const { user } = data
-            const body = req.body || {}
-            const fullName = body.fullName || user.name || 'Unknown'
+            // Look up the user from our database
+            const dbUser = await queryOne<{ id: string; email: string; full_name: string }>(
+                'SELECT id, email, full_name FROM users WHERE id = $1',
+                [userId]
+            )
 
-            // Ensure user exists in our users table
-            // Handle both ID conflict and email conflict (legacy user migration)
+            if (!dbUser) {
+                res.status(401).json({ error: 'User not found' })
+                return
+            }
+
+            const body = req.body || {}
+            const fullName = typeof body.fullName === 'string' ? body.fullName : dbUser.full_name || 'Unknown'
+
+            // Update user's full_name if provided
             try {
                 await queryOne(
-                    `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3)
-                     ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email`,
-                    [user.id, user.email, fullName]
+                    `UPDATE users SET full_name = $1 WHERE id = $2`,
+                    [fullName, userId]
                 )
             } catch (dbError: unknown) {
-                const details = asErrorDetails(dbError)
-                const message = typeof details.message === 'string' ? details.message : ''
-                if (details.code === '23505' && message.includes('email')) {
-                    // A legacy user with this email exists under a different ID.
-                    // Migrate all their data to the new Neon Auth ID.
-                    console.warn('Migrating legacy user to Neon Auth ID:', user.id)
-                    try {
-                        const legacy = await queryOne<{ id: string }>(
-                            'SELECT id FROM users WHERE email = $1 AND id != $2', [user.email, user.id]
-                        )
-                        if (legacy) {
-                            const oldId = legacy.id
-                            // Temporarily rename email to avoid unique constraint during insert
-                            await queryOne(`UPDATE users SET email = 'migrating_' || email WHERE id = $1`, [oldId])
-                            await queryOne(
-                                `INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, full_name = EXCLUDED.full_name`,
-                                [user.id, user.email, fullName]
-                            )
-                            // Migrate all child table references
-                            const childTables = ['debt_payments', 'debts', 'ai_insights', 'goals', 'budgets', 'transactions', 'categories', 'accounts', 'profiles']
-                            for (const table of childTables) {
-                                await queryOne(`UPDATE ${table} SET user_id = $1 WHERE user_id = $2`, [user.id, oldId])
-                            }
-                            await queryOne('DELETE FROM users WHERE id = $1', [oldId])
-                            console.log('Legacy user migration complete.')
-                        }
-                    } catch (migrationError) {
-                        console.error('Legacy user migration failed:', migrationError)
-                    }
-                } else {
-                    console.error('Database sync error (users table):', dbError)
-                }
+                console.error('Database sync error (users table):', dbError)
             }
 
             // Ensure profile exists in our database
             try {
                 await queryOne(
                     'INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING',
-                    [user.id, fullName, 'USD'],
+                    [userId, fullName, 'USD'],
                 )
             } catch (dbError: unknown) {
                 console.error('Database sync error (profiles table):', dbError)
