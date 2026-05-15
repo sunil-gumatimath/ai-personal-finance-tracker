@@ -85,6 +85,9 @@ export function Dashboard() {
                 const allTransactions = (transactionsRes.transactions || []) as Transaction[]
                 setRecentTransactions(allTransactions.slice(0, 10))
 
+                // Fetch accounts in parallel for total balance
+                const accountsPromise = api.accounts.list()
+
                 // 2. Fetch both current and last month data for comparison
                 type TwoMonthRow = {
                     type: Transaction['type']
@@ -223,8 +226,8 @@ export function Dashboard() {
                     setMonthlyTrends(monthlyTrendData)
                 }
 
-                // 4. Fetch accounts for total balance
-                const accountsRes = await api.accounts.list()
+                // 4. Fetch accounts for total balance (already started in parallel)
+                const accountsRes = await accountsPromise
                 const rawAccounts = accountsRes.accounts || []
                 const totalBalance = rawAccounts
                     .filter(a => a.is_active)
