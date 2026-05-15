@@ -1,8 +1,12 @@
-import { neon, Pool } from '@neondatabase/serverless'
+import { neon, neonConfig, Pool } from '@neondatabase/serverless'
 import type { PoolClient } from '@neondatabase/serverless'
+import ws from 'ws'
+
+// CRITICAL: Configure WebSocket constructor for Node.js/Vercel environments
+// Without this, Pool connections fail silently and all queries return 500 errors
+neonConfig.webSocketConstructor = ws
 
 // Use @neondatabase/serverless Pool which handles WebSocket connections internally.
-// No custom Client class needed - the Pool manages connections automatically.
 let pool: Pool | null = null
 let useMock = false
 
