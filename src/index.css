@@ -133,6 +133,246 @@
   --investment: hsl(262.1 83.3% 57.8%);
 }
 
+/* Ocean Theme - Cool Blue Tones */
+.ocean {
+  --background: oklch(0.98 0.015 220);
+  --foreground: oklch(0.25 0.01 220);
+  --card: oklch(0.98 0.015 220);
+  --card-foreground: oklch(0.25 0.01 220);
+  --popover: oklch(0.98 0.015 220);
+  --popover-foreground: oklch(0.25 0.01 220);
+  --primary: oklch(0.55 0.2 240);
+  --primary-foreground: oklch(0.98 0.01 220);
+  --secondary: oklch(0.94 0.02 220);
+  --secondary-foreground: oklch(0.25 0.01 220);
+  --muted: oklch(0.94 0.02 220);
+  --muted-foreground: oklch(0.5 0.02 220);
+  --accent: oklch(0.92 0.03 210);
+  --accent-foreground: oklch(0.25 0.01 220);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.02 220);
+  --input: oklch(0.92 0.02 220);
+  --ring: oklch(0.55 0.2 240);
+  --chart-1: oklch(0.55 0.2 240);
+  --chart-2: oklch(0.6 0.15 200);
+  --chart-3: oklch(0.5 0.18 180);
+  --chart-4: oklch(0.7 0.15 260);
+  --chart-5: oklch(0.65 0.18 220);
+  --sidebar: oklch(0.97 0.015 220);
+  --sidebar-foreground: oklch(0.25 0.01 220);
+  --sidebar-primary: oklch(0.55 0.2 240);
+  --sidebar-primary-foreground: oklch(0.98 0.01 220);
+  --sidebar-accent: oklch(0.92 0.03 210);
+  --sidebar-accent-foreground: oklch(0.25 0.01 220);
+  --sidebar-border: oklch(0.92 0.02 220);
+  --sidebar-ring: oklch(0.55 0.2 240);
+
+  --income: hsl(142.1 70.6% 45.3%);
+  --expense: hsl(0 84.2% 60.2%);
+  --savings: hsl(221.2 83.2% 53.3%);
+  --investment: hsl(262.1 83.3% 57.8%);
+}
+
+.ocean.dark {
+  --background: oklch(0.15 0.02 240);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.2 0.02 240);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.2 0.02 240);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.75 0.15 230);
+  --primary-foreground: oklch(0.2 0.02 240);
+  --secondary: oklch(0.27 0.03 240);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0.03 240);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.25 0.05 230);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.75 0.15 230);
+  --chart-1: oklch(0.75 0.15 230);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.6 0.15 200);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.65 0.18 220);
+  --sidebar: oklch(0.2 0.02 240);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.75 0.15 230);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.25 0.05 230);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.75 0.15 230);
+
+  --income: hsl(142.1 70.6% 45.3%);
+  --expense: hsl(0 72.2% 50.6%);
+  --savings: hsl(217.2 91.2% 59.8%);
+  --investment: hsl(263.4 70% 50.4%);
+  color-scheme: dark;
+}
+
+/* Forest Theme - Green Tones */
+.forest {
+  --background: oklch(0.98 0.012 140);
+  --foreground: oklch(0.25 0.01 140);
+  --card: oklch(0.98 0.012 140);
+  --card-foreground: oklch(0.25 0.01 140);
+  --popover: oklch(0.98 0.012 140);
+  --popover-foreground: oklch(0.25 0.01 140);
+  --primary: oklch(0.5 0.18 150);
+  --primary-foreground: oklch(0.98 0.01 140);
+  --secondary: oklch(0.94 0.02 140);
+  --secondary-foreground: oklch(0.25 0.01 140);
+  --muted: oklch(0.94 0.02 140);
+  --muted-foreground: oklch(0.5 0.02 140);
+  --accent: oklch(0.93 0.025 145);
+  --accent-foreground: oklch(0.25 0.01 140);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.02 140);
+  --input: oklch(0.92 0.02 140);
+  --ring: oklch(0.5 0.18 150);
+  --chart-1: oklch(0.5 0.18 150);
+  --chart-2: oklch(0.55 0.15 170);
+  --chart-3: oklch(0.45 0.16 130);
+  --chart-4: oklch(0.7 0.18 100);
+  --chart-5: oklch(0.65 0.15 140);
+  --sidebar: oklch(0.97 0.012 140);
+  --sidebar-foreground: oklch(0.25 0.01 140);
+  --sidebar-primary: oklch(0.5 0.18 150);
+  --sidebar-primary-foreground: oklch(0.98 0.01 140);
+  --sidebar-accent: oklch(0.93 0.025 145);
+  --sidebar-accent-foreground: oklch(0.25 0.01 140);
+  --sidebar-border: oklch(0.92 0.02 140);
+  --sidebar-ring: oklch(0.5 0.18 150);
+
+  --income: hsl(142.1 70.6% 45.3%);
+  --expense: hsl(0 84.2% 60.2%);
+  --savings: hsl(221.2 83.2% 53.3%);
+  --investment: hsl(262.1 83.3% 57.8%);
+}
+
+.forest.dark {
+  --background: oklch(0.14 0.015 155);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.19 0.015 155);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.19 0.015 155);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.72 0.16 150);
+  --primary-foreground: oklch(0.19 0.015 155);
+  --secondary: oklch(0.26 0.02 155);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.26 0.02 155);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.24 0.04 155);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.72 0.16 150);
+  --chart-1: oklch(0.72 0.16 150);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.6 0.15 170);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.65 0.15 140);
+  --sidebar: oklch(0.19 0.015 155);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.72 0.16 150);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.24 0.04 155);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.72 0.16 150);
+
+  --income: hsl(142.1 70.6% 45.3%);
+  --expense: hsl(0 72.2% 50.6%);
+  --savings: hsl(217.2 91.2% 59.8%);
+  --investment: hsl(263.4 70% 50.4%);
+  color-scheme: dark;
+}
+
+/* Sunset Theme - Warm Amber/Rose Tones */
+.sunset {
+  --background: oklch(0.98 0.015 65);
+  --foreground: oklch(0.25 0.01 65);
+  --card: oklch(0.98 0.015 65);
+  --card-foreground: oklch(0.25 0.01 65);
+  --popover: oklch(0.98 0.015 65);
+  --popover-foreground: oklch(0.25 0.01 65);
+  --primary: oklch(0.55 0.22 35);
+  --primary-foreground: oklch(0.98 0.01 65);
+  --secondary: oklch(0.94 0.02 65);
+  --secondary-foreground: oklch(0.25 0.01 65);
+  --muted: oklch(0.94 0.02 65);
+  --muted-foreground: oklch(0.5 0.02 65);
+  --accent: oklch(0.93 0.03 55);
+  --accent-foreground: oklch(0.25 0.01 65);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.02 65);
+  --input: oklch(0.92 0.02 65);
+  --ring: oklch(0.55 0.22 35);
+  --chart-1: oklch(0.55 0.22 35);
+  --chart-2: oklch(0.6 0.18 50);
+  --chart-3: oklch(0.5 0.2 20);
+  --chart-4: oklch(0.7 0.15 70);
+  --chart-5: oklch(0.65 0.2 40);
+  --sidebar: oklch(0.97 0.015 65);
+  --sidebar-foreground: oklch(0.25 0.01 65);
+  --sidebar-primary: oklch(0.55 0.22 35);
+  --sidebar-primary-foreground: oklch(0.98 0.01 65);
+  --sidebar-accent: oklch(0.93 0.03 55);
+  --sidebar-accent-foreground: oklch(0.25 0.01 65);
+  --sidebar-border: oklch(0.92 0.02 65);
+  --sidebar-ring: oklch(0.55 0.22 35);
+
+  --income: hsl(142.1 70.6% 45.3%);
+  --expense: hsl(0 84.2% 60.2%);
+  --savings: hsl(221.2 83.2% 53.3%);
+  --investment: hsl(262.1 83.3% 57.8%);
+}
+
+.sunset.dark {
+  --background: oklch(0.15 0.02 30);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.2 0.02 30);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.2 0.02 30);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.75 0.18 40);
+  --primary-foreground: oklch(0.2 0.02 30);
+  --secondary: oklch(0.27 0.03 30);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0.03 30);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.25 0.05 35);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.75 0.18 40);
+  --chart-1: oklch(0.75 0.18 40);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.6 0.18 50);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.65 0.2 40);
+  --sidebar: oklch(0.2 0.02 30);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.75 0.18 40);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.25 0.05 35);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.75 0.18 40);
+
+  --income: hsl(142.1 70.6% 45.3%);
+  --expense: hsl(0 72.2% 50.6%);
+  --savings: hsl(217.2 91.2% 59.8%);
+  --investment: hsl(263.4 70% 50.4%);
+  color-scheme: dark;
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -166,7 +406,6 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Custom Finance Colors */
   --income: hsl(142.1 70.6% 45.3%);
   --expense: hsl(0 72.2% 50.6%);
   --savings: hsl(217.2 91.2% 59.8%);
