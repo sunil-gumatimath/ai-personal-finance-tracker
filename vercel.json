@@ -1,4 +1,6 @@
 {
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
     "functions": {
         "api/handler.ts": {
             "runtime": "@vercel/node@3.2.29"
