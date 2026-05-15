@@ -1,9 +1,8 @@
 import { neon, Pool } from '@neondatabase/serverless'
 import type { PoolClient } from '@neondatabase/serverless'
-import ws from 'ws'
 
-// Enable WebSocket pooling for persistent connections
-// This eliminates the HTTP cold-start latency on every query
+// Use @neondatabase/serverless Pool which handles WebSocket connections internally.
+// No custom Client class needed - the Pool manages connections automatically.
 let pool: Pool | null = null
 let useMock = false
 
@@ -24,19 +23,13 @@ function getPool(): Pool {
     throw new Error('MOCK_MODE')
   }
 
-  // Use WebSocket-based connection pooling
-  // Replaces HTTP driver with persistent WebSocket connections
+  // @neondatabase/serverless Pool uses WebSocket connections internally.
+  // No need for custom Client or ws polyfill.
   pool = new Pool({
     connectionString,
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
-    // @ts-ignore - ws is required for Neon serverless WebSocket
-    Client: class NeonClient extends (neon as any).Client {
-      constructor(config: any) {
-        super({ ...config, webSocketConstructor: ws })
-      }
-    }
   })
 
   pool.on('error', (err) => {
