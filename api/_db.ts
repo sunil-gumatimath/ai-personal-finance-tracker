@@ -1,23 +1,14 @@
-import { neon } from '@neondatabase/serverless'
+import { neon, Pool } from '@neondatabase/serverless'
 import type { PoolClient } from '@neondatabase/serverless'
+import ws from 'ws'
 
-type QueryResult<T> = T[] | { rows: T[]; rowCount?: number }
-type UnsafeSql = ReturnType<typeof neon> & {
-  query: <T = unknown>(queryText: string, params: unknown[]) => Promise<QueryResult<T>>
-}
-
-function hasRows<T>(result: QueryResult<T>): result is { rows: T[]; rowCount?: number } {
-  return !Array.isArray(result) && Array.isArray(result.rows)
-}
-
-// Use fetch for serverless environments (HTTP driver)
-// No WebSocket polyfill needed for HTTP
-
-let sql: ReturnType<typeof neon> | null = null
+// Enable WebSocket pooling for persistent connections
+// This eliminates the HTTP cold-start latency on every query
+let pool: Pool | null = null
 let useMock = false
 
-function getSql(): ReturnType<typeof neon> {
-  if (sql) return sql
+function getPool(): Pool {
+  if (pool) return pool
 
   const connectionString = process.env.NEON_DATABASE_URL
   const useMockExplicitly = process.env.USE_MOCK_DB === 'true'
@@ -33,8 +24,26 @@ function getSql(): ReturnType<typeof neon> {
     throw new Error('MOCK_MODE')
   }
 
-  sql = neon(connectionString, { fullResults: true })
-  return sql
+  // Use WebSocket-based connection pooling
+  // Replaces HTTP driver with persistent WebSocket connections
+  pool = new Pool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    // @ts-ignore - ws is required for Neon serverless WebSocket
+    Client: class NeonClient extends (neon as any).Client {
+      constructor(config: any) {
+        super({ ...config, webSocketConstructor: ws })
+      }
+    }
+  })
+
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err)
+  })
+
+  return pool
 }
 
 export async function query<T = unknown>(
@@ -42,22 +51,18 @@ export async function query<T = unknown>(
   params?: unknown[],
 ): Promise<{ rows: T[]; rowCount: number }> {
   try {
-    const db = getSql()
-    // `neon()` returns a tagged-template function; for dynamic SQL strings use `query`.
-    const result = await (db as UnsafeSql).query<T>(queryText, params ?? [])
-
-    const rows = hasRows(result) ? result.rows : (Array.isArray(result) ? result : [])
-    const rowCount = hasRows(result) && typeof result.rowCount === 'number' ? result.rowCount : rows.length
-
+    const dbPool = getPool()
+    const result = await dbPool.query<T>(queryText, params ?? [])
+    const rows = Array.isArray(result.rows) ? result.rows : []
+    const rowCount = typeof result.rowCount === 'number' ? result.rowCount : rows.length
     return { rows, rowCount }
   } catch (error) {
     if (error instanceof Error && error.message === 'MOCK_MODE') {
-      // Use mock database
       const { query: mockQuery } = await import('./_db-mock.js')
       return await mockQuery<T>(queryText, params)
     }
     console.error('Database query error:', error, 'Query:', queryText, 'Params:', params)
-    throw error // Re-throw to be handled by the API endpoint
+    throw error
   }
 }
 
@@ -75,7 +80,17 @@ export async function transaction<T>(callback: (client: PoolClient) => Promise<T
     return await mockTransaction<T>(callback)
   }
 
-  // Interactive transactions are not supported by the HTTP driver in the same way.
-  // Since this app currently doesn't use them, we will just throw an error or mock it.
-  throw new Error('Interactive transactions are not supported over HTTP driver.')
+  const dbPool = getPool()
+  const client = await dbPool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await callback(client)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
