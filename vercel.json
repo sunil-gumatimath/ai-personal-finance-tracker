@@ -1,7 +1,16 @@
 {
     "buildCommand": "npm run build:npm",
     "outputDirectory": "dist",
+    "functions": {
+        "api/handler.ts": {
+            "runtime": "@vercel/node@3"
+        }
+    },
     "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "/api/handler"
+        },
         {
             "source": "/neon-auth/auth/:path*",
             "destination": "https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth/:path*"

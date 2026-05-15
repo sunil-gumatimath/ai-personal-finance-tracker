@@ -52,13 +52,26 @@ serve({
         let filePath = "";
         const extraParams: Record<string, string> = {};
 
-        // 1. Check exact match: api/some/path.ts
-        const exactPath = path.join(process.cwd(), "api", apiPath + ".ts");
-        if (await Bun.file(exactPath).exists()) {
-            filePath = exactPath;
+        // 1. Check handler match: api/_handler-some/path.ts (production naming)
+        const handlerParts = apiPath.split("/");
+        const handlerFile = handlerParts.pop();
+        const handlerDir = handlerParts.join("/");
+        const handlerPath = handlerDir
+            ? path.join(process.cwd(), "api", handlerDir, `_handler-${handlerFile}.ts`)
+            : path.join(process.cwd(), "api", `_handler-${apiPath}.ts`);
+        if (await Bun.file(handlerPath).exists()) {
+            filePath = handlerPath;
         }
 
-        // 2. Check index: api/some/path/index.ts
+        // 2. Check exact match: api/some/path.ts (legacy naming for dev)
+        if (!filePath) {
+            const exactPath = path.join(process.cwd(), "api", apiPath + ".ts");
+            if (await Bun.file(exactPath).exists()) {
+                filePath = exactPath;
+            }
+        }
+
+        // 3. Check index: api/some/path/index.ts
         if (!filePath) {
             const indexPath = path.join(process.cwd(), "api", apiPath, "index.ts");
             if (await Bun.file(indexPath).exists()) {
@@ -66,13 +79,12 @@ serve({
             }
         }
 
-        // 3. Check for dynamic route [id].ts in the parent folder
-        // e.g. api/transactions/123 -> api/transactions/[id].ts
+        // 4. Check for dynamic route [id].ts in the parent folder
         if (!filePath) {
             const parts = apiPath.split("/");
             if (parts.length > 0) {
-                const lastPart = parts.pop(); // The ID, e.g. "123"
-                const parentPath = parts.join("/"); // e.g. "transactions"
+                const lastPart = parts.pop();
+                const parentPath = parts.join("/");
                 const dynamicPath = path.join(process.cwd(), "api", parentPath, "[id].ts");
 
                 if (await Bun.file(dynamicPath).exists()) {
