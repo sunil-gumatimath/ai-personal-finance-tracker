@@ -1,6 +1,9 @@
 {
-    "buildCommand": "npm run build:npm",
-    "outputDirectory": "dist",
+    "functions": {
+        "api/handler.ts": {
+            "runtime": "@vercel/node@3.2.29"
+        }
+    },
     "rewrites": [
         {
             "source": "/api/:path*",

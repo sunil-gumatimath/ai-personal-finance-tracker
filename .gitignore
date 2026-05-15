@@ -65,3 +65,5 @@ vite.config.ts.timestamp-*
 .agents/
 skills.md
 skills-lock.json
+
+.vercel

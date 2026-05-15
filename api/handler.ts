@@ -1,6 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { ApiRequest, ApiResponse } from './_types.js';
 import { checkRateLimit } from './_rate-limiter.js';
+import authHandler from './_handler-auth.js';
+import profileHandler from './_handler-profile.js';
+import accountsHandler from './_handler-accounts.js';
+import categoriesHandler from './_handler-categories.js';
+import transactionsHandler from './_handler-transactions.js';
+import budgetsHandler from './_handler-budgets.js';
+import goalsHandler from './_handler-goals.js';
+import debtsHandler from './_handler-debts.js';
+import notificationsHandler from './_handler-notifications.js';
+import aiChatHandler from './ai/_handler-chat.js';
+import aiInsightsHandler from './ai/_handler-insights.js';
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -23,21 +34,21 @@ const ALLOWED_ORIGINS = [
 
 const RATE_LIMITED_PREFIXES = ['/api/ai/chat', '/api/ai/insights'];
 
-const ROUTES: Record<string, string> = {
-  auth: './_handler-auth.js',
-  profile: './_handler-profile.js',
-  accounts: './_handler-accounts.js',
-  categories: './_handler-categories.js',
-  transactions: './_handler-transactions.js',
-  budgets: './_handler-budgets.js',
-  goals: './_handler-goals.js',
-  debts: './_handler-debts.js',
-  notifications: './_handler-notifications.js',
-  'ai/chat': './ai/_handler-chat.js',
-  'ai/insights': './ai/_handler-insights.js',
+const ROUTES: Record<string, (req: ApiRequest, res: ApiResponse) => Promise<void>> = {
+  auth: authHandler,
+  profile: profileHandler,
+  accounts: accountsHandler,
+  categories: categoriesHandler,
+  transactions: transactionsHandler,
+  budgets: budgetsHandler,
+  goals: goalsHandler,
+  debts: debtsHandler,
+  notifications: notificationsHandler,
+  'ai/chat': aiChatHandler,
+  'ai/insights': aiInsightsHandler,
 };
 
-function resolveRoute(apiPath: string): string | null {
+function resolveRoute(apiPath: string): ((req: ApiRequest, res: ApiResponse) => Promise<void>) | null {
   if (ROUTES[apiPath]) return ROUTES[apiPath];
 
   const parts = apiPath.split('/');
@@ -59,9 +70,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const apiPath = pathname.replace(/^\/api\//, '');
-  const routeFile = resolveRoute(apiPath);
+  const routeHandler = resolveRoute(apiPath);
 
-  if (!routeFile) {
+  if (!routeHandler) {
     res.status(404).json({ error: `Route ${pathname} not found` });
     return;
   }
@@ -138,12 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    const module = await import(routeFile);
-    const handlerFn = module.default;
-    if (typeof handlerFn !== 'function') {
-      throw new Error(`Default export in ${routeFile} is not a function`);
-    }
-    await handlerFn(apiReq, apiRes);
+    await routeHandler(apiReq, apiRes);
   } catch (error) {
     console.error(`Error in ${pathname}:`, error);
     res.status(500).json({ error: 'Internal Server Error' });
