@@ -1,3 +1,4 @@
+import "./_dns-bypass.js"
 import { neon } from '@neondatabase/serverless'
 
 // @neondatabase/serverless HTTP driver - designed for serverless environments like Vercel.

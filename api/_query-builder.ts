@@ -4,13 +4,39 @@
 
 // Allowed column names for each table to prevent SQL injection
 const ALLOWED_COLUMNS: Record<string, string[]> = {
-  accounts: ['name', 'type', 'balance', 'currency', 'color', 'icon', 'is_active', 'description'],
-  transactions: ['type', 'amount', 'description', 'date', 'category_id', 'account_id', 'to_account_id', 'notes'],
-  categories: ['name', 'type', 'color', 'icon', 'description'],
+  accounts: ['name', 'type', 'balance', 'currency', 'color', 'icon', 'is_active'],
+  transactions: [
+    'type',
+    'amount',
+    'description',
+    'date',
+    'category_id',
+    'account_id',
+    'to_account_id',
+    'notes',
+    'is_recurring',
+    'recurring_frequency'
+  ],
+  categories: ['name', 'type', 'color', 'icon', 'parent_id'],
   budgets: ['category_id', 'amount', 'period', 'start_date', 'end_date'],
-  goals: ['name', 'target_amount', 'current_amount', 'deadline', 'description', 'color', 'icon', 'is_completed'],
-  debts: ['name', 'type', 'original_amount', 'current_balance', 'interest_rate', 'minimum_payment', 'due_date', 'lender', 'is_active', 'notes'],
-  debt_payments: ['debt_id', 'amount', 'payment_date', 'notes'],
+  goals: ['name', 'target_amount', 'current_amount', 'deadline', 'color', 'icon'],
+  debts: [
+    'name',
+    'type',
+    'original_amount',
+    'current_balance',
+    'interest_rate',
+    'minimum_payment',
+    'due_day',
+    'start_date',
+    'end_date',
+    'lender',
+    'is_active',
+    'notes',
+    'color',
+    'icon'
+  ],
+  debt_payments: ['debt_id', 'amount', 'payment_date', 'notes', 'principal_amount', 'interest_amount'],
   profiles: ['full_name', 'avatar_url', 'currency', 'preferences'],
   users: ['full_name', 'avatar_url'],
 }

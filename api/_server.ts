@@ -1,11 +1,8 @@
+import "./_dns-bypass.js";
 import { serve } from "bun";
 import path from "path";
 import type { ApiRequest, ApiResponse } from "./_types.js";
 import { checkRateLimit } from "./_rate-limiter.js";
-
-// NOTE: Removed hardcoded IP-based fetch interceptor for Neon domains.
-// The IPs can rotate, causing queries to be sent to wrong servers.
-// If DNS issues recur, resolve fresh IPs or use a proper DNS cache.
 
 const PORT = process.env.PORT || 3001;
 
