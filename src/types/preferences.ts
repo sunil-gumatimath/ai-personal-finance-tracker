@@ -21,7 +21,7 @@ export const defaultPreferences: Preferences = {
     budgetAlerts: true,
     aiProvider: 'gemini',
     geminiApiKey: '',
-    geminiModel: 'gemini-2.5-pro',
+    geminiModel: 'gemini-3.1-pro-preview',
     openrouterApiKey: '',
     openrouterModel: 'openrouter/free',
 }

@@ -114,7 +114,7 @@ export function Settings() {
   const [aiSettings, setAiSettings] = useState({
     aiProvider: preferences.aiProvider || ("gemini" as "gemini" | "openrouter"),
     geminiApiKey: preferences.geminiApiKey || "",
-    geminiModel: preferences.geminiModel || "gemini-2.5-pro",
+    geminiModel: preferences.geminiModel || "gemini-3.1-pro-preview",
     openrouterApiKey: preferences.openrouterApiKey || "",
     openrouterModel: preferences.openrouterModel || "openrouter/free",
   });
@@ -124,7 +124,7 @@ export function Settings() {
     setAiSettings({
       aiProvider: preferences.aiProvider || "gemini",
       geminiApiKey: preferences.geminiApiKey || "",
-      geminiModel: preferences.geminiModel || "gemini-2.5-pro",
+      geminiModel: preferences.geminiModel || "gemini-3.1-pro-preview",
       openrouterApiKey: preferences.openrouterApiKey || "",
       openrouterModel: preferences.openrouterModel || "openrouter/free",
     });
@@ -471,7 +471,7 @@ export function Settings() {
                       <Layout className="h-3 w-3" /> Model
                     </Label>
                     <Select
-                      value={aiSettings.geminiModel || "gemini-2.5-pro"}
+                      value={aiSettings.geminiModel || "gemini-3.1-pro-preview"}
                       onValueChange={(v) =>
                         setAiSettings((prev) => ({ ...prev, geminiModel: v }))
                       }
@@ -481,20 +481,23 @@ export function Settings() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="gemini-3.1-pro-preview">
+                          Gemini 3.1 Pro (Latest)
+                        </SelectItem>
+                        <SelectItem value="gemini-3.1-flash-lite">
+                          Gemini 3.1 Flash
+                        </SelectItem>
+                        <SelectItem value="gemini-3.0-pro">
+                          Gemini 3.0 Pro
+                        </SelectItem>
+                        <SelectItem value="gemini-3.0-flash">
+                          Gemini 3.0 Flash
+                        </SelectItem>
                         <SelectItem value="gemini-2.5-pro">
-                          Gemini 2.5 Pro (Latest)
+                          Gemini 2.5 Pro
                         </SelectItem>
                         <SelectItem value="gemini-2.5-flash">
                           Gemini 2.5 Flash
-                        </SelectItem>
-                        <SelectItem value="gemini-2.0-flash-001">
-                          Gemini 2.0 Flash
-                        </SelectItem>
-                        <SelectItem value="gemini-1.5-pro">
-                          Gemini 1.5 Pro
-                        </SelectItem>
-                        <SelectItem value="gemini-1.5-flash">
-                          Gemini 1.5 Flash
                         </SelectItem>
                       </SelectContent>
                     </Select>
