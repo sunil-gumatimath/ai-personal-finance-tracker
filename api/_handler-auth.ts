@@ -133,6 +133,38 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return;
   }
 
+  // Handle /api/auth?action=delete-account
+  if (action === "delete-account") {
+    if (req.method !== "DELETE") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    try {
+      const userId = await getAuthedUserId(req);
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      console.log(`🗑️ Initiating permanent deletion for user: ${userId}`);
+
+      // Delete from public.users (this triggers ON DELETE CASCADE for everything else)
+      await queryOne("DELETE FROM public.users WHERE id = $1", [userId]);
+
+      // Delete from neon_auth.user (this wipes identity and login access)
+      await queryOne("DELETE FROM neon_auth.user WHERE id = $1", [userId]);
+
+      console.log(`✅ Successfully wiped user: ${userId}`);
+
+      res.status(200).json({ ok: true, message: "Account deleted completely" });
+    } catch (error) {
+      console.error("Delete account error:", error);
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+    return;
+  }
+
   // Handle /api/auth?action=sync
   if (action === "sync") {
     if (req.method !== "POST") {
