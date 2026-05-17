@@ -32,6 +32,7 @@ interface AuthContextType {
     signOut: () => Promise<void>
     resetPassword: (email: string) => Promise<{ error: Error | null }>
     updateProfile: (data: { full_name?: string; avatar_url?: string }) => Promise<{ error: Error | null }>
+    deleteAccount: () => Promise<{ error: Error | null }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -139,6 +140,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }
 
+    const deleteAccount = async () => {
+        try {
+            setLoading(true)
+            await api.auth.deleteAccount()
+            await authClient.signOut().catch(() => undefined)
+            localStorage.removeItem('auth_token')
+            setUser(null)
+            setSession(null)
+            setApiAuthToken(null)
+            return { error: null }
+        } catch (err) {
+            console.error('Delete account error:', err)
+            return { error: err as Error }
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const updateProfile = async (data: { full_name?: string; avatar_url?: string }) => {
         if (!user) return { error: new Error('No user logged in') }
 
@@ -183,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 signOut,
                 resetPassword,
                 updateProfile,
+                deleteAccount,
             }}
         >
             {children}

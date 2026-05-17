@@ -15,6 +15,7 @@ import {
   Key,
   Layout,
   Save,
+  AlertTriangle,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 function ThemeSelector() {
   const { theme, setTheme } = useTheme();
@@ -82,9 +94,10 @@ function ThemeSelector() {
 }
 
 export function Settings() {
-  const { user, signOut, updateProfile, resetPassword } = useAuth();
+  const { user, signOut, updateProfile, resetPassword, deleteAccount } = useAuth();
   const { preferences, savePreferences } = usePreferences();
   const [loading, setLoading] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
   const [profileData, setProfileData] = useState({
     fullName: user?.user_metadata?.full_name || "",
@@ -197,6 +210,24 @@ export function Settings() {
     } catch (error) {
       console.error("Error sending reset email:", error);
       toast.error("Failed to send password reset email");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const { error } = await deleteAccount();
+      if (error) throw error;
+      toast.success("Goodbye! We'll miss you. 👋", {
+        description: "Your account and all associated data have been permanently deleted.",
+      });
+      // The context's deleteAccount handles signOut and state cleanup, 
+      // redirecting should be handled by the router wrapper automatically
+      // when user becomes null, or we can just let it be.
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast.error("Failed to delete account");
+      setIsDeletingAccount(false);
     }
   };
 
@@ -632,6 +663,48 @@ export function Settings() {
                 >
                   <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign Out
                 </Button>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-destructive/10">
+                <div>
+                  <p className="text-sm font-medium">Delete Account</p>
+                  <p className="text-xs text-muted-foreground">
+                    Permanently delete your account and all data
+                  </p>
+                </div>
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 bg-destructive hover:bg-destructive/90"
+                      disabled={isDeletingAccount}
+                    >
+                      <AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> 
+                      {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your
+                        account and completely wipe all of your financial data, including accounts,
+                        transactions, budgets, goals, and debts from our servers.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteAccount}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Yes, delete my account
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           </div>

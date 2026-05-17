@@ -89,6 +89,8 @@ export const api = {
       }),
     logout: () =>
       apiFetch<LogoutResponse>("/api/auth?action=logout", { method: "POST" }),
+    deleteAccount: () =>
+      apiFetch<OkResponse>("/api/auth?action=delete-account", { method: "DELETE" }),
   },
   profile: {
     get: () => apiFetch<ProfileResponse>("/api/profile"),
