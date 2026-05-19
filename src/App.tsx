@@ -17,6 +17,7 @@ import {
   Signup,
   ForgotPassword,
   Calendar,
+  SystemLogs,
 } from '@/pages'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -111,6 +112,7 @@ function AppRoutes() {
         <Route path="/categories" element={<Suspense fallback={<PageLoader />}><Categories /></Suspense>} />
         <Route path="/accounts" element={<Suspense fallback={<PageLoader />}><Accounts /></Suspense>} />
         <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+        <Route path="/system-logs" element={<Suspense fallback={<PageLoader />}><SystemLogs /></Suspense>} />
       </Route>
 
       {/* Catch all - redirect to dashboard */}

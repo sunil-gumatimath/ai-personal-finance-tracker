@@ -10,6 +10,7 @@ import {
     Settings,
     LogOut,
     CreditCard,
+    ScrollText,
 } from 'lucide-react'
 import {
     Sidebar,
@@ -37,6 +38,7 @@ const navItems = [
     { title: 'Debts', icon: CreditCard, path: '/debts' },
     { title: 'Accounts', icon: Wallet, path: '/accounts' },
     { title: 'Categories', icon: Tags, path: '/categories' },
+    { title: 'System Logs', icon: ScrollText, path: '/system-logs' },
 ]
 
 const bottomNavItems = [
