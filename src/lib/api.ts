@@ -286,4 +286,8 @@ export const api = {
         }),
       }),
   },
+  systemLogs: {
+    list: () => apiFetch<{ logs: any[] }>("/api/system-logs"),
+  },
 };
+

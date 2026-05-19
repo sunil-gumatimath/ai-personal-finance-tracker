@@ -3,6 +3,8 @@ import { serve } from "bun";
 import path from "path";
 import type { ApiRequest, ApiResponse } from "./_types.js";
 import { checkRateLimit } from "./_rate-limiter.js";
+import { query } from "./_db.js";
+import { logEvent, activeWsClients } from "./_logger.js";
 
 const PORT = process.env.PORT || 3001;
 
@@ -25,11 +27,59 @@ const HSTS_HEADER: Record<string, string> = process.env.NODE_ENV === "production
 // Auth has action-specific limits inside api/auth.ts, so it is not limited here.
 const RATE_LIMITED_PREFIXES = ["/api/ai/chat", "/api/ai/insights"];
 
+async function ensureSystemLogsTable() {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        action TEXT NOT NULL,
+        resource TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        user_email TEXT,
+        severity TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'error', 'critical')),
+        status TEXT NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'failure')),
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+      );
+    `);
+    
+    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs(timestamp DESC);`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_action ON system_logs(action);`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity);`);
+    
+    console.log("✅ Database system_logs table and indexes verified.");
+    
+    // Log server boot
+    await logEvent(null, {
+      action: "DEPLOYMENT_EVENT",
+      resource: "system/server",
+      newValue: "System server booted successfully.",
+      severity: "info",
+      status: "success",
+      metadata: { port: PORT, env: process.env.NODE_ENV || 'development' }
+    });
+  } catch (error) {
+    console.error("❌ Failed to ensure system_logs table:", error);
+  }
+}
+
+ensureSystemLogsTable();
+
 serve({
     port: PORT,
-    async fetch(req) {
+    async fetch(req, server) {
         const url = new URL(req.url);
         const pathname = url.pathname;
+
+        // Upgrade WebSocket connections for /api/ws-logs
+        if (pathname === "/api/ws-logs") {
+            if (server.upgrade(req)) {
+                return; // upgrade successful
+            }
+            return new Response("WebSocket upgrade failed", { status: 400 });
+        }
 
         if (!pathname.startsWith("/api/")) {
             return new Response("Not Found", { status: 404 });
@@ -201,6 +251,20 @@ serve({
             });
         } catch (error: unknown) {
             console.error(`💥 Error in ${pathname}:`, error);
+            
+            // Log unhandled server error
+            logEvent(null, {
+                action: "ERROR",
+                resource: pathname,
+                newValue: error instanceof Error ? error.message : String(error),
+                severity: "critical",
+                status: "failure",
+                metadata: {
+                    stack: error instanceof Error ? error.stack : undefined,
+                    method: req.method
+                }
+            }).catch(err => console.error("Failed to log server exception:", err));
+
             // Never leak internal error details to the client
             return new Response(JSON.stringify({ error: "Internal Server Error" }), {
                 status: 500,
@@ -208,4 +272,17 @@ serve({
             });
         }
     },
+    websocket: {
+        open(ws) {
+            console.log("🔌 Live logs WebSocket connection opened");
+            activeWsClients.add(ws);
+        },
+        message(ws, message) {
+            // No-op
+        },
+        close(ws) {
+            console.log("🔌 Live logs WebSocket connection closed");
+            activeWsClients.delete(ws);
+        }
+    }
 });
