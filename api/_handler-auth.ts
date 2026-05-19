@@ -9,6 +9,7 @@ import { ensureDefaultCategories } from "./_default-categories.js";
 import { checkRateLimit, recordFailedAttempt } from "./_rate-limiter.js";
 import { storeSession } from "./_session-store.js";
 import type { ApiRequest, ApiResponse } from "./_types.js";
+import { logEvent } from "./_logger.js";
 
 type ErrorWithDetails = {
   code?: unknown;
@@ -129,6 +130,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       return;
     }
 
+    await logEvent(req, {
+      action: "USER_LOGOUT",
+      resource: "auth/logout",
+      severity: "info",
+      status: "success",
+    });
+
     res.status(200).json({ ok: true });
     return;
   }
@@ -147,6 +155,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return;
       }
 
+      const userToDelete = await queryOne<{ email: string }>("SELECT email FROM users WHERE id = $1", [userId]);
+      const userEmail = userToDelete?.email || "unknown";
+
       console.log(`🗑️ Initiating permanent deletion for user: ${userId}`);
 
       // Delete from public.users (this triggers ON DELETE CASCADE for everything else)
@@ -156,6 +167,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       await queryOne("DELETE FROM neon_auth.user WHERE id = $1", [userId]);
 
       console.log(`✅ Successfully wiped user: ${userId}`);
+
+      await logEvent(null, {
+        action: "USER_DELETED",
+        resource: "auth/delete-account",
+        oldValue: `Wiped all user data and identity for ${userEmail}`,
+        userId,
+        userEmail,
+        severity: "critical",
+        status: "success",
+      });
 
       res.status(200).json({ ok: true, message: "Account deleted completely" });
     } catch (error) {
@@ -237,6 +258,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const clientId = getClientId(req);
     const rateCheck = checkRateLimit(clientId, "signup", true);
     if (!rateCheck.allowed) {
+      await logEvent(null, {
+        action: "USER_SIGNUP",
+        resource: "auth/signup",
+        newValue: "Rate limit hit for signup",
+        userEmail: req.body?.email || "unknown",
+        severity: "warning",
+        status: "failure",
+        metadata: { clientId }
+      });
       res
         .status(429)
         .json({ error: "Too many signup attempts. Please try again later." });
@@ -250,6 +280,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const fullName = typeof body.fullName === "string" ? body.fullName : "";
 
       if (!email || !password || !fullName) {
+        await logEvent(null, {
+          action: "USER_SIGNUP",
+          resource: "auth/signup",
+          newValue: "Validation error: Missing fields",
+          userEmail: email || "unknown",
+          severity: "warning",
+          status: "failure",
+        });
         res
           .status(400)
           .json({ error: "Email, password, and full name are required" });
@@ -274,6 +312,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           error,
           getAuthUrlDiagnostics(),
         );
+        await logEvent(null, {
+          action: "USER_SIGNUP",
+          resource: "auth/signup",
+          newValue: error.message || "Signup failed",
+          userEmail: email,
+          severity: "warning",
+          status: "failure",
+          metadata: { error }
+        });
         res.status(400).json({
           error: error.message || "Signup failed",
           diagnostics: getAuthUrlDiagnostics(),
@@ -286,6 +333,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         if (token) {
           storeSession(token, data.user.id);
         }
+
+        await logEvent(null, {
+          action: "USER_SIGNUP",
+          resource: "auth/signup",
+          newValue: "User signed up successfully",
+          userId: data.user.id,
+          userEmail: email,
+          severity: "info",
+          status: "success",
+          metadata: { fullName }
+        });
 
         // Ensure user exists in our users table (required for foreign key in profiles)
         // Handle email conflict from legacy users
@@ -415,6 +473,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const clientId = getClientId(req);
     const rateCheck = checkRateLimit(clientId, "login", true);
     if (!rateCheck.allowed) {
+      await logEvent(null, {
+        action: "USER_LOGIN",
+        resource: "auth/login",
+        newValue: "Rate limit hit for login",
+        userEmail: req.body?.email || "unknown",
+        severity: "warning",
+        status: "failure",
+        metadata: { clientId }
+      });
       res
         .status(429)
         .json({ error: "Too many login attempts. Please try again later." });
@@ -427,6 +494,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const password = typeof body.password === "string" ? body.password : "";
 
       if (!email || !password) {
+        await logEvent(null, {
+          action: "USER_LOGIN",
+          resource: "auth/login",
+          newValue: "Validation error: Missing email or password",
+          userEmail: email || "unknown",
+          severity: "warning",
+          status: "failure",
+        });
         res.status(400).json({ error: "Email and password are required" });
         return;
       }
@@ -454,6 +529,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         console.error("Neon Auth login error:", error);
         console.error("Error details:", JSON.stringify(error, null, 2));
         console.error("Auth URL diagnostics:", getAuthUrlDiagnostics());
+        
+        await logEvent(null, {
+          action: "USER_LOGIN",
+          resource: "auth/login",
+          newValue: error.message || "Login failed",
+          userEmail: email,
+          severity: "warning",
+          status: "failure",
+          metadata: { clientId, error }
+        });
+
         const message = error.message?.includes(
           "missing authentication credentials",
         )
@@ -550,6 +636,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         if (data.token) {
           storeSession(data.token, data.user.id);
         }
+
+        await logEvent(null, {
+          action: "USER_LOGIN",
+          resource: "auth/login",
+          newValue: "User logged in successfully",
+          userId: data.user.id,
+          userEmail: data.user.email,
+          severity: "info",
+          status: "success",
+          metadata: { clientId }
+        });
 
         res.status(200).json({
           token: data.token,
