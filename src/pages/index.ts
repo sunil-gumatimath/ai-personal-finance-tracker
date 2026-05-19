@@ -16,3 +16,4 @@ export const Goals = lazy(() => import('./Goals').then(m => ({ default: m.Goals 
 export const Debts = lazy(() => import('./Debts').then(m => ({ default: m.Debts })))
 export const Settings = lazy(() => import('./Settings').then(m => ({ default: m.Settings })))
 export const Calendar = lazy(() => import('./Calendar').then(m => ({ default: m.Calendar })))
+export const SystemLogs = lazy(() => import('./SystemLogs').then(m => ({ default: m.SystemLogs })))

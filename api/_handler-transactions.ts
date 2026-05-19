@@ -2,6 +2,7 @@ import { getAuthedUserId } from './_auth.js'
 import { query } from './_db.js'
 import { buildUpdateQuery, buildInsertQuery } from './_query-builder.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
+import { logEvent } from './_logger.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = await getAuthedUserId(req)
@@ -23,6 +24,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       try {
         const data = req.body || {}
         
+        // Fetch existing record BEFORE applying updates to capture the old state
+        const { rows: oldRows } = await query("SELECT * FROM transactions WHERE id = $1 AND user_id = $2", [id, userId]);
+        if (oldRows.length === 0) {
+          res.status(404).json({ error: 'Transaction not found' })
+          return
+        }
+        const oldTransaction = oldRows[0];
+
         const queryData = buildUpdateQuery(
           'transactions',
           data,
@@ -40,6 +49,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           res.status(404).json({ error: 'Transaction not found' })
           return
         }
+
+        const updatedTransaction = rows[0];
+        await logEvent(req, {
+          action: "TRANSACTION_EDITED",
+          resource: `transactions/${id}`,
+          oldValue: JSON.stringify(oldTransaction),
+          newValue: JSON.stringify(updatedTransaction),
+          severity: "info",
+          status: "success",
+          metadata: {
+            oldAmount: oldTransaction.amount,
+            newAmount: updatedTransaction.amount,
+            description: updatedTransaction.description
+          }
+        });
+
         res.status(200).json({ transaction: rows[0] })
       } catch (error) {
         console.error('Transactions PUT error:', error)
@@ -54,7 +79,29 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === 'DELETE') {
       try {
+        // Fetch existing record BEFORE deletion to capture its final state
+        const { rows: oldRows } = await query("SELECT * FROM transactions WHERE id = $1 AND user_id = $2", [id, userId]);
+        if (oldRows.length === 0) {
+          res.status(404).json({ error: 'Transaction not found' })
+          return
+        }
+        const oldTransaction = oldRows[0];
+
         await query('DELETE FROM transactions WHERE id = $1 AND user_id = $2', [id, userId])
+
+        await logEvent(req, {
+          action: "TRANSACTION_DELETED",
+          resource: `transactions/${id}`,
+          oldValue: JSON.stringify(oldTransaction),
+          severity: "warning",
+          status: "success",
+          metadata: {
+            type: oldTransaction.type,
+            amount: oldTransaction.amount,
+            description: oldTransaction.description
+          }
+        });
+
         res.status(200).json({ ok: true })
       } catch (error) {
         console.error('Transactions DELETE error:', error)
@@ -135,6 +182,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       
       const queryData = buildInsertQuery('transactions', data, { user_id: userId })
       const { rows } = await query(queryData.text, queryData.values)
+
+      const createdTransaction = rows[0];
+      await logEvent(req, {
+        action: "TRANSACTION_CREATED",
+        resource: `transactions/${createdTransaction.id}`,
+        newValue: JSON.stringify(createdTransaction),
+        severity: "info",
+        status: "success",
+        metadata: {
+          type: createdTransaction.type,
+          amount: createdTransaction.amount,
+          description: createdTransaction.description
+        }
+      });
+
       res.status(201).json({ transaction: rows[0] })
       } catch (error) {
         console.error('Transactions POST error:', error)

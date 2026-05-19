@@ -2,6 +2,7 @@ import { getAuthedUserId } from './_auth.js'
 import { query, queryOne } from './_db.js'
 import { buildUpdateQuery, buildInsertQuery } from './_query-builder.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
+import { logEvent } from './_logger.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = await getAuthedUserId(req)
@@ -53,6 +54,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       try {
         const data = req.body || {}
         
+        // Fetch existing record BEFORE updates
+        const { rows: oldRows } = await query("SELECT * FROM accounts WHERE id = $1 AND user_id = $2", [id, userId]);
+        if (oldRows.length === 0) {
+          res.status(404).json({ error: 'Account not found' })
+          return
+        }
+        const oldAccount = oldRows[0];
+
         const queryData = buildUpdateQuery(
           'accounts',
           data,
@@ -70,6 +79,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           res.status(404).json({ error: 'Account not found' })
           return
         }
+
+        const updatedAccount = rows[0];
+        await logEvent(req, {
+          action: "ACCOUNT_EDITED",
+          resource: `accounts/${id}`,
+          oldValue: JSON.stringify(oldAccount),
+          newValue: JSON.stringify(updatedAccount),
+          severity: "info",
+          status: "success",
+          metadata: {
+            oldBalance: oldAccount.balance,
+            newBalance: updatedAccount.balance,
+            name: updatedAccount.name
+          }
+        });
+
         res.status(200).json({ account: rows[0] })
       } catch (error) {
         console.error('Accounts PUT error:', error)
@@ -84,11 +109,34 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === 'DELETE') {
       try {
+        // Fetch existing record BEFORE deletion to capture its final state
+        const { rows: oldRows } = await query("SELECT * FROM accounts WHERE id = $1 AND user_id = $2", [id, userId]);
+        if (oldRows.length === 0) {
+          res.status(404).json({ error: 'Account not found' })
+          return
+        }
+        const oldAccount = oldRows[0];
+
         const cascade = req.query?.cascade === '1'
         if (cascade) {
           await query('DELETE FROM transactions WHERE account_id = $1 OR to_account_id = $1', [id])
         }
         await query('DELETE FROM accounts WHERE id = $1 AND user_id = $2', [id, userId])
+
+        await logEvent(req, {
+          action: "ACCOUNT_DELETED",
+          resource: `accounts/${id}`,
+          oldValue: JSON.stringify(oldAccount),
+          severity: "warning",
+          status: "success",
+          metadata: {
+            name: oldAccount.name,
+            type: oldAccount.type,
+            balance: oldAccount.balance,
+            cascade
+          }
+        });
+
         res.status(200).json({ ok: true })
       } catch (error) {
         console.error('Accounts DELETE error:', error)
@@ -132,6 +180,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       
       const queryData = buildInsertQuery('accounts', data, { user_id: userId })
       const { rows } = await query(queryData.text, queryData.values)
+
+      const createdAccount = rows[0];
+      await logEvent(req, {
+        action: "ACCOUNT_CREATED",
+        resource: `accounts/${createdAccount.id}`,
+        newValue: JSON.stringify(createdAccount),
+        severity: "info",
+        status: "success",
+        metadata: {
+          name: createdAccount.name,
+          type: createdAccount.type
+        }
+      });
+
       res.status(201).json({ account: rows[0] })
       } catch (error) {
         console.error('Accounts POST error:', error)
