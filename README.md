@@ -10,7 +10,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 - **AI Financial Coach**: Personalized coaching cards, spending alerts, kudos, and anomaly detection.
 - **AI Assistant Chat**: Natural-language conversations about balances, budgets, goals, debt, categories, trends, and spending questions.
 - **Provider Choice**: Configure either Google Gemini or OpenRouter in Settings.
-- **Model Selection**: Choose Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 1.5 Pro, or Gemini 1.5 Flash; OpenRouter accepts custom model slugs such as `openrouter/free`.
+- **Model Selection**: Choose Gemini 3.5 Flash, Gemini 3.1 Pro, Gemini 3.1 Flash-Lite, Gemini 3.0 Pro, or Gemini 3.0 Flash; OpenRouter accepts custom model slugs such as `openrouter/free`.
 - **Persisted Insights**: AI insights are stored in the database, can be dismissed, and are reused to avoid unnecessary regeneration.
 
 ### Dashboard & Analytics
@@ -43,7 +43,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 | Category | Technologies |
 | --- | --- |
 | Runtime / Package Manager | Bun 1.3.x |
-| Frontend | React 18, TypeScript 5.9, Vite 7 |
+| Frontend | React 18, TypeScript 5.9, Vite 6 |
 | Routing | React Router DOM 7 |
 | Styling | Tailwind CSS 4, Radix UI / Shadcn-style components |
 | State | React Context API and custom hooks |
@@ -96,7 +96,7 @@ A premium, AI-powered personal finance management platform for tracking transact
    - Create a Neon project.
    - Run `database/database-neon.sql` in the Neon SQL editor.
    - Run `database/database-debts.sql` to add debt tracking tables and helpers.
-   - After first login, optionally run `SELECT seed_my_data();` for demo data.
+   - Database tables are created empty; start adding your accounts and transactions in the UI.
 
 5. **AI setup:**
 
@@ -178,11 +178,12 @@ Then open `http://localhost:8080`.
 │   ├── pages/            # Dashboard, Transactions, Budgets, Goals, Debts, Accounts, Categories, Calendar, Settings, auth pages
 │   └── types/            # API, database, preferences, and shared TypeScript types
 ├── api/                  # Bun/Vercel API handlers and shared backend utilities
-│   ├── ai/               # AI chat and AI insights endpoints
+│   ├── ai/               # AI chat and AI insights handlers
+│   ├── handler.ts        # Vercel entry point and route dispatcher
 │   ├── _ai-provider.ts   # Gemini/OpenRouter provider routing
 │   ├── _db.ts            # Neon/mock database adapter
-│   ├── _server.ts        # Local Bun API server
-│   └── *.ts              # Accounts, auth, budgets, categories, debts, goals, notifications, profile, transactions
+│   ├── _server.ts        # Local Bun API server shim
+│   └── _handler-*.ts     # Feature-specific handlers (Accounts, Auth, Budgets, etc.)
 ├── database/             # Neon schema, seed helpers, and debt tables
 ├── public/               # Static assets and PWA icons
 └── scripts/              # Local dev and utility scripts
