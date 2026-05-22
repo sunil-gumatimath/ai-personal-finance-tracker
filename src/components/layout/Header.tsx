@@ -22,9 +22,11 @@ const routeConfig: Record<string, { title: string; breadcrumb: string }> = {
     '/calendar': { title: 'Calendar', breadcrumb: 'Calendar' },
     '/budgets': { title: 'Budgets', breadcrumb: 'Budgets' },
     '/goals': { title: 'Savings Goals', breadcrumb: 'Goals' },
+    '/debts': { title: 'Debts & Loans', breadcrumb: 'Debts' },
     '/categories': { title: 'Categories', breadcrumb: 'Categories' },
     '/accounts': { title: 'Accounts', breadcrumb: 'Accounts' },
     '/settings': { title: 'Settings', breadcrumb: 'Settings' },
+    '/system-logs': { title: 'Activity Logs', breadcrumb: 'Activity Logs' },
 }
 
 export function Header() {
