@@ -25,9 +25,9 @@ A premium, AI-powered personal finance management platform for tracking transact
 - Recurring transaction metadata and CSV export.
 - Category-based budgets with visual threshold states.
 - Savings goals with contribution tracking.
-- Debt and loan management with payment history, interest/principal breakdowns, payoff projections, and Snowball/Avalanche strategy comparisons.
+- Debt and loan management with payment history, interest/principal breakdowns, payoff projections, and an **Interactive Payoff Planner** that uses a slider to simulate extra monthly payments, charts payoff balance projections over time, and compares Snowball vs. Avalanche strategy outcomes (time and interest saved).
 - Multi-account tracking for checking, savings, credit, investments, and cash.
-- Custom categories with colors and icons.
+- Custom categories with custom color palettes, interactive icon selectors, real-time live preview, and quick category metrics cards.
 - Password reset flow.
 
 ### Premium User Experience

@@ -71,11 +71,13 @@ Use **Goals** to track savings targets.
 ### 5. Debts
 Use **Debts** to manage loans, cards, and payoff planning.
 
-- Add debt types such as mortgage, car loan, student loan, personal loan, credit card, medical, or other.
-- Track original amount, current balance, interest rate, minimum payment, due day, lender, and notes.
-- Record payments with amount, principal, interest, date, and notes.
-- Mark debts as paid off when the balance reaches zero.
-- Compare payoff strategies such as Snowball and Avalanche to prioritize repayment.
+- **Add & Track Debts**: Add loans (mortgage, car loan, student loan, personal, credit card, medical, etc.) with their interest rate, minimum payment, due date, and lender.
+- **Payment Log**: Record payment history, split by principal and interest, to accurately track decreasing balances.
+- **Interactive Payoff Planner**: Click the **Payoff Planner** button to open the simulation suite.
+  - **Extra Contribution Slider**: Drag the slider to add an extra monthly payment (using your budget surplus) and watch your payoff timeline shrink.
+  - **Payoff Balance Projection Chart**: Visualize how different payment amounts collapse your debt balances over time.
+  - **Strategy Comparison**: Side-by-side comparison of **Debt Snowball** (paying lowest balance first) vs. **Debt Avalanche** (paying highest interest rate first) to see which strategy saves the most time and interest.
+  - **Payoff Progress Rings**: Visually track the paid-off percentage for each individual debt and your overall debt portfolio.
 
 ### 6. Accounts
 Use **Accounts** to manage where your money is held.
@@ -87,9 +89,11 @@ Use **Accounts** to manage where your money is held.
 ### 7. Categories
 Use **Categories** to organize transactions.
 
-- Start from built-in categories such as food, rent, and salary.
-- Add your own categories with colors and icons.
-- Use category names consistently for better budgets, charts, and AI answers.
+- **Built-in & Custom Categories**: Start from default categories or create custom ones tailored to your budget.
+- **Visual Category Creator**: Add categories using a curated color palette and an interactive icon picker.
+- **Live Preview**: See how the category tile will appear on the dashboard in real-time as you type, select colors, and pick icons.
+- **Category Metrics**: Instantly view metrics at the top of the Categories page, including total category counts, type breakdowns, and most-used categories.
+- **Consistency**: Keep category names clean and consistent to ensure accurate budgets, analytics charts, and AI-powered coach answers.
 
 ---
 
@@ -99,7 +103,7 @@ Use **Categories** to organize transactions.
 Go to **Settings > Preferences > AI Integration**.
 
 - Choose **Gemini (Google)** or **OpenRouter (Multi-Model)**.
-- Paste the matching API key:
+- Paste the matching API key. You can toggle the key visibility (show/hide) using the eye icon next to the input field.
   - Gemini keys usually start with `AIza`.
   - OpenRouter keys usually start with `sk-or-`.
 - Select a Gemini model or enter an OpenRouter model slug such as `openrouter/free`.
@@ -126,7 +130,7 @@ Ask natural-language questions such as:
 ## Settings
 
 ### Profile
-- Update your full name.
+- Update your full name (the user profile badge dynamically derives and displays your initials based on your name).
 - View your registered email.
 
 ### Preferences
