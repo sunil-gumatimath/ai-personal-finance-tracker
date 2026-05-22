@@ -1,5 +1,6 @@
 import { getAuthedUserId } from './_auth.js'
 import { query } from './_db.js'
+import { ensureSystemLogsTable } from './_logger.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -11,6 +12,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   if (req.method === 'GET') {
     try {
+      await ensureSystemLogsTable()
       const { rows } = await query(
         `SELECT 
           id, 

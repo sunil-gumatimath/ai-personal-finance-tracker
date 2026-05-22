@@ -10,6 +10,7 @@ import budgetsHandler from './_handler-budgets.js';
 import goalsHandler from './_handler-goals.js';
 import debtsHandler from './_handler-debts.js';
 import notificationsHandler from './_handler-notifications.js';
+import systemLogsHandler from './_handler-system-logs.js';
 import aiChatHandler from './ai/_handler-chat.js';
 import aiInsightsHandler from './ai/_handler-insights.js';
 
@@ -44,6 +45,7 @@ const ROUTES: Record<string, (req: ApiRequest, res: ApiResponse) => Promise<void
   goals: goalsHandler,
   debts: debtsHandler,
   notifications: notificationsHandler,
+  'system-logs': systemLogsHandler,
   'ai/chat': aiChatHandler,
   'ai/insights': aiInsightsHandler,
 };

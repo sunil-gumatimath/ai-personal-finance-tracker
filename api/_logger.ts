@@ -36,6 +36,37 @@ export interface SystemLogEntry {
 // Global active WebSocket client list
 export const activeWsClients = new Set<any>();
 
+let isTableChecked = false;
+
+export async function ensureSystemLogsTable() {
+  if (isTableChecked) return;
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        action TEXT NOT NULL,
+        resource TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        user_email TEXT,
+        severity TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'error', 'critical')),
+        status TEXT NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'failure')),
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+      );
+    `);
+    
+    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs(timestamp DESC);`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_action ON system_logs(action);`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity);`);
+    
+    isTableChecked = true;
+  } catch (error) {
+    console.error("❌ Failed to ensure system_logs table:", error);
+  }
+}
+
 // Async queue variables
 const logQueue: SystemLogEntry[] = [];
 let isProcessing = false;
@@ -99,13 +130,20 @@ export async function logEvent(
     // Print readable message to the terminal console
     logToConsole(entry);
 
-    // Write log to rotation file (non-blocking)
-    writeToFileLog(entry).catch((err) =>
-      console.error("❌ Failed to write file log:", err)
-    );
+    if (!process.env.VERCEL) {
+      // Write log to rotation file (non-blocking)
+      writeToFileLog(entry).catch((err) =>
+        console.error("❌ Failed to write file log:", err)
+      );
 
-    // Queue log for database persistent storage and WebSocket push
-    queueLog(entry);
+      // Queue log for database persistent storage and WebSocket push
+      queueLog(entry);
+    } else {
+      // On Vercel (production), write directly to database and await it to prevent losing logs during container freeze
+      await writeLogToDb(entry).catch((err) =>
+        console.error("❌ Failed to write DB log in serverless:", err)
+      );
+    }
   } catch (err) {
     console.error("💥 Critical failure in logging engine:", err);
   }
@@ -170,6 +208,7 @@ async function processQueue() {
  */
 async function writeLogToDb(log: SystemLogEntry) {
   try {
+    await ensureSystemLogsTable();
     const maskedOld = maskSensitiveData(log.oldValue);
     const maskedNew = maskSensitiveData(log.newValue);
     const maskedMeta = maskSensitiveData(log.metadata);
@@ -224,6 +263,8 @@ function broadcastLog(log: SystemLogEntry) {
  */
 async function writeToFileLog(log: SystemLogEntry) {
   try {
+    if (process.env.VERCEL) return;
+
     ensureLogDirectory();
 
     // Rotate log file if it exceeds 5MB
@@ -243,7 +284,11 @@ async function writeToFileLog(log: SystemLogEntry) {
         metadata: maskSensitiveData(log.metadata),
       }) + "\n";
 
-    await Bun.write(LOG_FILE_PATH, logLine, { append: true });
+    if (typeof Bun !== "undefined") {
+      await Bun.write(LOG_FILE_PATH, logLine, { append: true });
+    } else {
+      await fs.promises.appendFile(LOG_FILE_PATH, logLine);
+    }
   } catch (err) {
     console.error("Failed to write to file log:", err);
   }
