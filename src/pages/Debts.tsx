@@ -27,8 +27,9 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -88,6 +89,154 @@ function toNumber(value: unknown): number {
     return 0
 }
 
+interface SimulationResult {
+    months: number
+    totalInterest: number
+    monthlyData: { month: number; remainingBalance: number }[]
+}
+
+const runSimulation = (
+    activeDebtsList: Debt[],
+    extraPayment: number,
+    strategy: 'snowball' | 'avalanche' | 'minimums'
+): SimulationResult => {
+    // Make deep copies of active debts
+    const simulatedDebts = activeDebtsList.map(d => ({
+        id: d.id,
+        current_balance: d.current_balance,
+        interest_rate: d.interest_rate,
+        minimum_payment: d.minimum_payment,
+    }))
+
+    let currentMonth = 0
+    let totalInterestPaid = 0
+    const monthlyData = [{ month: 0, remainingBalance: simulatedDebts.reduce((sum, d) => sum + d.current_balance, 0) }]
+
+    const maxMonths = 360 // 30 years limit
+    
+    // Sort for rollover strategies
+    if (strategy === 'snowball') {
+        simulatedDebts.sort((a, b) => a.current_balance - b.current_balance)
+    } else if (strategy === 'avalanche') {
+        simulatedDebts.sort((a, b) => b.interest_rate - a.interest_rate)
+    }
+
+    // Sum of all initial minimum payments
+    const baseMinimums = simulatedDebts.reduce((sum, d) => sum + d.minimum_payment, 0)
+
+    while (currentMonth < maxMonths) {
+        // Check if all debts are paid off
+        const activeCount = simulatedDebts.filter(d => d.current_balance > 0).length
+        if (activeCount === 0) break
+
+        currentMonth++
+
+        // 1. Accrue interest first
+        simulatedDebts.forEach(d => {
+            if (d.current_balance > 0) {
+                const interest = d.current_balance * (d.interest_rate / 100 / 12)
+                d.current_balance += interest
+                totalInterestPaid += interest
+            }
+        })
+
+        // 2. Distribute payments
+        if (strategy === 'minimums') {
+            // Pay only minimums, no rollover, no extra
+            simulatedDebts.forEach(d => {
+                if (d.current_balance > 0) {
+                    const pay = Math.min(d.current_balance, d.minimum_payment)
+                    d.current_balance -= pay
+                }
+            })
+        } else {
+            // Rollover strategy: baseMinimums + extraPayment is the monthly pool
+            let monthlyPool = baseMinimums + extraPayment
+            let leftoverPool = 0
+
+            // Step 2a: Pay minimums first
+            simulatedDebts.forEach(d => {
+                if (d.current_balance > 0) {
+                    const minDue = d.minimum_payment
+                    const pay = Math.min(d.current_balance, minDue)
+                    d.current_balance -= pay
+                    monthlyPool -= pay
+                    
+                    // If we paid off the debt and paid less than the minimum due,
+                    // the leftover of the minimum payment goes back to the pool
+                    if (d.current_balance === 0 && pay < minDue) {
+                        leftoverPool += (minDue - pay)
+                    }
+                }
+            })
+
+            // Add leftoverPool to the pool for extra payments
+            let extraPool = monthlyPool + leftoverPool
+
+            // Step 2b: Apply the extraPool to the highest priority debt
+            for (let i = 0; i < simulatedDebts.length; i++) {
+                const d = simulatedDebts[i]
+                if (d.current_balance > 0) {
+                    const pay = Math.min(d.current_balance, extraPool)
+                    d.current_balance -= pay
+                    extraPool -= pay
+                    if (extraPool <= 0) break
+                }
+            }
+        }
+
+        const remainingBalance = simulatedDebts.reduce((sum, d) => sum + d.current_balance, 0)
+        monthlyData.push({
+            month: currentMonth,
+            remainingBalance: Math.round(remainingBalance),
+        })
+
+        if (remainingBalance === 0) break
+    }
+
+    return {
+        months: currentMonth,
+        totalInterest: totalInterestPaid,
+        monthlyData,
+    }
+}
+
+const PayoffProgressRing = ({ percentage, color = 'var(--color-savings)' }: { percentage: number; color?: string }) => {
+    const radius = 22
+    const circumference = 2 * Math.PI * radius
+    const strokeDashoffset = circumference - (percentage / 100) * circumference
+
+    return (
+        <div className="relative flex items-center justify-center h-14 w-14 shrink-0">
+            <svg className="w-full h-full transform -rotate-90">
+                <circle
+                    cx="28"
+                    cy="28"
+                    r={radius}
+                    className="stroke-muted"
+                    strokeWidth="3.5"
+                    fill="transparent"
+                />
+                <circle
+                    cx="28"
+                    cy="28"
+                    r={radius}
+                    stroke={color}
+                    strokeWidth="3.5"
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    className="transition-all duration-500 ease-out"
+                />
+            </svg>
+            <div className="absolute flex flex-col items-center justify-center">
+                <span className="text-[10px] font-bold">{Math.round(percentage)}%</span>
+            </div>
+        </div>
+    )
+}
+
 export function Debts() {
     const { user } = useAuth()
     const { formatCurrency } = usePreferences()
@@ -101,6 +250,7 @@ export function Debts() {
     const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
     const [expandedDebt, setExpandedDebt] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState('active')
+    const [extraPayment, setExtraPayment] = useState(200)
 
     const [formData, setFormData] = useState({
         name: '',
@@ -245,6 +395,11 @@ export function Debts() {
             const newBalance = Math.max(0, selectedDebt.current_balance - principalAmount)
             if (newBalance === 0) {
                 toast.success('Congratulations! This debt is now paid off!')
+                try {
+                    await api.debts.update(selectedDebt.id, { is_active: false })
+                } catch (updateError) {
+                    console.error('Error auto-marking debt as inactive:', updateError)
+                }
             } else {
                 toast.success(`Payment recorded! Remaining: ${formatCurrency(newBalance)}`)
             }
@@ -353,9 +508,14 @@ export function Debts() {
             return Math.ceil(debt.current_balance / debt.minimum_payment)
         }
 
+        // If minimum payment is less than or equal to monthly interest, it will never be paid off
+        if (debt.minimum_payment <= debt.current_balance * monthlyRate) {
+            return null
+        }
+
         // Calculate months using amortization formula
         const months = Math.log(debt.minimum_payment / (debt.minimum_payment - debt.current_balance * monthlyRate)) / Math.log(1 + monthlyRate)
-        return Math.ceil(months)
+        return isNaN(months) || !isFinite(months) ? null : Math.ceil(months)
     }
 
     const calculateTotalInterest = (debt: Debt) => {
@@ -378,17 +538,354 @@ export function Debts() {
     }, [debts])
 
     // Stats
-    const activeDebts = debts.filter(d => d.is_active)
+    const activeDebts = debts.filter(d => d.is_active && d.current_balance > 0)
     const paidOffDebts = debts.filter(d => !d.is_active || d.current_balance === 0)
     const totalDebt = activeDebts.reduce((sum, d) => sum + d.current_balance, 0)
-    const totalOriginal = activeDebts.reduce((sum, d) => sum + d.original_amount, 0)
+    const totalOriginal = debts.reduce((sum, d) => sum + d.original_amount, 0)
     const totalMinPayment = activeDebts.reduce((sum, d) => sum + d.minimum_payment, 0)
     const avgInterestRate = activeDebts.length > 0
         ? activeDebts.reduce((sum, d) => sum + d.interest_rate, 0) / activeDebts.length
         : 0
-    const totalPaid = totalOriginal - totalDebt
+    const totalPaid = Math.max(0, totalOriginal - totalDebt)
 
-    const displayedDebts = activeTab === 'active' ? activeDebts : paidOffDebts
+    // Payoff simulations
+    const simulations = useMemo(() => {
+        const activeDebtsList = debts.filter(d => d.is_active && d.current_balance > 0)
+        if (activeDebtsList.length === 0) {
+            return {
+                snowball: { months: 0, totalInterest: 0, monthlyData: [] },
+                avalanche: { months: 0, totalInterest: 0, monthlyData: [] },
+                minimums: { months: 0, totalInterest: 0, monthlyData: [] },
+                mergedData: [],
+            }
+        }
+
+        const snowballRes = runSimulation(activeDebtsList, extraPayment, 'snowball')
+        const avalancheRes = runSimulation(activeDebtsList, extraPayment, 'avalanche')
+        const minOnlyRes = runSimulation(activeDebtsList, 0, 'minimums')
+
+        // Merge data for the Recharts chart
+        const mergedData = []
+        const maxLen = Math.max(
+            snowballRes.monthlyData.length,
+            avalancheRes.monthlyData.length,
+            minOnlyRes.monthlyData.length
+        )
+
+        const now = new Date()
+        for (let i = 0; i < maxLen; i++) {
+            const dateLabel = format(
+                new Date(now.getFullYear(), now.getMonth() + i, 1),
+                'MMM yyyy'
+            )
+            const snowballVal = i < snowballRes.monthlyData.length 
+                ? snowballRes.monthlyData[i].remainingBalance 
+                : 0
+            const avalancheVal = i < avalancheRes.monthlyData.length 
+                ? avalancheRes.monthlyData[i].remainingBalance 
+                : 0
+            const minOnlyVal = i < minOnlyRes.monthlyData.length 
+                ? minOnlyRes.monthlyData[i].remainingBalance 
+                : 0
+
+            mergedData.push({
+                month: i,
+                dateLabel,
+                snowball: snowballVal,
+                avalanche: avalancheVal,
+                minimums: minOnlyVal,
+            })
+        }
+
+        return {
+            snowball: snowballRes,
+            avalanche: avalancheRes,
+            minimums: minOnlyRes,
+            mergedData,
+        }
+    }, [debts, extraPayment])
+
+    const renderDebtCard = (debt: Debt) => {
+        const DebtIcon = getDebtIcon(debt.type)
+        const progress = getProgress(debt)
+        const isPaidOff = debt.current_balance === 0
+        const payoffMonths = calculatePayoffTime(debt)
+        const totalInterest = calculateTotalInterest(debt)
+        const isExpanded = expandedDebt === debt.id
+
+        return (
+            <div
+                key={debt.id}
+                className={cn(
+                    'group relative overflow-hidden rounded-xl border bg-card/40 backdrop-blur-md p-5 transition-all duration-300 hover:bg-card/70 h-fit',
+                    isPaidOff 
+                        ? 'border-green-500/30 shadow-[0_4px_20px_rgb(34,197,94,0.03)]' 
+                        : 'border-border/50'
+                )}
+                style={
+                    !isPaidOff 
+                        ? {
+                            borderColor: isExpanded ? `${debt.color}30` : undefined,
+                            boxShadow: isExpanded 
+                                ? `0 10px 30px -10px ${debt.color}15, 0 1px 3px 0 ${debt.color}05` 
+                                : 'none'
+                          }
+                        : undefined
+                }
+            >
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent pointer-events-none" />
+                <div className="relative space-y-4">
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                            <div
+                                className="rounded-xl p-2.5 shrink-0 transition-transform duration-300 group-hover:scale-105"
+                                style={{ backgroundColor: `${debt.color}15` }}
+                            >
+                                <DebtIcon
+                                    className="h-5 w-5"
+                                    style={{ color: debt.color }}
+                                />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="text-base font-bold tracking-tight truncate">{debt.name}</h3>
+                                    {isPaidOff && (
+                                        <Badge className="bg-green-500/10 text-green-500 border border-green-500/20 shrink-0">
+                                            Paid Off
+                                        </Badge>
+                                    )}
+                                </div>
+                                <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-0.5">
+                                    <span>{debtTypes.find(t => t.value === debt.type)?.label}</span>
+                                    {debt.lender && (
+                                        <>
+                                            <span>•</span>
+                                            <span>{debt.lender}</span>
+                                        </>
+                                    )}
+                                    {debt.interest_rate > 0 && (
+                                        <>
+                                            <span>•</span>
+                                            <span className="text-amber-500 font-semibold">{debt.interest_rate}% APR</span>
+                                        </>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setExpandedDebt(isExpanded ? null : debt.id)}
+                            >
+                                {isExpanded ? (
+                                    <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                    <ChevronDown className="h-4 w-4" />
+                                )}
+                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    {!isPaidOff && (
+                                        <DropdownMenuItem onClick={() => {
+                                            setSelectedDebt(debt)
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                amount: debt.minimum_payment.toString(),
+                                            })
+                                            setIsPaymentDialogOpen(true)
+                                        }}>
+                                            <DollarSign className="mr-2 h-4 w-4" />
+                                            Record Payment
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem onClick={() => handleEdit(debt)}>
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Edit
+                                    </DropdownMenuItem>
+                                    {!isPaidOff && (
+                                        <DropdownMenuItem onClick={() => handleMarkPaidOff(debt)}>
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            Mark as Paid Off
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                        className="text-destructive"
+                                        onClick={() => handleDelete(debt.id)}
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground font-medium">Payoff Progress</span>
+                            <span className="font-semibold" style={{ color: debt.color }}>{Math.round(progress)}% paid</span>
+                        </div>
+                        <Progress
+                            value={progress}
+                            className="h-2 rounded-full bg-secondary/50"
+                            style={
+                                {
+                                    '--progress-color': debt.color,
+                                } as React.CSSProperties
+                            }
+                        />
+                        <div className="flex justify-between text-xs font-medium">
+                            <span className="text-foreground font-semibold">
+                                {formatCurrency(debt.current_balance)} remaining
+                            </span>
+                            <span className="text-muted-foreground">
+                                of {formatCurrency(debt.original_amount)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Quick stats */}
+                    {!isPaidOff && (
+                        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/30 text-center">
+                            <div>
+                                <p className="text-[10px] text-muted-foreground font-medium">Min Payment</p>
+                                <p className="text-xs font-bold text-foreground mt-0.5">{formatCurrency(debt.minimum_payment)}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-muted-foreground font-medium">Due Date</p>
+                                <p className="text-xs font-bold text-foreground mt-0.5">
+                                    {debt.due_day ? `Day ${debt.due_day}` : 'N/A'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-muted-foreground font-medium">Payoff Time</p>
+                                <p className="text-xs font-bold text-foreground mt-0.5">
+                                    {payoffMonths === null
+                                        ? 'Never (min too low)'
+                                        : payoffMonths > 12
+                                            ? `${Math.floor(payoffMonths / 12)}y ${payoffMonths % 12}m`
+                                            : `${payoffMonths} months`
+                                    }
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Expanded content - Payment history */}
+                    {isExpanded && (
+                        <div className="pt-4 border-t border-border/40 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold text-foreground">Recent Payments</h4>
+                                {!isPaidOff && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs gap-1"
+                                        onClick={() => {
+                                            setSelectedDebt(debt)
+                                            setPaymentFormData({
+                                                ...paymentFormData,
+                                                amount: debt.minimum_payment.toString(),
+                                            })
+                                            setIsPaymentDialogOpen(true)
+                                        }}
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                        Add Payment
+                                    </Button>
+                                )}
+                            </div>
+
+                            {payments.length === 0 ? (
+                                <p className="text-xs text-muted-foreground text-center py-6 bg-muted/20 rounded-xl border border-dashed border-border/50">
+                                    No payments recorded yet
+                                </p>
+                            ) : (
+                                <div className="relative pl-6 border-l border-dashed border-border/80 space-y-3 ml-3 py-1">
+                                    {payments.map((payment) => (
+                                        <div key={payment.id} className="relative group/item">
+                                            {/* Dotted indicator */}
+                                            <div 
+                                                className="absolute -left-[31px] top-1.5 h-4.5 w-4.5 rounded-full border-2 border-background bg-card flex items-center justify-center transition-all duration-300 group-hover/item:scale-110"
+                                                style={{ borderColor: debt.color }}
+                                            >
+                                                <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: debt.color }} />
+                                            </div>
+                                            
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-border/30 bg-card/60 backdrop-blur-sm transition-all duration-200 hover:border-border/60 hover:bg-card/90 gap-2">
+                                                <div className="space-y-0.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-sm text-foreground">{formatCurrency(payment.amount)}</span>
+                                                        <span className="text-[10px] text-muted-foreground font-medium">
+                                                            {format(new Date(payment.payment_date), 'MMM d, yyyy')}
+                                                        </span>
+                                                    </div>
+                                                    {payment.notes && (
+                                                        <p className="text-xs text-muted-foreground italic font-medium">
+                                                            "{payment.notes}"
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
+                                                        Principal: {formatCurrency(payment.principal_amount)}
+                                                    </span>
+                                                    <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
+                                                        Interest: {formatCurrency(payment.interest_amount)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Interest projection */}
+                            {!isPaidOff && totalInterest > 0 && (
+                                <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                    <p className="text-xs text-amber-500/90 leading-relaxed font-medium">
+                                        <strong>Interest Warning:</strong> At this minimum payment rate, you'll pay approximately{' '}
+                                        <strong className="text-amber-500">{formatCurrency(totalInterest)}</strong> in interest over{' '}
+                                        {payoffMonths && payoffMonths > 12
+                                            ? `${Math.floor(payoffMonths / 12)} years and ${payoffMonths % 12} months`
+                                            : `${payoffMonths} months`
+                                        }.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Quick action for active debts */}
+                    {!isPaidOff && !isExpanded && (
+                        <Button
+                            className="w-full h-9 text-xs"
+                            variant="outline"
+                            onClick={() => {
+                                setSelectedDebt(debt)
+                                setPaymentFormData({
+                                    ...paymentFormData,
+                                    amount: debt.minimum_payment.toString(),
+                                })
+                                setIsPaymentDialogOpen(true)
+                            }}
+                        >
+                            <DollarSign className="mr-1.5 h-3.5 w-3.5" />
+                            Record Payment
+                        </Button>
+                    )}
+                </div>
+            </div>
+        )
+    }
 
     if (loading) {
         return (
@@ -431,84 +928,86 @@ export function Debts() {
 
             {/* Stats Cards */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-md p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-red-500/20 hover:bg-card/75 hover:shadow-[0_8px_30px_rgb(239,68,68,0.04)]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Total Debt</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-red-400">
-                            <TrendingDown className="h-3 w-3" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
+                            <TrendingDown className="h-4 w-4" />
                         </div>
                     </div>
-                    <div className="relative mb-3">
+                    <div className="relative mb-2">
                         <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                             {formatCurrency(totalDebt)}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-red-400">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-red-400 mb-1">
                         <span>Across {activeDebts.length} debts</span>
                     </div>
-                    <p className="text-xs text-muted-foreground/70">Outstanding balance</p>
-                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-red-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                    <p className="text-[10px] text-muted-foreground/70">Outstanding liability balance</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-red-500 opacity-5 blur-2xl transition-all duration-500 group-hover:scale-125 group-hover:opacity-10 pointer-events-none" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-                    <div className="relative flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-muted-foreground">Total Paid</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-emerald-400">
-                            <CheckCircle2 className="h-3 w-3" />
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-md p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-500/20 hover:bg-card/75 hover:shadow-[0_8px_30px_rgb(16,185,129,0.04)]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent pointer-events-none" />
+                    <div className="relative flex items-center justify-between mb-1">
+                        <div className="space-y-1">
+                            <span className="text-sm font-medium text-muted-foreground">Total Paid</span>
+                            <div className="relative">
+                                <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground block">
+                                    {formatCurrency(totalPaid)}
+                                </span>
+                            </div>
                         </div>
+                        <PayoffProgressRing
+                            percentage={totalOriginal > 0 ? (totalPaid / totalOriginal) * 100 : 0}
+                            color="var(--color-income)"
+                        />
                     </div>
-                    <div className="relative mb-3">
-                        <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                            {formatCurrency(totalPaid)}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-400">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 mt-2">
                         <span>{totalOriginal > 0 ? Math.round((totalPaid / totalOriginal) * 100) : 0}% paid off</span>
                     </div>
-                    <p className="text-xs text-muted-foreground/70">Keep going!</p>
-                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-emerald-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-emerald-500 opacity-5 blur-2xl transition-all duration-500 group-hover:scale-125 group-hover:opacity-10 pointer-events-none" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-md p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-500/20 hover:bg-card/75 hover:shadow-[0_8px_30px_rgb(59,130,246,0.04)]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Monthly Payment</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-blue-400">
-                            <Calendar className="h-3 w-3" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                            <Calendar className="h-4 w-4" />
                         </div>
                     </div>
-                    <div className="relative mb-3">
+                    <div className="relative mb-2">
                         <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                             {formatCurrency(totalMinPayment)}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-blue-400">
-                        <span>Minimum due</span>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-400 mb-1">
+                        <span>Minimum due monthly</span>
                     </div>
-                    <p className="text-xs text-muted-foreground/70">Combined payments</p>
-                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-blue-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                    <p className="text-[10px] text-muted-foreground/70">Combined active payments</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-blue-500 opacity-5 blur-2xl transition-all duration-500 group-hover:scale-125 group-hover:opacity-10 pointer-events-none" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-md p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-500/20 hover:bg-card/75 hover:shadow-[0_8px_30px_rgb(245,158,11,0.04)]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Avg Interest</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-amber-400">
-                            <Percent className="h-3 w-3" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+                            <Percent className="h-4 w-4" />
                         </div>
                     </div>
-                    <div className="relative mb-3">
+                    <div className="relative mb-2">
                         <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                             {avgInterestRate.toFixed(1)}%
                         </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-amber-400">
-                        <span>APR</span>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 mb-1">
+                        <span>Weighted APR</span>
                     </div>
-                    <p className="text-xs text-muted-foreground/70">Average rate</p>
-                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-amber-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                    <p className="text-[10px] text-muted-foreground/70">Average rate of active loans</p>
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-amber-500 opacity-5 blur-2xl transition-all duration-500 group-hover:scale-125 group-hover:opacity-10 pointer-events-none" />
                 </div>
             </div>
 
@@ -525,8 +1024,8 @@ export function Debts() {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value={activeTab} className="mt-6">
-                    {displayedDebts.length === 0 ? (
+                <TabsContent value="active" className="mt-6">
+                    {activeDebts.length === 0 ? (
                         <div className="group relative overflow-hidden rounded-xl border-2 border-dashed border-border/50 bg-card/50 backdrop-blur-sm">
                             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
                             <div className="relative flex flex-col items-center justify-center py-16 text-center">
@@ -537,280 +1036,52 @@ export function Debts() {
                                     </div>
                                 </div>
                                 <h3 className="text-xl font-bold tracking-tight mb-2">
-                                    {activeTab === 'active' ? 'No active debts' : 'No paid off debts yet'}
+                                    No active debts
                                 </h3>
                                 <p className="text-sm text-muted-foreground mb-8">
-                                    {activeTab === 'active'
-                                        ? 'Add your debts to start tracking and planning payoffs'
-                                        : 'Keep working on your debts - you got this!'
-                                    }
+                                    Add your debts to start tracking and planning payoffs
                                 </p>
-                                {activeTab === 'active' && (
-                                    <Button
-                                        onClick={() => {
-                                            resetForm()
-                                            setIsDialogOpen(true)
-                                        }}
-                                        className="gap-2"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                        Add Debt
-                                    </Button>
-                                )}
+                                <Button
+                                    onClick={() => {
+                                        resetForm()
+                                        setIsDialogOpen(true)
+                                    }}
+                                    className="gap-2"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add Debt
+                                </Button>
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            {displayedDebts.map((debt) => {
-                                const DebtIcon = getDebtIcon(debt.type)
-                                const progress = getProgress(debt)
-                                const isPaidOff = debt.current_balance === 0
-                                const payoffMonths = calculatePayoffTime(debt)
-                                const totalInterest = calculateTotalInterest(debt)
-                                const isExpanded = expandedDebt === debt.id
+                        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                            {activeDebts.map(renderDebtCard)}
+                        </div>
+                    )}
+                </TabsContent>
 
-                                return (
-                                    <div
-                                        key={debt.id}
-                                        className={cn(
-                                            'group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80',
-                                            isPaidOff && 'ring-2 ring-green-500/50 opacity-75'
-                                        )}
-                                    >
-                                        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-                                        <div className="relative space-y-4">
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex items-center gap-3 flex-1">
-                                                    <div
-                                                        className="rounded-xl p-2.5 shrink-0"
-                                                        style={{ backgroundColor: `${debt.color}20` }}
-                                                    >
-                                                        <DebtIcon
-                                                            className="h-5 w-5"
-                                                            style={{ color: debt.color }}
-                                                        />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <h3 className="text-base font-bold tracking-tight truncate">{debt.name}</h3>
-                                                            {isPaidOff && (
-                                                                <Badge className="bg-green-500 text-white shrink-0">
-                                                                    Paid Off
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                                                            <span>{debtTypes.find(t => t.value === debt.type)?.label}</span>
-                                                            {debt.lender && (
-                                                                <>
-                                                                    <span>•</span>
-                                                                    <span>{debt.lender}</span>
-                                                                </>
-                                                            )}
-                                                            {debt.interest_rate > 0 && (
-                                                                <>
-                                                                    <span>•</span>
-                                                                    <span className="text-amber-500">{debt.interest_rate}% APR</span>
-                                                                </>
-                                                            )}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8"
-                                                        onClick={() => setExpandedDebt(isExpanded ? null : debt.id)}
-                                                    >
-                                                        {isExpanded ? (
-                                                            <ChevronUp className="h-4 w-4" />
-                                                        ) : (
-                                                            <ChevronDown className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            {!isPaidOff && (
-                                                                <DropdownMenuItem onClick={() => {
-                                                                    setSelectedDebt(debt)
-                                                                    setPaymentFormData({
-                                                                        ...paymentFormData,
-                                                                        amount: debt.minimum_payment.toString(),
-                                                                    })
-                                                                    setIsPaymentDialogOpen(true)
-                                                                }}>
-                                                                    <DollarSign className="mr-2 h-4 w-4" />
-                                                                    Record Payment
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            <DropdownMenuItem onClick={() => handleEdit(debt)}>
-                                                                <Pencil className="mr-2 h-4 w-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            {!isPaidOff && (
-                                                                <DropdownMenuItem onClick={() => handleMarkPaidOff(debt)}>
-                                                                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                                                                    Mark as Paid Off
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            <DropdownMenuItem
-                                                                className="text-destructive"
-                                                                onClick={() => handleDelete(debt.id)}
-                                                            >
-                                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                                Delete
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </div>
-
-                                            {/* Progress bar */}
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-muted-foreground">Progress</span>
-                                                    <span className="font-medium">{Math.round(progress)}% paid</span>
-                                                </div>
-                                                <Progress
-                                                    value={progress}
-                                                    className="h-2"
-                                                    style={
-                                                        {
-                                                            '--progress-color': debt.color,
-                                                        } as React.CSSProperties
-                                                    }
-                                                />
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="font-semibold text-red-500">
-                                                        {formatCurrency(debt.current_balance)} remaining
-                                                    </span>
-                                                    <span className="text-muted-foreground">
-                                                        of {formatCurrency(debt.original_amount)}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Quick stats */}
-                                            {!isPaidOff && (
-                                                <div className="grid grid-cols-3 gap-4 pt-2 border-t">
-                                                    <div className="text-center">
-                                                        <p className="text-xs text-muted-foreground">Min Payment</p>
-                                                        <p className="text-sm font-semibold">{formatCurrency(debt.minimum_payment)}</p>
-                                                    </div>
-                                                    {debt.due_day && (
-                                                        <div className="text-center">
-                                                            <p className="text-xs text-muted-foreground">Due Date</p>
-                                                            <p className="text-sm font-semibold">Day {debt.due_day}</p>
-                                                        </div>
-                                                    )}
-                                                    {payoffMonths && (
-                                                        <div className="text-center">
-                                                            <p className="text-xs text-muted-foreground">Payoff Time</p>
-                                                            <p className="text-sm font-semibold">
-                                                                {payoffMonths > 12
-                                                                    ? `${Math.floor(payoffMonths / 12)}y ${payoffMonths % 12}m`
-                                                                    : `${payoffMonths} months`
-                                                                }
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* Expanded content - Payment history */}
-                                            {isExpanded && (
-                                                <div className="pt-4 border-t space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className="font-semibold">Recent Payments</h4>
-                                                        {!isPaidOff && (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    setSelectedDebt(debt)
-                                                                    setPaymentFormData({
-                                                                        ...paymentFormData,
-                                                                        amount: debt.minimum_payment.toString(),
-                                                                    })
-                                                                    setIsPaymentDialogOpen(true)
-                                                                }}
-                                                            >
-                                                                <Plus className="mr-1 h-3 w-3" />
-                                                                Add Payment
-                                                            </Button>
-                                                        )}
-                                                    </div>
-
-                                                    {payments.length === 0 ? (
-                                                        <p className="text-sm text-muted-foreground text-center py-4">
-                                                            No payments recorded yet
-                                                        </p>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {payments.map((payment) => (
-                                                                <div
-                                                                    key={payment.id}
-                                                                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                                                                >
-                                                                    <div>
-                                                                        <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                                                                        <p className="text-xs text-muted-foreground">
-                                                                            {format(new Date(payment.payment_date), 'MMM d, yyyy')}
-                                                                            {payment.notes && ` • ${payment.notes}`}
-                                                                        </p>
-                                                                    </div>
-                                                                    <div className="text-right text-xs">
-                                                                        <p className="text-emerald-500">Principal: {formatCurrency(payment.principal_amount)}</p>
-                                                                        <p className="text-amber-500">Interest: {formatCurrency(payment.interest_amount)}</p>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Interest projection */}
-                                                    {!isPaidOff && totalInterest > 0 && (
-                                                        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                                                            <p className="text-sm text-amber-500">
-                                                                <strong>Interest Alert:</strong> At minimum payments, you'll pay approximately{' '}
-                                                                <strong>{formatCurrency(totalInterest)}</strong> in interest over{' '}
-                                                                {payoffMonths && payoffMonths > 12
-                                                                    ? `${Math.floor(payoffMonths / 12)} years and ${payoffMonths % 12} months`
-                                                                    : `${payoffMonths} months`
-                                                                }.
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* Quick action for active debts */}
-                                            {!isPaidOff && !isExpanded && (
-                                                <Button
-                                                    className="w-full"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setSelectedDebt(debt)
-                                                        setPaymentFormData({
-                                                            ...paymentFormData,
-                                                            amount: debt.minimum_payment.toString(),
-                                                        })
-                                                        setIsPaymentDialogOpen(true)
-                                                    }}
-                                                >
-                                                    <DollarSign className="mr-2 h-4 w-4" />
-                                                    Record Payment
-                                                </Button>
-                                            )}
-                                        </div>
+                <TabsContent value="paid" className="mt-6">
+                    {paidOffDebts.length === 0 ? (
+                        <div className="group relative overflow-hidden rounded-xl border-2 border-dashed border-border/50 bg-card/50 backdrop-blur-sm">
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                            <div className="relative flex flex-col items-center justify-center py-16 text-center">
+                                <div className="relative mb-6">
+                                    <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
+                                    <div className="relative flex h-16 w-16 items-center justify-center rounded-xl bg-background/50 text-primary border border-border/50">
+                                        <CreditCard className="h-8 w-8" />
                                     </div>
-                                )
-                            })}
+                                </div>
+                                <h3 className="text-xl font-bold tracking-tight mb-2">
+                                    No paid off debts yet
+                                </h3>
+                                <p className="text-sm text-muted-foreground mb-8">
+                                    Keep working on your debts - you got this!
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                            {paidOffDebts.map(renderDebtCard)}
                         </div>
                     )}
                 </TabsContent>
@@ -1111,97 +1382,296 @@ export function Debts() {
 
             {/* Payoff Strategy Dialog */}
             <Dialog open={isStrategyDialogOpen} onOpenChange={setIsStrategyDialogOpen}>
-                <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+                <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Debt Payoff Strategies</DialogTitle>
+                        <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">Interactive Payoff Planner</DialogTitle>
                         <DialogDescription>
-                            Compare different strategies to pay off your debts faster
+                            Simulate and compare payoff strategies by adding extra monthly contributions.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-6">
-                        {/* Snowball Method */}
-                        <Card className="border-blue-500/50">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="rounded-full bg-blue-500/20 p-2">
-                                        <Snowflake className="h-5 w-5 text-blue-500" />
-                                    </div>
-                                    <div>
-                                        <CardTitle className="text-lg">Snowball Method</CardTitle>
-                                        <CardDescription>Pay smallest balances first for quick wins</CardDescription>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <p className="text-sm text-muted-foreground">
-                                    Focus on paying off debts with the smallest balance first while making minimum payments on others.
-                                    This builds momentum and motivation.
-                                </p>
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium">Payoff Order:</p>
-                                    {snowballStrategy.map((debt, index) => (
-                                        <div key={debt.id} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="w-6 h-6 rounded-full p-0 flex items-center justify-center">
-                                                    {index + 1}
-                                                </Badge>
-                                                <span>{debt.name}</span>
-                                            </div>
-                                            <span className="text-muted-foreground">{formatCurrency(debt.current_balance)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Avalanche Method */}
-                        <Card className="border-orange-500/50">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="rounded-full bg-orange-500/20 p-2">
-                                        <Zap className="h-5 w-5 text-orange-500" />
-                                    </div>
-                                    <div>
-                                        <CardTitle className="text-lg">Avalanche Method</CardTitle>
-                                        <CardDescription>Pay highest interest rates first to save money</CardDescription>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <p className="text-sm text-muted-foreground">
-                                    Focus on paying off debts with the highest interest rate first.
-                                    This saves the most money in interest over time.
-                                </p>
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium">Payoff Order:</p>
-                                    {avalancheStrategy.map((debt, index) => (
-                                        <div key={debt.id} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="w-6 h-6 rounded-full p-0 flex items-center justify-center">
-                                                    {index + 1}
-                                                </Badge>
-                                                <span>{debt.name}</span>
-                                            </div>
-                                            <span className="text-amber-500 font-medium">{debt.interest_rate}% APR</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Recommendation */}
-                        <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                            <div className="flex items-start gap-3">
-                                <ArrowDownRight className="h-5 w-5 text-primary mt-0.5" />
-                                <div>
-                                    <p className="font-medium text-primary">Our Recommendation</p>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        {avgInterestRate > 15
-                                            ? 'With high-interest debts, the Avalanche method will save you more money in the long run.'
-                                            : 'The Snowball method is great for building momentum, but consider Avalanche if you can stay motivated.'}
+                    <div className="space-y-6 py-4">
+                        {/* Interactive Budget Slider */}
+                        <div className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <h4 className="text-sm font-semibold">Extra Monthly Payment</h4>
+                                    <p className="text-xs text-muted-foreground">
+                                        Accelerate your payoff by adding a monthly budget surplus.
                                     </p>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-muted-foreground">$</span>
+                                    <Input
+                                        type="number"
+                                        className="w-24 text-right font-semibold"
+                                        value={extraPayment}
+                                        onChange={(e) => setExtraPayment(Math.max(0, parseFloat(e.target.value) || 0))}
+                                        min="0"
+                                    />
+                                    <span className="text-xs text-muted-foreground">/ month</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="2000"
+                                    step="50"
+                                    value={extraPayment}
+                                    onChange={(e) => setExtraPayment(parseFloat(e.target.value))}
+                                    className="w-full h-2 rounded-lg bg-secondary appearance-none cursor-pointer accent-primary"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-border/30">
+                                <div>
+                                    <p className="text-muted-foreground">Base Minimums</p>
+                                    <p className="font-semibold">{formatCurrency(totalMinPayment)}</p>
+                                </div>
+                                <div className="text-primary font-bold">
+                                    <p className="text-primary/70">Extra Accelerator</p>
+                                    <p>+ {formatCurrency(extraPayment)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-muted-foreground">Total Budget</p>
+                                    <p className="font-semibold">{formatCurrency(totalMinPayment + extraPayment)}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Comparative Cards */}
+                        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+                            {/* Standard Minimums Card */}
+                            <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/20 p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm font-semibold">Minimums Only</span>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-lg font-bold">
+                                        {simulations.minimums.months >= 360 ? '30+ years' : `${simulations.minimums.months} months`}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground font-medium">
+                                        Interest: <span className="text-red-400 font-semibold">{formatCurrency(simulations.minimums.totalInterest)}</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Snowball Card */}
+                            <div className="relative overflow-hidden rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                                <div className="absolute top-0 right-0 bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-bl-lg text-[10px] font-semibold uppercase tracking-wider">
+                                    Momentum
+                                </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Snowflake className="h-4 w-4 text-blue-500 animate-pulse" />
+                                    <span className="text-sm font-semibold text-blue-500">Snowball Strategy</span>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-lg font-bold text-foreground">
+                                        {simulations.snowball.months} months
+                                    </p>
+                                    <p className="text-xs text-muted-foreground font-medium">
+                                        Interest: <span className="text-amber-500 font-semibold">{formatCurrency(simulations.snowball.totalInterest)}</span>
+                                    </p>
+                                    {simulations.minimums.months > simulations.snowball.months && (
+                                        <p className="text-[10px] text-emerald-500 font-bold mt-1 leading-normal">
+                                            Saved {simulations.minimums.months - simulations.snowball.months} months & {formatCurrency(Math.max(0, simulations.minimums.totalInterest - simulations.snowball.totalInterest))} interest
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Avalanche Card */}
+                            <div className="relative overflow-hidden rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
+                                <div className="absolute top-0 right-0 bg-purple-500/10 text-purple-500 px-2 py-0.5 rounded-bl-lg text-[10px] font-semibold uppercase tracking-wider">
+                                    Max Savings
+                                </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Zap className="h-4 w-4 text-purple-500 animate-pulse" />
+                                    <span className="text-sm font-semibold text-purple-500">Avalanche Strategy</span>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-lg font-bold text-foreground">
+                                        {simulations.avalanche.months} months
+                                    </p>
+                                    <p className="text-xs text-muted-foreground font-medium">
+                                        Interest: <span className="text-amber-500 font-semibold">{formatCurrency(simulations.avalanche.totalInterest)}</span>
+                                    </p>
+                                    {simulations.minimums.months > simulations.avalanche.months && (
+                                        <p className="text-[10px] text-emerald-500 font-bold mt-1 leading-normal">
+                                            Saved {simulations.minimums.months - simulations.avalanche.months} months & {formatCurrency(Math.max(0, simulations.minimums.totalInterest - simulations.avalanche.totalInterest))} interest
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Chart Projections */}
+                        <div className="p-4 rounded-xl border border-border/50 bg-card/10">
+                            <h4 className="text-sm font-semibold mb-3">Payoff Balance Projection</h4>
+                            <div className="h-[250px] w-full">
+                                <ChartContainer
+                                    config={{
+                                        snowball: { label: 'Snowball Method', color: '#3b82f6' },
+                                        avalanche: { label: 'Avalanche Method', color: '#a855f7' },
+                                        minimums: { label: 'Minimums Only', color: '#64748b' }
+                                    }}
+                                    className="h-full w-full"
+                                >
+                                    <AreaChart data={simulations.mergedData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="snowballGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                                            </linearGradient>
+                                            <linearGradient id="avalancheGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#a855f7" stopOpacity={0.15} />
+                                                <stop offset="95%" stopColor="#a855f7" stopOpacity={0.0} />
+                                            </linearGradient>
+                                            <linearGradient id="minimumsGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#64748b" stopOpacity={0.05} />
+                                                <stop offset="95%" stopColor="#64748b" stopOpacity={0.0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/40" />
+                                        <XAxis
+                                            dataKey="dateLabel"
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickMargin={8}
+                                            style={{ fontSize: '10px' }}
+                                            interval={Math.ceil(simulations.mergedData.length / 6)}
+                                        />
+                                        <YAxis
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickMargin={8}
+                                            style={{ fontSize: '10px' }}
+                                            tickFormatter={(val) => val === 0 ? '$0' : `$${(val / 1000).toFixed(0)}k`}
+                                        />
+                                        <ChartTooltip
+                                            content={
+                                                <ChartTooltipContent
+                                                    indicator="dot"
+                                                    formatter={(value, name) => (
+                                                        <div className="flex items-center justify-between gap-6 text-xs">
+                                                            <span className="text-muted-foreground">{name === 'snowball' ? 'Snowball' : name === 'avalanche' ? 'Avalanche' : 'Minimums'}</span>
+                                                            <span className="font-bold">{formatCurrency(Number(value))}</span>
+                                                        </div>
+                                                    )}
+                                                />
+                                            }
+                                        />
+                                        <Area
+                                            name="minimums"
+                                            dataKey="minimums"
+                                            type="monotone"
+                                            stroke="#64748b"
+                                            strokeWidth={1.5}
+                                            strokeDasharray="4 4"
+                                            fill="url(#minimumsGrad)"
+                                        />
+                                        <Area
+                                            name="snowball"
+                                            dataKey="snowball"
+                                            type="monotone"
+                                            stroke="#3b82f6"
+                                            strokeWidth={2}
+                                            fill="url(#snowballGrad)"
+                                        />
+                                        <Area
+                                            name="avalanche"
+                                            dataKey="avalanche"
+                                            type="monotone"
+                                            stroke="#a855f7"
+                                            strokeWidth={2}
+                                            fill="url(#avalancheGrad)"
+                                        />
+                                    </AreaChart>
+                                </ChartContainer>
+                            </div>
+                        </div>
+
+                        {/* Order Tabs */}
+                        <Tabs defaultValue="avalanche" className="w-full">
+                            <TabsList className="grid grid-cols-2">
+                                <TabsTrigger value="avalanche" className="gap-2">
+                                    <Zap className="h-3.5 w-3.5" />
+                                    Avalanche Payoff Order
+                                </TabsTrigger>
+                                <TabsTrigger value="snowball" className="gap-2">
+                                    <Snowflake className="h-3.5 w-3.5" />
+                                    Snowball Payoff Order
+                                </TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="avalanche" className="mt-3 space-y-2">
+                                <p className="text-xs text-muted-foreground italic mb-2">
+                                    High-interest rates are paid first. Mathematically, this saves you the most interest.
+                                </p>
+                                {avalancheStrategy.map((debt, index) => (
+                                    <div key={debt.id} className="flex items-center justify-between text-sm p-3 rounded-xl border border-border/40 bg-card/50">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="w-6 h-6 rounded-full p-0 flex items-center justify-center font-bold">
+                                                {index + 1}
+                                            </Badge>
+                                            <span className="font-semibold">{debt.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-xs font-semibold">
+                                            <span className="text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{debt.interest_rate}% APR</span>
+                                            <span className="text-muted-foreground">{formatCurrency(debt.current_balance)}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </TabsContent>
+                            <TabsContent value="snowball" className="mt-3 space-y-2">
+                                <p className="text-xs text-muted-foreground italic mb-2">
+                                    Smallest balances are paid first. This provides psychological quick-wins to keep you motivated.
+                                </p>
+                                {snowballStrategy.map((debt, index) => (
+                                    <div key={debt.id} className="flex items-center justify-between text-sm p-3 rounded-xl border border-border/40 bg-card/50">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="w-6 h-6 rounded-full p-0 flex items-center justify-center font-bold">
+                                                {index + 1}
+                                            </Badge>
+                                            <span className="font-semibold">{debt.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-xs font-semibold">
+                                            <span className="text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{formatCurrency(debt.current_balance)} balance</span>
+                                            <span className="text-amber-500">{debt.interest_rate}% APR</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </TabsContent>
+                        </Tabs>
+
+                        {/* Recommendation */}
+                        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex gap-3">
+                            <ArrowDownRight className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                            <div className="space-y-1">
+                                <h4 className="text-sm font-semibold text-primary">Strategy Analysis & Recommendation</h4>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    {simulations.avalanche.totalInterest < simulations.snowball.totalInterest ? (
+                                        <>
+                                            The <strong>Avalanche method</strong> is your best option, saving you{' '}
+                                            <strong>{formatCurrency(simulations.snowball.totalInterest - simulations.avalanche.totalInterest)}</strong>{' '}
+                                            in interest charges compared to Snowball. By focusing extra payments on your{' '}
+                                            {avalancheStrategy[0] && <strong>{avalancheStrategy[0].name} ({avalancheStrategy[0].interest_rate}% APR)</strong>}, you minimize waste.
+                                        </>
+                                    ) : (
+                                        <>
+                                            Both strategies yield similar interest profiles. The <strong>Snowball method</strong> is recommended for the psychological boost of paying off{' '}
+                                            {snowballStrategy[0] && <strong>{snowballStrategy[0].name} ({formatCurrency(snowballStrategy[0].current_balance)} remaining)</strong>}{' '}
+                                            extremely quickly.
+                                        </>
+                                    )}
+                                    {extraPayment === 0 && (
+                                        <span className="block mt-2 font-semibold text-amber-500">
+                                            Tip: Try moving the slider to see how even $100 or $200 a month will collapse your payoff timeline by years!
+                                        </span>
+                                    )}
+                                </p>
                             </div>
                         </div>
                     </div>
