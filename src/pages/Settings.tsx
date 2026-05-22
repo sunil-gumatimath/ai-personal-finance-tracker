@@ -16,6 +16,8 @@ import {
   Layout,
   Save,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -31,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 
@@ -65,10 +67,10 @@ function ThemeSelector() {
           type="button"
           onClick={() => setTheme(value)}
           className={cn(
-            "flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all hover:bg-muted/50",
+            "flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all hover:bg-muted/50 cursor-pointer",
             theme === value
-              ? "border-primary bg-primary/5"
-              : "border-border/50",
+              ? "border-primary bg-primary/5 text-primary"
+              : "border-border/50 text-muted-foreground",
           )}
         >
           <Icon
@@ -99,10 +101,19 @@ export function Settings() {
   const [loading, setLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
+  const [showKey, setShowKey] = useState(false);
   const [profileData, setProfileData] = useState({
     fullName: user?.user_metadata?.full_name || "",
     email: user?.email || "",
   });
+
+  const getInitials = () => {
+    const fullName = user?.user_metadata?.full_name || user?.email || "";
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "U";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   useEffect(() => {
     setProfileData({
@@ -221,9 +232,6 @@ export function Settings() {
       toast.success("Goodbye! We'll miss you. 👋", {
         description: "Your account and all associated data have been permanently deleted.",
       });
-      // The context's deleteAccount handles signOut and state cleanup, 
-      // redirecting should be handled by the router wrapper automatically
-      // when user becomes null, or we can just let it be.
     } catch (error) {
       console.error("Error deleting account:", error);
       toast.error("Failed to delete account");
@@ -245,25 +253,25 @@ export function Settings() {
         <TabsList className="h-9 rounded-lg bg-muted/50 p-1">
           <TabsTrigger
             value="profile"
-            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5"
+            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
           >
             <User className="h-3.5 w-3.5" /> Profile
           </TabsTrigger>
           <TabsTrigger
             value="preferences"
-            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5"
+            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
           >
             <Palette className="h-3.5 w-3.5" /> Preferences
           </TabsTrigger>
           <TabsTrigger
             value="notifications"
-            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5"
+            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
           >
             <Bell className="h-3.5 w-3.5" /> Alerts
           </TabsTrigger>
           <TabsTrigger
             value="security"
-            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5"
+            className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
           >
             <Shield className="h-3.5 w-3.5" /> Security
           </TabsTrigger>
@@ -278,9 +286,8 @@ export function Settings() {
             <div className="p-4 space-y-4">
               <div className="flex items-center gap-4 mb-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={user?.user_metadata?.avatar_url || undefined} alt={user?.user_metadata?.full_name || 'User avatar'} />
                   <AvatarFallback className="bg-primary/10 text-primary text-lg font-medium">
-                    {(user?.user_metadata?.full_name || user?.email || 'U').split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -323,7 +330,7 @@ export function Settings() {
                 onClick={handleProfileUpdate}
                 disabled={loading}
                 size="sm"
-                className="h-8"
+                className="h-8 cursor-pointer"
               >
                 {loading ? "Saving..." : "Save Changes"}
               </Button>
@@ -351,7 +358,7 @@ export function Settings() {
                     value={preferences.currency}
                     onValueChange={(v) => savePreferences({ currency: v })}
                   >
-                    <SelectTrigger className="h-9 text-sm">
+                    <SelectTrigger className="h-9 text-sm cursor-pointer">
                       <Globe className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                       <SelectValue />
                     </SelectTrigger>
@@ -370,7 +377,7 @@ export function Settings() {
                     value={preferences.dateFormat}
                     onValueChange={(v) => savePreferences({ dateFormat: v })}
                   >
-                    <SelectTrigger className="h-9 text-sm">
+                    <SelectTrigger className="h-9 text-sm cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -406,7 +413,7 @@ export function Settings() {
                     }));
                   }}
                 >
-                  <SelectTrigger className="h-9 text-sm">
+                  <SelectTrigger className="h-9 text-sm cursor-pointer">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -423,7 +430,7 @@ export function Settings() {
                 </p>
               </div>
 
-              {/* API Key — shows for both providers, saves to the active one */}
+              {/* API Key */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label
@@ -432,35 +439,48 @@ export function Settings() {
                   >
                     <Key className="h-3 w-3" /> API Key
                   </Label>
-                  <Input
-                    id="aiApiKey"
-                    type="password"
-                    placeholder={
-                      aiSettings.aiProvider === "openrouter"
-                        ? "sk-or-v1-..."
-                        : "AIza..."
-                    }
-                    value={
-                      aiSettings.aiProvider === "openrouter"
-                        ? aiSettings.openrouterApiKey
-                        : aiSettings.geminiApiKey
-                    }
-                    onChange={(e) => {
-                      const key = e.target.value;
-                      if (aiSettings.aiProvider === "openrouter") {
-                        setAiSettings((prev) => ({
-                          ...prev,
-                          openrouterApiKey: key,
-                        }));
-                      } else {
-                        setAiSettings((prev) => ({
-                          ...prev,
-                          geminiApiKey: key,
-                        }));
+                  <div className="relative flex items-center">
+                    <Input
+                      id="aiApiKey"
+                      type={showKey ? "text" : "password"}
+                      placeholder={
+                        aiSettings.aiProvider === "openrouter"
+                          ? "sk-or-v1-..."
+                          : "AIza..."
                       }
-                    }}
-                    className="h-9 text-sm font-mono"
-                  />
+                      value={
+                        aiSettings.aiProvider === "openrouter"
+                          ? aiSettings.openrouterApiKey
+                          : aiSettings.geminiApiKey
+                      }
+                      onChange={(e) => {
+                        const key = e.target.value;
+                        if (aiSettings.aiProvider === "openrouter") {
+                          setAiSettings((prev) => ({
+                            ...prev,
+                            openrouterApiKey: key,
+                          }));
+                        } else {
+                          setAiSettings((prev) => ({
+                            ...prev,
+                            geminiApiKey: key,
+                          }));
+                        }
+                      }}
+                      className="h-9 text-sm font-mono pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-3 text-muted-foreground hover:text-foreground cursor-pointer flex items-center justify-center"
+                    >
+                      {showKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Model — switches based on provider */}
@@ -476,7 +496,7 @@ export function Settings() {
                         setAiSettings((prev) => ({ ...prev, geminiModel: v }))
                       }
                     >
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger className="h-9 text-sm cursor-pointer">
                         <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" />
                         <SelectValue />
                       </SelectTrigger>
@@ -521,10 +541,9 @@ export function Settings() {
                       }
                       className="h-9 text-sm font-mono"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Default: openrouter/free. You can also try
-                      meta-llama/llama-3.3-70b-instruct:free. Use any model slug
-                      from{" "}
+                    <p className="text-[10px] text-muted-foreground leading-normal mt-1">
+                      Default: openrouter/free. You can also try{" "}
+                      <code className="text-purple-400">meta-llama/llama-3.3-70b-instruct:free</code>. Use any model slug from{" "}
                       <a
                         href="https://openrouter.ai/models"
                         target="_blank"
@@ -544,7 +563,7 @@ export function Settings() {
                   onClick={handleAiSave}
                   disabled={aiSaving}
                   size="sm"
-                  className="h-8 gap-1.5"
+                  className="h-8 gap-1.5 cursor-pointer"
                 >
                   <Save className="h-3.5 w-3.5" />
                   {aiSaving ? "Saving..." : "Save AI Settings"}
@@ -608,6 +627,7 @@ export function Settings() {
                     onCheckedChange={(checked) =>
                       savePreferences({ [item.id]: checked })
                     }
+                    className="cursor-pointer"
                   />
                 </div>
               ))}
@@ -633,7 +653,7 @@ export function Settings() {
                   variant="outline"
                   size="sm"
                   onClick={handlePasswordReset}
-                  className="h-8"
+                  className="h-8 cursor-pointer"
                 >
                   Send Link <ChevronRight className="ml-1 h-3.5 w-3.5" />
                 </Button>
@@ -659,7 +679,7 @@ export function Settings() {
                   variant="outline"
                   size="sm"
                   onClick={signOut}
-                  className="h-8 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
+                  className="h-8 border-destructive/30 text-destructive hover:bg-destructive hover:text-white cursor-pointer"
                 >
                   <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign Out
                 </Button>
@@ -678,14 +698,14 @@ export function Settings() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      className="h-8 bg-destructive hover:bg-destructive/90"
+                      className="h-8 bg-destructive hover:bg-destructive/90 cursor-pointer"
                       disabled={isDeletingAccount}
                     >
                       <AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> 
                       {isDeletingAccount ? "Deleting..." : "Delete Account"}
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent className="rounded-xl">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                       <AlertDialogDescription>
@@ -695,10 +715,10 @@ export function Settings() {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDeleteAccount}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
                       >
                         Yes, delete my account
                       </AlertDialogAction>
