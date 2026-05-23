@@ -4,6 +4,7 @@ import {
   generateWithProvider,
   type AIProviderPreferences,
 } from "../_ai-provider.js";
+import { decryptPreferences } from "../_crypto.js";
 import type { ApiRequest, ApiResponse } from "../_types.js";
 
 type Insight = {
@@ -93,12 +94,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }>("SELECT preferences, currency FROM profiles WHERE user_id = $1", [
         userId,
       ]);
-      const rawPrefs = profile?.preferences || {};
+      const decryptedProfilePrefs = decryptPreferences(profile?.preferences || {});
+      const rawPrefs = decryptedProfilePrefs || {};
       const prefs = rawPrefs as AIProviderPreferences;
       const currency =
         typeof rawPrefs["currency"] === "string"
           ? (rawPrefs["currency"] as string)
-          : profile?.currency || "USD";
+          : profile?.currency || "INR";
       const currencyLocales: Record<string, string> = {
         USD: "en-US",
         INR: "en-IN",
@@ -204,25 +206,66 @@ Generate 2-3 specific, actionable financial insights focusing on:
 - Success stories where spending decreased (Kudo)
 - Actionable advice
 
-Return ONLY a JSON array:
-[{"type": "coaching" | "kudo", "title": "Title", "description": "Description"}]
+Return ONLY a JSON object containing an insights array:
+{"insights": [{"type": "coaching" | "kudo", "title": "Title", "description": "Description"}]}
 No markdown, no extra text, and NO emojis.
         `;
 
+        const options = {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              insights: {
+                type: "ARRAY",
+                description: "List of actionable financial insights and kudos",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    type: {
+                      type: "STRING",
+                      enum: ["coaching", "kudo"],
+                      description: "Type of the insight"
+                    },
+                    title: {
+                      type: "STRING",
+                      description: "A short, concise title for the insight"
+                    },
+                    description: {
+                      type: "STRING",
+                      description: "Actionable financial advice or kudo description without emojis"
+                    }
+                  },
+                  required: ["type", "title", "description"]
+                }
+              }
+            },
+            required: ["insights"]
+          }
+        };
+
         try {
-          const aiResponse = await generateWithProvider(prompt, prefs);
+          const aiResponse = await generateWithProvider(prompt, prefs, options);
           if (aiResponse) {
             const cleaned = aiResponse
               .replace(/```json/g, "")
               .replace(/```/g, "")
               .trim();
-            const aiInsights = JSON.parse(cleaned) as Array<{
-              type: "coaching" | "kudo";
-              title: string;
-              description: string;
-            }>;
-            aiInsights.forEach((insight) => {
-              newInsights.push({ ...insight, type: insight.type });
+            const parsed = JSON.parse(cleaned);
+            const aiInsights = Array.isArray(parsed)
+              ? parsed
+              : Array.isArray(parsed.insights)
+              ? parsed.insights
+              : [];
+            
+            aiInsights.forEach((insight: any) => {
+              if (insight && typeof insight === "object" && insight.type && insight.title && insight.description) {
+                newInsights.push({
+                  type: insight.type === "kudo" ? "kudo" : "coaching",
+                  title: String(insight.title),
+                  description: String(insight.description),
+                });
+              }
             });
           }
         } catch (e) {

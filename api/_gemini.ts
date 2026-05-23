@@ -2,7 +2,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const DEFAULT_MODEL = 'gemini-3.5-flash'
 
-export async function generateFinancialAdvice(prompt: string, apiKey: string, modelName?: string) {
+export async function generateFinancialAdvice(
+  prompt: string,
+  apiKey: string,
+  modelName?: string,
+  options?: { responseMimeType?: string; responseSchema?: any }
+) {
   // For demo purposes, return a mock response when using demo or test keys
   if (apiKey === 'demo-key' || apiKey.startsWith('test-real-key') || apiKey.startsWith('AIzaSyDemoKey')) {
     return `Based on your financial data, here's your income vs expenses analysis for this month:
@@ -35,7 +40,13 @@ export async function generateFinancialAdvice(prompt: string, apiKey: string, mo
     try {
       const modelId = modelName || DEFAULT_MODEL
       const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: modelId })
+      const model = genAI.getGenerativeModel({
+        model: modelId,
+        generationConfig: options ? {
+          responseMimeType: options.responseMimeType,
+          responseSchema: options.responseSchema,
+        } : undefined
+      })
       const result = await model.generateContent(prompt)
       const response = await result.response
       return response.text()

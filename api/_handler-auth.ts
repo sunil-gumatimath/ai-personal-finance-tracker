@@ -232,7 +232,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       try {
         await queryOne(
           "INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING",
-          [userId, fullName, "USD"],
+          [userId, fullName, "INR"],
         );
       } catch (dbError: unknown) {
         console.error("Database sync error (profiles table):", dbError);
@@ -416,7 +416,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         try {
           await queryOne(
             "INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING RETURNING user_id",
-            [data.user.id, fullName, "USD"],
+            [data.user.id, fullName, "INR"],
           );
         } catch (dbError: unknown) {
           console.error(
@@ -622,7 +622,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         try {
           await queryOne(
             "INSERT INTO profiles (user_id, full_name, currency) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING",
-            [data.user.id, data.user.name || "Unknown", "USD"],
+            [data.user.id, data.user.name || "Unknown", "INR"],
           );
         } catch (dbError: unknown) {
           console.error(

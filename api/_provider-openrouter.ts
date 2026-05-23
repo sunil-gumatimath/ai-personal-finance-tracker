@@ -23,7 +23,12 @@ function isFreeRouterModel(model: string): boolean {
   return model === DEFAULT_MODEL;
 }
 
-async function callOpenRouter(prompt: string, apiKey: string, model: string) {
+async function callOpenRouter(
+  prompt: string,
+  apiKey: string,
+  model: string,
+  options?: { responseMimeType?: string },
+) {
   return fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -41,6 +46,7 @@ async function callOpenRouter(prompt: string, apiKey: string, model: string) {
         },
       ],
       max_tokens: 2048,
+      response_format: options?.responseMimeType === "application/json" ? { type: "json_object" } : undefined,
     }),
   });
 }
@@ -77,6 +83,7 @@ export async function generateWithOpenRouter(
   prompt: string,
   apiKey: string,
   modelName?: string,
+  options?: { responseMimeType?: string },
 ): Promise<string> {
   if (apiKey === "demo-key" || apiKey.startsWith("sk-or-demo-")) {
     return `Based on your financial data, here's your income vs expenses analysis for this month:
@@ -107,7 +114,7 @@ export async function generateWithOpenRouter(
   const model = normalizeOpenRouterModel(modelName);
 
   try {
-    let response = await callOpenRouter(prompt, apiKey, model);
+    let response = await callOpenRouter(prompt, apiKey, model, options);
 
     if (!response.ok && isFreeRouterModel(model)) {
       const freeRouterError = await response.text();
@@ -122,6 +129,7 @@ export async function generateWithOpenRouter(
         prompt,
         apiKey,
         FREE_ROUTER_FALLBACK_MODEL,
+        options,
       );
 
       if (!response.ok) {

@@ -1,6 +1,7 @@
 import { getAuthedUserId } from './_auth.js'
 import { queryOne } from './_db.js'
 import { buildUpdateQuery } from './_query-builder.js'
+import { decryptPreferences, encryptPreferences } from './_crypto.js'
 import type { ApiRequest, ApiResponse } from './_types.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -16,8 +17,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         'SELECT preferences, currency FROM profiles WHERE user_id = $1',
         [userId],
       )
+      const decryptedPrefs = decryptPreferences(row?.preferences || {})
       res.status(200).json({
-        preferences: row?.preferences || {},
+        preferences: decryptedPrefs,
         currency: row?.currency || null,
       })
     } catch (error) {
@@ -49,14 +51,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         [userId],
       )
 
-      const merged = {
-        ...(existing?.preferences || {}),
-        ...(preferences || {}),
+      const decryptedExisting = decryptPreferences(existing?.preferences || {})
+      const decryptedIncoming = decryptPreferences(preferences || {})
+
+      const mergedPlaintext = {
+        ...decryptedExisting,
+        ...decryptedIncoming,
       }
+
+      const encryptedMerged = encryptPreferences(mergedPlaintext)
 
       await queryOne(
         'UPDATE profiles SET preferences = $1, currency = COALESCE($2, currency), updated_at = NOW() WHERE user_id = $3 RETURNING user_id',
-        [JSON.stringify(merged), currency || null, userId],
+        [JSON.stringify(encryptedMerged), currency || null, userId],
       )
 
       if (full_name !== undefined || avatar_url !== undefined) {
@@ -84,7 +91,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         if (profilesQuery) await queryOne(profilesQuery.text, profilesQuery.values)
       }
 
-      res.status(200).json({ ok: true, preferences: merged, currency: currency || null })
+      res.status(200).json({ ok: true, preferences: mergedPlaintext, currency: currency || null })
     } catch (error) {
       console.error('Profile PATCH error:', error)
       // Sanitize error messages to avoid leaking internal details

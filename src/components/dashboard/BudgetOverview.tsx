@@ -116,18 +116,10 @@ const CustomTooltip = ({ active, payload, formatCurrency }: CustomTooltipProps) 
     return null
 }
 
-interface ActiveShapeProps {
-    cx: number
-    cy: number
-    innerRadius: number
-    outerRadius: number
-    startAngle: number
-    endAngle: number
-    fill: string
-}
+
 
 // Custom active shape component for the Donut Chart
-const renderActiveShape = (props: ActiveShapeProps) => {
+const renderActiveShape = (props: any) => {
     const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
     return (
         <g>

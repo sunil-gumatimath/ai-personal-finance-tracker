@@ -6,6 +6,7 @@ import {
   MissingApiKeyError,
   type AIProviderPreferences,
 } from "../_ai-provider.js";
+import { decryptPreferences } from "../_crypto.js";
 import type { ApiRequest, ApiResponse } from "../_types.js";
 // @ts-expect-error - JavaScript module
 import { AIQueryProcessor } from "./query-processor.js";
@@ -128,8 +129,8 @@ async function fetchFinancialData(userId: string, intent: ProcessedIntent) {
     );
     data.transactions = transactions || [];
 
-    // Get budgets for spending/budget queries
-    if (["spending", "budget", "comparison"].includes(intent.type)) {
+    // Get budgets for spending/budget/general queries
+    if (["spending", "budget", "comparison", "general"].includes(intent.type)) {
       const { rows: budgets } = await query<BudgetRow>(
         `SELECT b.amount, b.period, c.name as category_name
          FROM budgets b
@@ -140,8 +141,8 @@ async function fetchFinancialData(userId: string, intent: ProcessedIntent) {
       data.budgets = budgets || [];
     }
 
-    // Get goals for goal-related queries
-    if (["goals", "forecast"].includes(intent.type)) {
+    // Get goals for goal-related/general queries
+    if (["goals", "forecast", "general"].includes(intent.type)) {
       const { rows: goals } = await query<GoalRow>(
         "SELECT name, target_amount, current_amount, deadline FROM goals WHERE user_id = $1",
         [userId],
@@ -149,8 +150,8 @@ async function fetchFinancialData(userId: string, intent: ProcessedIntent) {
       data.goals = goals || [];
     }
 
-    // Get debts for debt-related queries
-    if (["debt", "forecast"].includes(intent.type)) {
+    // Get debts for debt-related/general queries
+    if (["debt", "forecast", "general"].includes(intent.type)) {
       const { rows: debts } = await query<DebtRow>(
         "SELECT name, current_balance, interest_rate, minimum_payment FROM debts WHERE user_id = $1 AND is_active = true",
         [userId],
@@ -158,14 +159,14 @@ async function fetchFinancialData(userId: string, intent: ProcessedIntent) {
       data.debts = debts || [];
     }
 
-    return formatFinancialData(data, intent, "USD"); // Default to USD, will be overridden
+    return formatFinancialData(data, intent, "INR"); // Default to INR, will be overridden
   } catch (error) {
     console.error("Error fetching financial data:", error);
     // Return basic formatted data even if database queries fail
     return formatFinancialData(
       { accounts: [], transactions: [], budgets: [], goals: [], debts: [] },
       intent,
-      "USD",
+      "INR",
     );
   }
 }
@@ -207,11 +208,19 @@ function formatFinancialData(
     });
   }
 
-  if (
-    data.transactions.length &&
-    ["spending", "income", "comparison"].includes(intent.type)
-  ) {
-    formatted += `\n**Recent Transactions:**\n`;
+  if (data.transactions.length) {
+    formatted += `\n**Recent Individual Transactions (Last 15):**\n`;
+    const recentTx = data.transactions.slice(0, 15);
+    recentTx.forEach((t) => {
+      const dateStr = t.date ? new Date(t.date).toISOString().split('T')[0] : 'No Date';
+      const descStr = t.description ? ` - ${t.description}` : '';
+      const catStr = t.category_name ? ` [${t.category_name}]` : '';
+      const amountFormatted = formatCurrency(Number(t.amount || 0), currency);
+      const typeStr = t.type === 'income' ? '+' : '-';
+      formatted += `- ${dateStr}: ${typeStr}${amountFormatted}${catStr}${descStr}\n`;
+    });
+
+    formatted += `\n**Recent Transactions Summary:**\n`;
     const income = data.transactions
       .filter((t) => t.type === "income")
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -219,53 +228,34 @@ function formatFinancialData(
       .filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    if (intent.type === "comparison") {
-      formatted += `- Total Income: ${formatCurrency(income, currency)}\n`;
-      formatted += `- Total Expenses: ${formatCurrency(expenses, currency)}\n`;
-      formatted += `- Net Savings: ${formatCurrency(income - expenses, currency)}\n`;
-      if (intent.categories?.length) {
-        const categorySpending: Record<string, number> = {};
-        data.transactions.forEach((t) => {
-          if (t.type === "expense" && t.category_name) {
-            categorySpending[t.category_name] =
-              (categorySpending[t.category_name] || 0) + Number(t.amount || 0);
-          }
-        });
-        Object.entries(categorySpending).forEach(([cat, amount]) => {
-          formatted += `- ${cat}: ${formatCurrency(amount, currency)}\n`;
-        });
-      }
-    }
+    formatted += `- Total Income: ${formatCurrency(income, currency)}\n`;
+    formatted += `- Total Expenses: ${formatCurrency(expenses, currency)}\n`;
+    formatted += `- Net Savings: ${formatCurrency(income - expenses, currency)}\n`;
 
-    if (intent.type === "spending") {
-      formatted += `- Total Expenses: ${formatCurrency(expenses, currency)}\n`;
-      if (intent.categories?.length) {
-        const categorySpending: Record<string, number> = {};
-        data.transactions.forEach((t) => {
-          if (t.type === "expense" && t.category_name) {
-            categorySpending[t.category_name] =
-              (categorySpending[t.category_name] || 0) + Number(t.amount || 0);
-          }
-        });
-        Object.entries(categorySpending).forEach(([cat, amount]) => {
-          formatted += `- ${cat}: ${formatCurrency(amount, currency)}\n`;
-        });
+    const categorySpending: Record<string, number> = {};
+    data.transactions.forEach((t) => {
+      if (t.type === "expense" && t.category_name) {
+        categorySpending[t.category_name] =
+          (categorySpending[t.category_name] || 0) + Number(t.amount || 0);
       }
-    }
+    });
 
-    if (intent.type === "income") {
-      formatted += `- Total Income: ${formatCurrency(income, currency)}\n`;
+    if (Object.keys(categorySpending).length > 0) {
+      formatted += `\n**Expense Breakdown by Category:**\n`;
+      Object.entries(categorySpending).forEach(([cat, amount]) => {
+        formatted += `- ${cat}: ${formatCurrency(amount, currency)}\n`;
+      });
     }
   }
 
-  if (data.budgets.length && ["budget", "spending"].includes(intent.type)) {
+  if (data.budgets.length) {
     formatted += `\n**Budgets:**\n`;
     data.budgets.forEach((budget) => {
       formatted += `- ${budget.category_name}: ${formatCurrency(Number(budget.amount || 0), currency)} (${budget.period})\n`;
     });
   }
 
-  if (data.goals.length && ["goals", "forecast"].includes(intent.type)) {
+  if (data.goals.length) {
     formatted += `\n**Savings Goals:**\n`;
     data.goals.forEach((goal) => {
       const progress =
@@ -275,7 +265,7 @@ function formatFinancialData(
     });
   }
 
-  if (data.debts.length && ["debt", "forecast"].includes(intent.type)) {
+  if (data.debts.length) {
     formatted += `\n**Debts:**\n`;
     data.debts.forEach((debt) => {
       formatted += `- ${debt.name}: ${formatCurrency(Number(debt.current_balance || 0), currency)} at ${Number(debt.interest_rate || 0)}%\n`;
@@ -349,15 +339,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }
     }
 
+    const decryptedProfilePrefs = decryptPreferences(profile?.preferences || {});
+
     const rawPrefs = {
-      ...(profile?.preferences || {}),
+      ...(decryptedProfilePrefs || {}),
       ...allowedRequestPrefs,
     };
     const prefs = rawPrefs as AIProviderPreferences;
     const currency =
       typeof rawPrefs["currency"] === "string"
         ? (rawPrefs["currency"] as string)
-        : profile?.currency || "USD";
+        : profile?.currency || "INR";
 
     const hasGeminiKey =
       typeof prefs.geminiApiKey === "string" && prefs.geminiApiKey.length > 0;

@@ -22,13 +22,15 @@ export async function generateFinancialAdvice(
   prompt: string,
   apiKey: string,
   modelName?: string,
+  options?: { responseMimeType?: string; responseSchema?: any },
 ): Promise<string> {
-  return geminiGenerate(prompt, apiKey, modelName);
+  return geminiGenerate(prompt, apiKey, modelName, options);
 }
 
 export async function generateWithProvider(
   prompt: string,
   prefs: AIProviderPreferences,
+  options?: { responseMimeType?: string; responseSchema?: any },
 ): Promise<string> {
   const provider = prefs.aiProvider || "gemini";
 
@@ -49,6 +51,7 @@ export async function generateWithProvider(
         prompt,
         key,
         prefs.openrouterModel || "openrouter/free",
+        options,
       );
     }
     case "gemini":
@@ -68,7 +71,7 @@ export async function generateWithProvider(
           'Gemini API key appears invalid. Gemini keys usually start with "AIza". Please paste your Gemini key in Settings > Preferences > AI Integration.',
         );
       }
-      return geminiGenerate(prompt, key, prefs.geminiModel);
+      return geminiGenerate(prompt, key, prefs.geminiModel, options);
     }
   }
 }
