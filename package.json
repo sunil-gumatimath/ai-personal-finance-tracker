@@ -11,10 +11,13 @@
     "api": "bun --watch api/_server.ts",
     "vite": "bunx --bun vite",
     "build": "tsc -b && vite build",
-    "build:npm": "tsc -b && vite build",
     "lint": "bunx eslint .",
     "preview": "bunx --bun vite preview",
-    "typecheck": "bunx tsc --noEmit"
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit",
+    "typecheck:api": "cd api && bunx tsc --noEmit",
+    "fix-imports": "bun scripts/fix-imports.js",
+    "generate-pwa-icons": "bun scripts/generate-pwa-icons.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -35,7 +38,6 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.1.18",
-    "@types/ws": "^8.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -48,8 +50,7 @@
     "recharts": "2.15.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "tailwindcss": "^4.1.18",
-    "ws": "^8.20.0"
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
