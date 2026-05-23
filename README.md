@@ -171,22 +171,37 @@ Then open `http://localhost:8080`.
 
 ```text
 ├── src/
-│   ├── components/       # Dashboard, layout, shared UI, theme, and error-boundary components
-│   ├── contexts/         # Auth and preferences providers
-│   ├── hooks/            # Financial health, insights, notifications, preferences, and responsive helpers
-│   ├── lib/              # API client, auth, crypto, AI query utilities, Gemini helpers, and shared utilities
-│   ├── pages/            # Dashboard, Transactions, Budgets, Goals, Debts, Accounts, Categories, Calendar, Settings, auth pages
-│   └── types/            # API, database, preferences, and shared TypeScript types
-├── api/                  # Bun/Vercel API handlers and shared backend utilities
-│   ├── ai/               # AI chat and AI insights handlers
-│   ├── handler.ts        # Vercel entry point and route dispatcher
-│   ├── _ai-provider.ts   # Gemini/OpenRouter provider routing
-│   ├── _db.ts            # Neon/mock database adapter
-│   ├── _server.ts        # Local Bun API server shim
-│   └── _handler-*.ts     # Feature-specific handlers (Accounts, Auth, Budgets, etc.)
-├── database/             # Neon schema, seed helpers, and debt tables
-├── public/               # Static assets and PWA icons
-└── scripts/              # Local dev and utility scripts
+│   ├── components/
+│   │   ├── accounts/          # Account management: cards, modals, delete confirmation
+│   │   ├── dashboard/         # Dashboard widgets: stats, charts, AI coach, health score
+│   │   ├── debts/             # Debt tracking: cards, modals, payoff ring, strategy planner
+│   │   ├── layout/            # App shell: sidebar, header, main layout wrapper
+│   │   └── ui/                # Shared primitives: shadcn components, theme, logo, error boundary
+│   ├── contexts/              # React contexts: authentication and global user preferences
+│   ├── hooks/                 # Custom hooks: financial health, insights, accounts, debts, sidebar
+│   ├── lib/                   # Frontend API client, auth helpers, log formatter, and utilities
+│   ├── pages/                 # Route pages: dashboard, transactions, budgets, goals, debts, etc.
+│   ├── types/                 # TypeScript type definitions: API, database, preferences
+│   ├── App.tsx                # Root React component with routing
+│   ├── index.css              # Global styles and Tailwind directives
+│   └── main.tsx               # Frontend entrypoint
+├── api/                       # Bun & Vercel API backend
+│   ├── handlers/              # Route handlers: auth, accounts, transactions, budgets, goals, debts
+│   │   └── ai/                # AI handlers: chat, insights, query processor
+│   ├── middleware/            # Sliding-window rate limiter
+│   ├── services/              # DB adapters, AI providers (Gemini, OpenRouter), logger, auth, sessions
+│   ├── utils/                 # Crypto helpers, default categories, DNS bypass, shared types
+│   ├── handler.ts             # Vercel Serverless Function entrypoint
+│   ├── _server.ts             # Local development Bun HTTP server shim
+│   └── tsconfig.json          # API-specific TypeScript configuration
+├── database/                  # Neon PostgreSQL schema and data
+│   ├── database-neon.sql      # Full schema definition
+│   ├── database-debts.sql     # Debt tables and helpers
+│   ├── migrations/            # Versioned migrations (initial schema, debts/payments)
+│   └── seeds/                 # Seed data (default categories)
+├── public/                    # Static assets: favicon, PWA icons
+├── scripts/                   # Dev helpers: fullstack runner, import fixer, PWA icon generator
+└── tests/                     # API and component test scaffolding
 ```
 
 ## Database Schema
