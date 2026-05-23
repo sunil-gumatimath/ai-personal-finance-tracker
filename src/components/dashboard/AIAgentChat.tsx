@@ -4,7 +4,6 @@ import {
   User,
   BotMessageSquare,
   X,
-  Loader2,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -141,14 +140,27 @@ export function AIAgentChat() {
     setIsLoading(true);
     lastApiCall = Date.now();
 
+    // Format the last 6 messages as history to provide context for follow-up questions
+    const history = messages
+      .filter((m) => !m.content.startsWith("Error:"))
+      .slice(-6)
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
     try {
-      const { response } = await api.ai.chat(userMessage, {
-        aiProvider: preferences.aiProvider,
-        geminiApiKey: preferences.geminiApiKey,
-        geminiModel: preferences.geminiModel,
-        openrouterApiKey: preferences.openrouterApiKey,
-        openrouterModel: preferences.openrouterModel,
-      });
+      const { response } = await api.ai.chat(
+        userMessage,
+        {
+          aiProvider: preferences.aiProvider,
+          geminiApiKey: preferences.geminiApiKey,
+          geminiModel: preferences.geminiModel,
+          openrouterApiKey: preferences.openrouterApiKey,
+          openrouterModel: preferences.openrouterModel,
+        },
+        history,
+      );
 
       if (response) {
         setMessages((prev) => [
@@ -291,15 +303,16 @@ export function AIAgentChat() {
               </div>
             ))}
             {isLoading && (
-              <div className="flex gap-2 max-w-[88%]">
+              <div className="flex gap-2 max-w-[88%] animate-pulse">
                 <Avatar className="h-6 w-6 shrink-0">
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    <BotMessageSquare className="h-3 w-3" />
+                    <BotMessageSquare className="h-3 w-3 animate-bounce" />
                   </AvatarFallback>
                 </Avatar>
-                <div className="bg-muted rounded-lg px-2.5 py-1.5 text-sm flex items-center gap-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span className="text-muted-foreground">Thinking...</span>
+                <div className="bg-muted rounded-lg px-3 py-2 text-sm flex flex-col gap-1.5 w-48 shadow-sm">
+                  <div className="h-2.5 bg-foreground/10 rounded w-3/4 animate-pulse" />
+                  <div className="h-2.5 bg-foreground/10 rounded w-5/6 animate-pulse" />
+                  <div className="h-2 bg-foreground/10 rounded w-1/2 animate-pulse" />
                 </div>
               </div>
             )}
