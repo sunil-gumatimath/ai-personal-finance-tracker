@@ -333,7 +333,7 @@ export function Dashboard() {
             </div>
 
             {/* Monthly Trends Chart */}
-            <div className="w-full animate-fade-in-up animate-delay-300">
+            <div className="w-full animate-fade-in-up animate-delay-300 relative z-10">
                 <SpendingChart data={monthlyTrends} />
             </div>
 
