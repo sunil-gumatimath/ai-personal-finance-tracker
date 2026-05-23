@@ -55,10 +55,10 @@ export function AICoach() {
 
     const getTypeStyles = (type: Insight['type']) => {
         switch (type) {
-            case 'anomaly': return 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-            case 'kudo': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-            case 'coaching': return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-            default: return 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+            case 'anomaly': return 'bg-rose-500/10 text-rose-500 border-rose-500/25 dark:bg-rose-500/15'
+            case 'kudo': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25 dark:bg-emerald-500/15'
+            case 'coaching': return 'bg-blue-500/10 text-blue-500 border-blue-500/25 dark:bg-blue-500/15'
+            default: return 'bg-amber-500/10 text-amber-500 border-amber-500/25 dark:bg-amber-500/15'
         }
     }
 
@@ -72,25 +72,28 @@ export function AICoach() {
     }
 
     return (
-        <Card className="border-border/50 bg-card/50">
+        <Card className="relative overflow-hidden border border-border bg-card">
             <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                     {/* Icon */}
                     <div className="flex items-center gap-3 shrink-0">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                             {getIcon(currentInsight.type)}
                         </div>
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0 space-y-1">
+                    <div 
+                        key={currentIndex}
+                        className="flex-1 min-w-0 space-y-1"
+                    >
                         <div className="flex items-center gap-2">
-                            <Badge variant="outline" className={cn("text-xs px-2 py-0", getTypeStyles(currentInsight.type))}>
+                            <Badge variant="outline" className={cn("text-xs px-2 py-0 border font-medium rounded-full", getTypeStyles(currentInsight.type))}>
                                 {getTypeLabel(currentInsight.type)}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">AI Agent</span>
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60">AI Financial Coach</span>
                         </div>
-                        <h3 className="text-sm font-medium text-foreground truncate">
+                        <h3 className="text-sm font-semibold text-foreground truncate">
                             {currentInsight.title}
                         </h3>
                         <p className="text-xs text-muted-foreground line-clamp-1">
@@ -101,14 +104,14 @@ export function AICoach() {
                     {/* Actions */}
                     <div className="flex items-center gap-3 shrink-0">
                         {insights.length > 1 && (
-                            <div className="hidden sm:flex items-center gap-1">
+                            <div className="hidden sm:flex items-center gap-1.5 mr-2">
                                 {insights.map((_, i) => (
                                     <button
                                         key={i}
                                         onClick={() => setCurrentIndex(i)}
                                         className={cn(
-                                            "h-1.5 w-1.5 rounded-full transition-colors",
-                                            currentIndex === i ? "bg-primary" : "bg-muted-foreground/30"
+                                            "h-1.5 w-1.5 rounded-full transition-colors duration-200",
+                                            currentIndex === i ? "bg-primary w-3" : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
                                         )}
                                     />
                                 ))}
@@ -116,7 +119,7 @@ export function AICoach() {
                         )}
                         <Button
                             size="sm"
-                            className="h-8"
+                            className="h-8 font-medium rounded-lg"
                             onClick={() => window.dispatchEvent(new CustomEvent('open-ai-chat'))}
                         >
                             Chat
