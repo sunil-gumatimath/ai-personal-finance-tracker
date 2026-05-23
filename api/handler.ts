@@ -1,18 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { ApiRequest, ApiResponse } from './utils/types.js';
-import { checkRateLimit } from './middleware/rate-limiter.js';
-import authHandler from './handlers/auth.js';
-import profileHandler from './handlers/profile.js';
-import accountsHandler from './handlers/accounts.js';
-import categoriesHandler from './handlers/categories.js';
-import transactionsHandler from './handlers/transactions.js';
-import budgetsHandler from './handlers/budgets.js';
-import goalsHandler from './handlers/goals.js';
-import debtsHandler from './handlers/debts.js';
-import notificationsHandler from './handlers/notifications.js';
-import systemLogsHandler from './handlers/system-logs.js';
-import aiChatHandler from './handlers/ai/chat.js';
-import aiInsightsHandler from './handlers/ai/insights.js';
+import type { ApiRequest, ApiResponse } from './_lib/utils/types.js';
+import { checkRateLimit } from './_lib/middleware/rate-limiter.js';
+import authHandler from './_lib/handlers/auth.js';
+import profileHandler from './_lib/handlers/profile.js';
+import accountsHandler from './_lib/handlers/accounts.js';
+import categoriesHandler from './_lib/handlers/categories.js';
+import transactionsHandler from './_lib/handlers/transactions.js';
+import budgetsHandler from './_lib/handlers/budgets.js';
+import goalsHandler from './_lib/handlers/goals.js';
+import debtsHandler from './_lib/handlers/debts.js';
+import notificationsHandler from './_lib/handlers/notifications.js';
+import systemLogsHandler from './_lib/handlers/system-logs.js';
+import aiChatHandler from './_lib/handlers/ai/chat.js';
+import aiInsightsHandler from './_lib/handlers/ai/insights.js';
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',

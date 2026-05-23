@@ -1,10 +1,10 @@
-import "./utils/dns-bypass.js";
+import "./_lib/utils/dns-bypass.js";
 import { serve } from "bun";
 import path from "path";
-import type { ApiRequest, ApiResponse } from "./utils/types.js";
-import { checkRateLimit } from "./middleware/rate-limiter.js";
-import { query } from "./services/db.js";
-import { logEvent, activeWsClients } from "./services/logger.js";
+import type { ApiRequest, ApiResponse } from "./_lib/utils/types.js";
+import { checkRateLimit } from "./_lib/middleware/rate-limiter.js";
+import { query } from "./_lib/services/db.js";
+import { logEvent, activeWsClients } from "./_lib/services/logger.js";
 
 const PORT = process.env.PORT || 3001;
 
