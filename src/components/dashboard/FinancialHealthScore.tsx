@@ -40,7 +40,7 @@ interface FinancialHealthScoreProps {
 
 export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProps) {
     const [open, setOpen] = useState(false)
-    const [hoveredMetric, setHoveredMetric] = useState<string | null>(null)
+
     const { formatCurrency } = usePreferences()
 
     if (loading || !data) {
@@ -142,32 +142,20 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
     return (
         <TooltipProvider>
             <>
-                <Card className="h-full border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden group flex flex-col relative">
-                    {/* Animated gradient background */}
-                    <div
-                        className="absolute inset-0 pointer-events-none opacity-30"
-                        style={{
-                            background: `
-                                radial-gradient(circle at 20% 20%, ${gradientColors.start}20 0%, transparent 50%),
-                                radial-gradient(circle at 80% 80%, ${gradientColors.end}15 0%, transparent 50%)
-                            `
-                        }}
-                    />
-
-
-                    <CardHeader className="pb-2 relative z-10">
+                <Card className="h-full border border-border bg-card flex flex-col relative">
+                    <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                 <div className={cn(
-                                    "p-1 rounded-md",
-                                    score >= 60 ? "bg-primary/10" : "bg-destructive/10"
+                                    "p-1.5 rounded-lg border",
+                                    score >= 60 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-destructive/10 border-destructive/20"
                                 )}>
                                     <Activity className={cn("h-4 w-4", getScoreColor(score))} />
                                 </div>
                                 Health Score
                             </CardTitle>
                             <div className={cn(
-                                "flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full border",
+                                "flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border",
                                 getScoreColor(score),
                                 getScoreBadgeStyle(score)
                             )}>
@@ -177,15 +165,14 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                         </div>
                     </CardHeader>
 
-                    <CardContent className="flex-1 relative z-10">
+                    <CardContent className="flex-1">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
                             {/* Score Ring Section */}
                             <div className="flex items-center justify-center">
                                 <div
-                                    className="relative h-[180px] w-full flex items-center justify-center cursor-pointer group/ring"
+                                    className="relative h-[180px] w-full flex items-center justify-center cursor-pointer"
                                     onClick={() => setOpen(true)}
                                 >
-
                                     <svg viewBox="0 0 120 120" className="w-[160px] h-[160px] transform -rotate-90">
                                         <defs>
                                             <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -205,7 +192,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                             opacity="0.15"
                                         />
 
-                                        {/* Tick marks */}
+                                        {/* Flat plain tick marks */}
                                         {[...Array(12)].map((_, i) => (
                                             <line
                                                 key={i}
@@ -214,13 +201,13 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                                 x2="60"
                                                 y2="10"
                                                 stroke="hsl(var(--muted-foreground))"
-                                                strokeWidth="1"
-                                                opacity="0.3"
+                                                strokeWidth="1.2"
+                                                opacity="0.25"
                                                 transform={`rotate(${i * 30} 60 60)`}
                                             />
                                         ))}
 
-                                        {/* Animated score arc with gradient */}
+                                        {/* Animated score arc with clean gradient */}
                                         <circle
                                             cx="60"
                                             cy="60"
@@ -234,29 +221,31 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                         />
                                     </svg>
 
-                                    {/* Center content */}
-                                    <div className="absolute inset-0 flex items-center justify-center flex-col">
+                                    {/* Clean, flat center content overlay */}
+                                    <div className="absolute h-[110px] w-[110px] rounded-full bg-card border border-border flex items-center justify-center flex-col">
                                         <span
-                                            className="text-4xl font-bold tracking-tight"
+                                            className="text-4xl font-extrabold tracking-tight tabular-nums"
                                             style={{ color: getGaugeFillColor(score) }}
                                         >
                                             {score}
                                         </span>
-                                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">
+                                        <span className="text-[8px] font-bold text-muted-foreground/60 uppercase tracking-widest mt-0.5">
                                             out of 100
                                         </span>
 
                                         {/* Trend indicator */}
                                         <div className={cn(
-                                            "flex items-center gap-0.5 mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full",
-                                            score >= 60 ? "text-emerald-500 bg-emerald-500/10" : "text-amber-500 bg-amber-500/10"
+                                            "flex items-center gap-0.5 mt-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full border",
+                                            score >= 60 
+                                                ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" 
+                                                : "text-amber-500 bg-amber-500/10 border-amber-500/20"
                                         )}>
                                             {score >= 60 ? (
-                                                <ArrowUpRight className="h-3 w-3" />
+                                                <ArrowUpRight className="h-2.5 w-2.5" />
                                             ) : (
-                                                <ArrowDownRight className="h-3 w-3" />
+                                                <ArrowDownRight className="h-2.5 w-2.5" />
                                             )}
-                                            <span>{score >= 60 ? 'On track' : 'Improve'}</span>
+                                            <span>{score >= 60 ? 'On Track' : 'Improve'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -268,7 +257,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                     <span>Score Breakdown</span>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Info className="h-3.5 w-3.5 cursor-help opacity-50 hover:opacity-100 transition-opacity" />
+                                            <Info className="h-3.5 w-3.5 cursor-help opacity-50" />
                                         </TooltipTrigger>
                                         <TooltipContent side="left" className="max-w-[200px]">
                                             <p className="text-xs">Your health score is calculated from savings (40%), budget adherence (30%), and emergency fund progress (30%).</p>
@@ -285,8 +274,6 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                         weight={metric.weight}
                                         description={metric.description}
                                         detail={metric.detail}
-                                        isHovered={hoveredMetric === metric.id}
-                                        onHover={(hovered) => setHoveredMetric(hovered ? metric.id : null)}
                                     />
                                 ))}
                             </div>
@@ -297,7 +284,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                         <CardFooter className="pt-0 pb-4 relative z-10">
                             <Button
                                 variant="ghost"
-                                className="w-full justify-between h-auto py-3 px-4 bg-muted/20 hover:bg-muted/40 border border-transparent hover:border-border/50 rounded-xl group/btn"
+                                className="w-full justify-between h-auto py-3 px-4 bg-muted/20 border border-border/50 rounded-xl"
                                 onClick={() => setOpen(true)}
                             >
                                 <div className="flex items-start gap-3 text-left">
@@ -311,7 +298,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                         </p>
                                     </div>
                                 </div>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover/btn:translate-x-1 transition-transform" />
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
                             </Button>
                         </CardFooter>
                     )}
@@ -336,13 +323,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
 
                         <div className="space-y-6 pt-4">
                             {/* Large score display */}
-                            <div className="flex items-center justify-center py-8 bg-gradient-to-br from-muted/30 to-muted/10 rounded-2xl border border-border/50 relative overflow-hidden">
-                                <div
-                                    className="absolute inset-0 opacity-20"
-                                    style={{
-                                        background: `radial-gradient(circle at center, ${getGaugeFillColor(score)} 0%, transparent 70%)`
-                                    }}
-                                />
+                            <div className="flex items-center justify-center py-8 bg-muted/20 rounded-2xl border border-border/50 relative overflow-hidden">
                                 <div className="text-center relative z-10">
                                     <div className="flex items-center justify-center gap-2 mb-2">
                                         <span className={cn(
@@ -390,7 +371,7 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                                             </div>
                                             <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
                                                 <div
-                                                    className={cn("h-full rounded-full transition-all", getMetricColor(metric.value).bar)}
+                                                    className={cn("h-full rounded-full", getMetricColor(metric.value).bar)}
                                                     style={{ width: `${metric.value}%` }}
                                                 />
                                             </div>
@@ -406,8 +387,8 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                             <div className="space-y-4">
                                 <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Action Plan</h4>
                                 {nextSteps.map((step, i) => (
-                                    <div key={i} className="flex gap-3 p-3 rounded-xl bg-card border border-border/50 items-start group hover:bg-muted/20 transition-colors">
-                                        <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 text-xs font-bold group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                    <div key={i} className="flex gap-3 p-3 rounded-xl bg-card border border-border/50 items-start">
+                                        <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 text-xs font-bold">
                                             {i + 1}
                                         </div>
                                         <p className="text-sm font-medium leading-relaxed">{step}</p>
@@ -429,40 +410,27 @@ interface EnhancedMetricBarProps {
     weight: number
     description: string
     detail: string
-    isHovered: boolean
-    onHover: (hovered: boolean) => void
 }
 
 function getMetricColor(value: number) {
-    if (value >= 80) return { bar: 'bg-emerald-500', icon: 'text-emerald-500', text: 'text-emerald-500', glow: 'shadow-emerald-500/20' }
-    if (value >= 50) return { bar: 'bg-blue-500', icon: 'text-blue-500', text: 'text-blue-500', glow: 'shadow-blue-500/20' }
-    if (value >= 25) return { bar: 'bg-amber-500', icon: 'text-amber-500', text: 'text-amber-500', glow: 'shadow-amber-500/20' }
-    return { bar: 'bg-rose-500', icon: 'text-rose-500', text: 'text-rose-500', glow: 'shadow-rose-500/20' }
+    if (value >= 80) return { bar: 'bg-emerald-500', icon: 'text-emerald-400', text: 'text-emerald-400' }
+    if (value >= 50) return { bar: 'bg-blue-500', icon: 'text-blue-400', text: 'text-blue-400' }
+    if (value >= 25) return { bar: 'bg-amber-500', icon: 'text-amber-400', text: 'text-amber-400' }
+    return { bar: 'bg-rose-500', icon: 'text-rose-400', text: 'text-rose-400' }
 }
 
-function EnhancedMetricBar({ icon: Icon, label, value, weight, description, detail, isHovered, onHover }: EnhancedMetricBarProps) {
+function EnhancedMetricBar({ icon: Icon, label, value, weight, description, detail }: EnhancedMetricBarProps) {
     const colors = getMetricColor(value)
 
     return (
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <div
-                        className={cn(
-                            "space-y-1.5 p-2 rounded-lg transition-all cursor-pointer",
-                            "hover:bg-muted/30",
-                            isHovered && "bg-muted/40 ring-1 ring-border"
-                        )}
-                        onMouseEnter={() => onHover(true)}
-                        onMouseLeave={() => onHover(false)}
-                    >
-                        <div className="flex items-center justify-between text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
+                    <div className="space-y-1.5 p-2.5 rounded-xl cursor-pointer">
+                        <div className="flex items-center justify-between text-[10px] font-bold uppercase text-muted-foreground tracking-wider">
                             <div className="flex items-center gap-2">
-                                <div className={cn(
-                                    "p-1 rounded transition-colors",
-                                    isHovered ? "bg-muted" : "bg-transparent"
-                                )}>
-                                    <Icon className={cn("h-3.5 w-3.5 transition-colors", colors.icon)} />
+                                <div className="p-1.5 rounded-lg border bg-transparent border-transparent">
+                                    <Icon className={cn("h-4 w-4", colors.icon)} />
                                 </div>
                                 <span className="truncate">{label}</span>
                             </div>
@@ -471,18 +439,17 @@ function EnhancedMetricBar({ icon: Icon, label, value, weight, description, deta
                                     {weight}%
                                 </span>
                                 <span className={cn(
-                                    "font-bold transition-all tabular-nums",
-                                    colors.text,
-                                    isHovered && "scale-110"
+                                    "font-bold tabular-nums text-xs",
+                                    colors.text
                                 )}>
                                     {Math.min(100, value)}%
                                 </span>
                             </div>
                         </div>
-                        <div className="h-2 w-full bg-muted/30 rounded-full overflow-hidden border border-border/30">
+                        <div className="h-2 w-full bg-muted/30 rounded-full overflow-hidden border border-border/20">
                             <div
                                 className={cn(
-                                    "h-full rounded-full transition-all duration-700 ease-out",
+                                    "h-full rounded-full",
                                     colors.bar
                                 )}
                                 style={{
