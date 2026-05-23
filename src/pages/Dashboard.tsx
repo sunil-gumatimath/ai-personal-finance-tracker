@@ -43,6 +43,7 @@ export function Dashboard() {
     const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
     const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([])
     const [spendingByCategory, setSpendingByCategory] = useState<SpendingByCategory[]>([])
+    const [previousMonthSpending, setPreviousMonthSpending] = useState<SpendingByCategory[]>([])
 
     const { data: healthData, loading: healthLoading } = useFinancialHealth()
     useEffect(() => {
@@ -180,6 +181,34 @@ export function Dashboard() {
                         .sort((a, b) => b.amount - a.amount)
 
                     setSpendingByCategory(spendingData)
+
+                    // Calculate Spending by Category for last month
+                    const lastCategoryMap = new Map<string, { amount: number; color: string }>()
+                    const lastTotalExpenses = lastMonthExpenses || 1 // Avoid division by zero
+
+                    lastMonthData
+                        .filter((t) => t.type === 'expense' && t.category)
+                        .forEach((t) => {
+                            const category = t.category
+                            const catName = category?.name || 'Uncategorized'
+                            const catColor = category?.color || '#94a3b8'
+                            const current = lastCategoryMap.get(catName) || { amount: 0, color: catColor }
+                            lastCategoryMap.set(catName, {
+                                amount: current.amount + toNumber(t.amount),
+                                color: catColor
+                            })
+                        })
+
+                    const lastSpendingData: SpendingByCategory[] = Array.from(lastCategoryMap.entries())
+                        .map(([category, { amount, color }]) => ({
+                            category,
+                            amount,
+                            color,
+                            percentage: (amount / lastTotalExpenses) * 100
+                        }))
+                        .sort((a, b) => b.amount - a.amount)
+
+                    setPreviousMonthSpending(lastSpendingData)
                 }
 
                 // 3. Fetch 6-month trend data
@@ -329,7 +358,10 @@ export function Dashboard() {
             {/* Health Score & Spending Flow Row */}
             <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2 animate-fade-in-up animate-delay-300">
                 <FinancialHealthScore data={healthData} loading={healthLoading} />
-                <BudgetOverview spendingByCategory={spendingByCategory} />
+                <BudgetOverview 
+                    spendingByCategory={spendingByCategory} 
+                    previousMonthData={previousMonthSpending} 
+                />
             </div>
 
             {/* Monthly Trends Chart */}
