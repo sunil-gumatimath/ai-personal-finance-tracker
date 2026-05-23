@@ -25,7 +25,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         const data = req.body || {}
         
         // Fetch existing record BEFORE applying updates to capture the old state
-        const { rows: oldRows } = await query("SELECT * FROM transactions WHERE id = $1 AND user_id = $2", [id, userId]);
+        const { rows: oldRows } = await query<Record<string, any>>("SELECT * FROM transactions WHERE id = $1 AND user_id = $2", [id, userId]);
         if (oldRows.length === 0) {
           res.status(404).json({ error: 'Transaction not found' })
           return
@@ -44,12 +44,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           return
         }
         
-        const { rows } = await query(queryData.text, queryData.values)
+        const { rows } = await query<Record<string, any>>(queryData.text, queryData.values)
         if (rows.length === 0) {
           res.status(404).json({ error: 'Transaction not found' })
           return
         }
-
         const updatedTransaction = rows[0];
         await logEvent(req, {
           action: "TRANSACTION_EDITED",
@@ -80,7 +79,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method === 'DELETE') {
       try {
         // Fetch existing record BEFORE deletion to capture its final state
-        const { rows: oldRows } = await query("SELECT * FROM transactions WHERE id = $1 AND user_id = $2", [id, userId]);
+        const { rows: oldRows } = await query<Record<string, any>>("SELECT * FROM transactions WHERE id = $1 AND user_id = $2", [id, userId]);
         if (oldRows.length === 0) {
           res.status(404).json({ error: 'Transaction not found' })
           return
@@ -181,7 +180,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }
       
       const queryData = buildInsertQuery('transactions', data, { user_id: userId })
-      const { rows } = await query(queryData.text, queryData.values)
+      const { rows } = await query<Record<string, any>>(queryData.text, queryData.values)
 
       const createdTransaction = rows[0];
       await logEvent(req, {

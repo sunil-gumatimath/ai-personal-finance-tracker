@@ -33,9 +33,9 @@ export async function query<T = unknown>(
 ): Promise<{ rows: T[]; rowCount: number }> {
   try {
     const db = getSql()
-    const result = await db.query<T>(queryText, params ?? [])
+    const result = (await db.query(queryText, params ?? [])) as any
 
-    const rows = Array.isArray(result.rows) ? result.rows : []
+    const rows = Array.isArray(result.rows) ? (result.rows as T[]) : []
     const rowCount = typeof result.rowCount === 'number' ? result.rowCount : rows.length
     return { rows, rowCount }
   } catch (error) {

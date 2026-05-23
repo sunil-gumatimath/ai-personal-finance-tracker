@@ -45,7 +45,7 @@ interface AccountRow {
 }
 
 interface TransactionRow {
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   amount: number | string;
   date: string;
   description: string | null;

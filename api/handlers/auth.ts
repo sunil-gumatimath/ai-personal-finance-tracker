@@ -262,7 +262,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         action: "USER_SIGNUP",
         resource: "auth/signup",
         newValue: "Rate limit hit for signup",
-        userEmail: req.body?.email || "unknown",
+        userEmail: typeof req.body?.email === "string" ? req.body.email : "unknown",
         severity: "warning",
         status: "failure",
         metadata: { clientId }
@@ -477,7 +477,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         action: "USER_LOGIN",
         resource: "auth/login",
         newValue: "Rate limit hit for login",
-        userEmail: req.body?.email || "unknown",
+        userEmail: typeof req.body?.email === "string" ? req.body.email : "unknown",
         severity: "warning",
         status: "failure",
         metadata: { clientId }

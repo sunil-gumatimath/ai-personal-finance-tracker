@@ -35,7 +35,7 @@ const ALLOWED_ORIGINS = [
 
 const RATE_LIMITED_PREFIXES = ['/api/ai/chat', '/api/ai/insights'];
 
-const ROUTES: Record<string, (req: ApiRequest, res: ApiResponse) => Promise<void>> = {
+const ROUTES: Record<string, (req: ApiRequest, res: ApiResponse) => Promise<any>> = {
   auth: authHandler,
   profile: profileHandler,
   accounts: accountsHandler,
@@ -50,7 +50,7 @@ const ROUTES: Record<string, (req: ApiRequest, res: ApiResponse) => Promise<void
   'ai/insights': aiInsightsHandler,
 };
 
-function resolveRoute(apiPath: string): ((req: ApiRequest, res: ApiResponse) => Promise<void>) | null {
+function resolveRoute(apiPath: string): ((req: ApiRequest, res: ApiResponse) => Promise<any>) | null {
   if (ROUTES[apiPath]) return ROUTES[apiPath];
 
   const parts = apiPath.split('/');

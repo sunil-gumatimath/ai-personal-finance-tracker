@@ -285,7 +285,7 @@ async function writeToFileLog(log: SystemLogEntry) {
       }) + "\n";
 
     if (typeof Bun !== "undefined") {
-      await Bun.write(LOG_FILE_PATH, logLine, { append: true });
+      await fs.promises.appendFile(LOG_FILE_PATH, logLine);
     } else {
       await fs.promises.appendFile(LOG_FILE_PATH, logLine);
     }

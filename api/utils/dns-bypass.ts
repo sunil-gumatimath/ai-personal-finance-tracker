@@ -54,7 +54,7 @@ if (process.env.NODE_ENV !== "production") {
   let authIpIndex = 0;
   let dbIpIndex = 0;
   
-  globalThis.fetch = async function(input: RequestInfo | URL, init?: BunRequestInit) {
+  globalThis.fetch = (async function(input: RequestInfo | URL, init?: BunRequestInit) {
       const url = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request).url);
       
       let targetDomain = '';
@@ -88,5 +88,5 @@ if (process.env.NODE_ENV !== "production") {
       }
       
       return originalFetch(input, init);
-  };
+  }) as typeof fetch;
 }
