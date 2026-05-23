@@ -1,10 +1,10 @@
-import "./_dns-bypass.js";
+import "./utils/dns-bypass.js";
 import { serve } from "bun";
 import path from "path";
-import type { ApiRequest, ApiResponse } from "./_types.js";
-import { checkRateLimit } from "./_rate-limiter.js";
-import { query } from "./_db.js";
-import { logEvent, activeWsClients } from "./_logger.js";
+import type { ApiRequest, ApiResponse } from "./utils/types.js";
+import { checkRateLimit } from "./middleware/rate-limiter.js";
+import { query } from "./services/db.js";
+import { logEvent, activeWsClients } from "./services/logger.js";
 
 const PORT = process.env.PORT || 3001;
 
@@ -67,6 +67,7 @@ async function ensureSystemLogsTable() {
 
 ensureSystemLogsTable();
 
+try {
 serve({
     port: PORT,
     async fetch(req, server) {
@@ -99,40 +100,27 @@ serve({
         let filePath = "";
         const extraParams: Record<string, string> = {};
 
-        // 1. Check handler match: api/_handler-some/path.ts (production naming)
-        const handlerParts = apiPath.split("/");
-        const handlerFile = handlerParts.pop();
-        const handlerDir = handlerParts.join("/");
-        const handlerPath = handlerDir
-            ? path.join(process.cwd(), "api", handlerDir, `_handler-${handlerFile}.ts`)
-            : path.join(process.cwd(), "api", `_handler-${apiPath}.ts`);
-        if (await Bun.file(handlerPath).exists()) {
-            filePath = handlerPath;
+        // 1. Check exact match: api/handlers/some/path.ts
+        const exactPath = path.join(process.cwd(), "api", "handlers", apiPath + ".ts");
+        if (await Bun.file(exactPath).exists()) {
+            filePath = exactPath;
         }
 
-        // 2. Check exact match: api/some/path.ts (legacy naming for dev)
+        // 2. Check index match: api/handlers/some/path/index.ts
         if (!filePath) {
-            const exactPath = path.join(process.cwd(), "api", apiPath + ".ts");
-            if (await Bun.file(exactPath).exists()) {
-                filePath = exactPath;
-            }
-        }
-
-        // 3. Check index: api/some/path/index.ts
-        if (!filePath) {
-            const indexPath = path.join(process.cwd(), "api", apiPath, "index.ts");
+            const indexPath = path.join(process.cwd(), "api", "handlers", apiPath, "index.ts");
             if (await Bun.file(indexPath).exists()) {
                 filePath = indexPath;
             }
         }
 
-        // 4. Check for dynamic route [id].ts in the parent folder
+        // 3. Check dynamic match: api/handlers/some/[id].ts
         if (!filePath) {
             const parts = apiPath.split("/");
             if (parts.length > 0) {
                 const lastPart = parts.pop();
                 const parentPath = parts.join("/");
-                const dynamicPath = path.join(process.cwd(), "api", parentPath, "[id].ts");
+                const dynamicPath = path.join(process.cwd(), "api", "handlers", parentPath, "[id].ts");
 
                 if (await Bun.file(dynamicPath).exists()) {
                     filePath = dynamicPath;
@@ -286,3 +274,20 @@ serve({
         }
     }
 });
+} catch (error: any) {
+    if (error.code === "EADDRINUSE" || (error.message && error.message.includes("EADDRINUSE"))) {
+        console.error(`\n❌ Failed to start API server: Port ${PORT} is already in use!`);
+        console.error(`💡 Tips to resolve this:`);
+        if (process.platform === "win32") {
+            console.error(`   Run the following command in PowerShell to free port ${PORT}:`);
+            console.error(`   Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force`);
+        } else {
+            console.error(`   Run the following command in Terminal to free port ${PORT}:`);
+            console.error(`   kill -9 $(lsof -t -i:${PORT})`);
+        }
+        console.error();
+        process.exit(1);
+    } else {
+        throw error;
+    }
+}
