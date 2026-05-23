@@ -257,10 +257,11 @@ export const api = {
         openrouterApiKey?: string;
         openrouterModel?: string;
       },
+      history?: Array<{ role: "user" | "assistant"; content: string }>,
     ) =>
       apiFetch<AiChatResponse>("/api/ai/chat", {
         method: "POST",
-        body: JSON.stringify({ message, aiPreferences }),
+        body: JSON.stringify({ message, aiPreferences, history }),
       }),
   },
   notifications: {
