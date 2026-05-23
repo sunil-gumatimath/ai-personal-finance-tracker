@@ -1,7 +1,33 @@
-// Advanced AI Query Processor for Natural Language Financial Queries (Backend JS Version)
+// Advanced AI Query Processor for Natural Language Financial Queries
+
+type Timeframe = 'today' | 'week' | 'month' | 'last_month' | 'quarter' | 'year' | 'all' | 'custom'
+type IntentType = 'comparison' | 'forecast' | 'income' | 'debt' | 'balance' | 'spending' | 'budget' | 'goals' | 'general'
+type OperationType = 'total' | 'average' | 'count' | 'trend' | 'breakdown'
+type ComparisonType = 'last_month' | 'last_year' | 'budget' | 'goal'
+
+interface IntentResult {
+  type: IntentType
+  confidence: number
+}
+
+interface ProcessedIntent {
+  type: IntentType
+  timeframe: Timeframe | undefined
+  categories: string[]
+  operation: OperationType | undefined
+  comparison: ComparisonType | undefined
+  amount: number | undefined
+}
+
+interface ProcessedQuery {
+  intent: ProcessedIntent
+  originalQuery: string
+  confidence: number
+  suggestedResponse: string
+}
 
 class AIQueryProcessor {
-  static TIMEFRAME_PATTERNS = {
+  static TIMEFRAME_PATTERNS: Record<string, RegExp> = {
     'today': /today|now|current/i,
     'week': /this week|past week|last 7 days|past 7 days/i,
     'month': /this month|past month|last 30 days|past 30 days|monthly/i,
@@ -11,7 +37,7 @@ class AIQueryProcessor {
     'all': /all time|ever|total|overall|lifetime/i
   }
 
-  static CATEGORY_PATTERNS = {
+  static CATEGORY_PATTERNS: Record<string, RegExp> = {
     'food': /food|dining|restaurant|groceries|eating|meal/i,
     'transport': /transport|car|gas|fuel|uber|taxi|bus|train|metro/i,
     'shopping': /shopping|clothes|retail|amazon|purchase|buy/i,
@@ -21,7 +47,7 @@ class AIQueryProcessor {
     'education': /education|school|college|course|books|tuition/i
   }
 
-  static INTENT_PATTERNS = {
+  static INTENT_PATTERNS: Record<string, RegExp> = {
     'comparison': /compare|difference|change|versus|vs|than|income vs expenses|expenses vs income/i,
     'forecast': /forecast|predict|expect|project|future/i,
     'income': /income|earned|salary|wage|received|deposit|how much.*earn/i,
@@ -32,7 +58,7 @@ class AIQueryProcessor {
     'goals': /goal|target|save|objective|aim/i
   }
 
-  static OPERATION_PATTERNS = {
+  static OPERATION_PATTERNS: Record<string, RegExp> = {
     'total': /total|sum|overall|complete|grand total/i,
     'average': /average|mean|typical|usual|normal/i,
     'count': /count|number|how many|frequency/i,
@@ -40,7 +66,7 @@ class AIQueryProcessor {
     'breakdown': /breakdown|split|by category|categor/i
   }
 
-  static processQuery(query) {
+  static processQuery(query: string): ProcessedQuery {
     const normalizedQuery = query.toLowerCase().trim()
     
     // Determine intent
@@ -61,7 +87,7 @@ class AIQueryProcessor {
     // Extract amount
     const amount = this.extractAmount(normalizedQuery)
 
-    const processedQuery = {
+    const processedQuery: ProcessedQuery = {
       intent: {
         type: intent.type,
         timeframe,
@@ -71,7 +97,8 @@ class AIQueryProcessor {
         amount
       },
       originalQuery: query,
-      confidence: intent.confidence
+      confidence: intent.confidence,
+      suggestedResponse: ''
     }
 
     // Add suggested response for common patterns
@@ -80,19 +107,19 @@ class AIQueryProcessor {
     return processedQuery
   }
 
-  static determineIntent(query) {
+  static determineIntent(query: string): IntentResult {
     for (const [intentType, pattern] of Object.entries(this.INTENT_PATTERNS)) {
       if (pattern.test(query)) {
-        return { type: intentType, confidence: 0.9 }
+        return { type: intentType as IntentType, confidence: 0.9 }
       }
     }
     return { type: 'general', confidence: 0.3 }
   }
 
-  static extractTimeframe(query) {
+  static extractTimeframe(query: string): Timeframe | undefined {
     for (const [timeframe, pattern] of Object.entries(this.TIMEFRAME_PATTERNS)) {
       if (pattern.test(query)) {
-        return timeframe
+        return timeframe as Timeframe
       }
     }
     
@@ -104,8 +131,8 @@ class AIQueryProcessor {
     return undefined
   }
 
-  static extractCategories(query) {
-    const categories = []
+  static extractCategories(query: string): string[] {
+    const categories: string[] = []
     for (const [category, pattern] of Object.entries(this.CATEGORY_PATTERNS)) {
       if (pattern.test(query)) {
         categories.push(category)
@@ -114,16 +141,16 @@ class AIQueryProcessor {
     return categories
   }
 
-  static extractOperation(query) {
+  static extractOperation(query: string): OperationType | undefined {
     for (const [operation, pattern] of Object.entries(this.OPERATION_PATTERNS)) {
       if (pattern.test(query)) {
-        return operation
+        return operation as OperationType
       }
     }
     return undefined
   }
 
-  static extractComparison(query) {
+  static extractComparison(query: string): ComparisonType | undefined {
     if (/last month|previous month|month over month/i.test(query)) {
       return 'last_month'
     }
@@ -139,7 +166,7 @@ class AIQueryProcessor {
     return undefined
   }
 
-  static extractAmount(query) {
+  static extractAmount(query: string): number | undefined {
     const amountMatch = query.match(/\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/)
     if (amountMatch) {
       return parseFloat(amountMatch[1].replace(/,/g, ''))
@@ -147,7 +174,7 @@ class AIQueryProcessor {
     return undefined
   }
 
-  static generateSuggestedResponse(processed) {
+  static generateSuggestedResponse(processed: ProcessedQuery): string {
     const { intent } = processed
     
     // Generate contextual suggestions based on intent
@@ -189,7 +216,7 @@ class AIQueryProcessor {
 }
 
 // Example query templates for users
-const QUERY_EXAMPLES = [
+const QUERY_EXAMPLES: string[] = [
   "How much did I spend on food last month?",
   "What's my total account balance?",
   "Show me my income vs expenses this month",
@@ -211,3 +238,4 @@ const QUERY_EXAMPLES = [
 ]
 
 export { AIQueryProcessor, QUERY_EXAMPLES }
+export type { ProcessedQuery, ProcessedIntent, IntentResult, Timeframe, IntentType, OperationType, ComparisonType }

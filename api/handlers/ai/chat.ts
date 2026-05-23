@@ -9,7 +9,6 @@ import {
 import { decryptPreferences } from "../../utils/crypto.js";
 import type { ApiRequest, ApiResponse } from "../../utils/types.js";
 import { ensureSystemLogsTable } from "../../services/logger.js";
-// @ts-expect-error - JavaScript module
 import { AIQueryProcessor } from "./query-processor.js";
 
 type IntentType =
