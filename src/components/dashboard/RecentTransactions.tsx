@@ -17,9 +17,9 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
 
     if (transactions.length === 0) {
         return (
-            <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-all duration-300 hover:border-border hover:bg-card/80">
+            <div className="group relative overflow-hidden rounded-2xl border border-border/30 bg-card/45 backdrop-blur-md p-6 transition-all duration-300 hover:border-primary/10">
                 {/* Subtle gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none" />
 
                 {/* Header */}
                 <div className="relative flex items-center justify-between mb-4">
@@ -52,14 +52,11 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
     }
 
     return (
-        <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-all duration-300 hover:border-border hover:bg-card/80">
-            {/* Subtle gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6">
             {/* Header */}
-            <div className="relative flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                    <div className="p-2 rounded-xl bg-primary/10 text-primary border border-border/10">
                         <Receipt className="h-4 w-4" />
                     </div>
                     <div>
@@ -69,7 +66,7 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
                 </div>
                 <Link
                     to="/transactions"
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                    className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
                 >
                     View all
                     <ArrowRight className="h-3 w-3" />
@@ -77,7 +74,7 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
             </div>
 
             {/* Transactions List */}
-            <div className="relative space-y-3">
+            <div className="space-y-3">
                 {transactions.slice(0, 5).map((transaction) => {
                     const isAnomaly = anomalies.some(a => a.id === `anomaly-${transaction.id}`)
 
@@ -85,19 +82,19 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
                         <div
                             key={transaction.id}
                             className={cn(
-                                'flex items-center justify-between rounded-xl border p-3 transition-all duration-200',
+                                'flex items-center justify-between rounded-xl border p-3',
                                 isAnomaly
-                                    ? 'border-rose-500/50 bg-rose-500/[0.03] shadow-[0_0_15px_rgba(239,68,68,0.1)]'
-                                    : 'border-border/30 bg-background/30 hover:bg-background/50 hover:border-border/50'
+                                    ? 'border-rose-500/30 bg-rose-500/[0.02]'
+                                    : 'border-border/30 bg-background/20'
                             )}
                         >
                             <div className="flex items-center gap-3">
                                 <div
                                     className={cn(
-                                        'flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200',
+                                        'flex h-10 w-10 items-center justify-center rounded-xl border',
                                         transaction.type === 'income'
-                                            ? 'bg-emerald-500/10 text-emerald-400'
-                                            : 'bg-rose-500/10 text-rose-400'
+                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/10'
+                                            : 'bg-rose-500/10 text-rose-400 border-rose-500/10'
                                     )}
                                 >
                                     {transaction.type === 'income' ? (

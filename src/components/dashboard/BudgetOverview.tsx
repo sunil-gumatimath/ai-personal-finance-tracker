@@ -223,12 +223,12 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
     }
 
     return (
-        <Card className="h-full flex flex-col overflow-hidden">
+        <Card className="h-full flex flex-col overflow-hidden border border-border bg-card">
             <CardHeader className="items-center pb-2">
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
                     Spending Flow
                 </CardTitle>
-                <CardDescription>This month's expense breakdown</CardDescription>
+                <CardDescription className="text-xs">This month's expense breakdown</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 pb-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
@@ -252,10 +252,6 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                         innerRadius={50}
                                         outerRadius={80}
                                         paddingAngle={3}
-                                        activeIndex={activeIndex}
-                                        activeShape={renderActiveShape}
-                                        onMouseEnter={onPieEnter}
-                                        onMouseLeave={onPieLeave}
                                         animationBegin={0}
                                         animationDuration={800}
                                         animationEasing="ease-out"
@@ -266,10 +262,6 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                                 fill={entry.fill}
                                                 stroke="hsl(var(--background))"
                                                 strokeWidth={2}
-                                                style={{
-                                                    transition: 'all 0.2s ease-out',
-                                                    cursor: 'pointer',
-                                                }}
                                             />
                                         ))}
                                     </Pie>
@@ -280,34 +272,23 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
 
                     {/* Category Legend Section */}
                     <div className="flex flex-col justify-center space-y-2 py-2">
-                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
                             Top Categories
                         </div>
                         <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar pr-1">
                             {topCategories.map((cat, index) => {
                                 const change = getSpendingChange(cat.category, cat.amount)
                                 const color = cat.color || COLORS[index % COLORS.length]
-                                const isActive = activeIndex === spendingByCategory.findIndex(c => c.category === cat.category)
 
                                 return (
                                     <div
                                         key={cat.category}
-                                        className={cn(
-                                            "group flex items-center gap-3 p-2 rounded-lg transition-all duration-200 cursor-pointer",
-                                            "hover:bg-muted/50",
-                                            isActive && "bg-muted/70 ring-1 ring-border"
-                                        )}
-                                        onMouseEnter={() => setActiveIndex(spendingByCategory.findIndex(c => c.category === cat.category))}
-                                        onMouseLeave={() => setActiveIndex(0)}
+                                        className="flex items-center gap-3 p-2.5 rounded-xl border border-transparent"
                                     >
-                                        {/* Color indicator with glow effect */}
+                                        {/* Color indicator with no effects */}
                                         <div className="relative">
                                             <div
-                                                className="absolute inset-0 rounded-full blur-sm opacity-50"
-                                                style={{ backgroundColor: color }}
-                                            />
-                                            <div
-                                                className="relative w-3 h-3 rounded-full ring-2 ring-background"
+                                                className="w-3 h-3 rounded-full"
                                                 style={{ backgroundColor: color }}
                                             />
                                         </div>
@@ -315,26 +296,27 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                         {/* Category info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between gap-2">
-                                                <span className="text-sm font-medium truncate">
+                                                <span className="text-xs font-semibold truncate text-foreground">
                                                     {cat.category}
                                                 </span>
-                                                <span className="text-sm font-semibold tabular-nums">
+                                                <span className="text-xs font-bold tabular-nums">
                                                     {formatCurrency(cat.amount)}
                                                 </span>
                                             </div>
 
                                             {/* Progress bar */}
                                             <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden border border-border/10">
                                                     <div
-                                                        className="h-full rounded-full transition-all duration-500 ease-out"
+                                                        className="h-full rounded-full transition-all duration-700 ease-[var(--ease-out-custom)]"
                                                         style={{
                                                             width: `${cat.percentage}%`,
                                                             backgroundColor: color,
+                                                            boxShadow: `0 0 8px ${color}20`
                                                         }}
                                                     />
                                                 </div>
-                                                <span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
+                                                <span className="text-[10px] font-bold text-muted-foreground/75 tabular-nums w-10 text-right">
                                                     {cat.percentage.toFixed(0)}%
                                                 </span>
                                             </div>
@@ -343,10 +325,10 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                         {/* Trend indicator */}
                                         {change.direction !== 'same' && (
                                             <div className={cn(
-                                                "flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded",
+                                                "flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors",
                                                 change.direction === 'up'
-                                                    ? "text-red-500 bg-red-500/10"
-                                                    : "text-green-500 bg-green-500/10"
+                                                    ? "text-red-500 bg-red-500/10 border-red-500/20"
+                                                    : "text-green-500 bg-green-500/10 border-green-500/20"
                                             )}>
                                                 {change.direction === 'up'
                                                     ? <TrendingUp className="h-3 w-3" />
@@ -361,7 +343,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
 
                         {/* More categories indicator */}
                         {spendingByCategory.length > 5 && (
-                            <div className="text-xs text-muted-foreground text-center pt-1">
+                            <div className="text-[10px] font-bold text-muted-foreground/70 text-center pt-1 uppercase tracking-wider">
                                 +{spendingByCategory.length - 5} more categories
                             </div>
                         )}
@@ -370,31 +352,33 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
             </CardContent>
 
             {/* Enhanced Footer */}
-            <div className="border-t border-border/50 px-6 py-3 bg-muted/20">
+            <div className="border-t border-border/30 px-6 py-3 bg-muted/15 relative z-10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
-                            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                            <div className="p-1 rounded-lg bg-muted border border-border/30">
+                                <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            </div>
                             <div>
-                                <p className="text-sm font-semibold">{formatCurrency(totalSpending)}</p>
-                                <p className="text-xs text-muted-foreground">Total spent</p>
+                                <p className="text-xs font-bold">{formatCurrency(totalSpending)}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total spent</p>
                             </div>
                         </div>
-                        <div className="h-8 w-px bg-border/50" />
+                        <div className="h-8 w-px bg-border/40" />
                         <div>
-                            <p className="text-sm font-semibold">{chartData.length}</p>
-                            <p className="text-xs text-muted-foreground">Categories</p>
+                            <p className="text-xs font-bold">{chartData.length}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Categories</p>
                         </div>
                     </div>
                     <Button
                         asChild
                         variant="ghost"
                         size="sm"
-                        className="gap-1 text-xs hover:text-primary"
+                        className="gap-1 text-xs hover:text-primary active:scale-95 font-medium rounded-lg"
                     >
                         <Link to="/categories">
                             View All
-                            <ArrowRight className="h-3 w-3" />
+                            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                         </Link>
                     </Button>
                 </div>

@@ -261,15 +261,15 @@ export function Dashboard() {
     return (
         <div className="space-y-6">
             {/* Header with Quick Actions */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-fade-in-up">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text">Dashboard</h1>
                     <p className="text-sm sm:text-base text-muted-foreground">
                         Welcome back! Here's your financial overview.
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button asChild className="w-full sm:w-auto">
+                    <Button asChild className="w-full sm:w-auto font-semibold">
                         <Link to="/transactions?action=new">
                             <Plus className="mr-2 h-4 w-4" />
                             Add Transaction
@@ -279,56 +279,68 @@ export function Dashboard() {
             </div>
 
             {/* AI Coaching Section */}
-            <AICoach />
+            <div className="animate-fade-in-up animate-delay-50">
+                <AICoach />
+            </div>
 
-            {/* Stats Cards */}
+            {/* Stats Cards - Cascaded loading */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                <StatCard
-                    title="Total Balance"
-                    value={formatCurrency(stats.totalBalance)}
-                    trendDescription={stats.totalBalance >= 0 ? "Net worth positive" : "Building up"}
-                    subtitle="Across all accounts"
-                    changeType={stats.totalBalance >= 0 ? "positive" : "neutral"}
-                />
-                <StatCard
-                    title="Monthly Income"
-                    value={formatCurrency(stats.monthlyIncome)}
-                    percentageChange={`${stats.incomeChange >= 0 ? '+' : ''}${stats.incomeChange.toFixed(1)}%`}
-                    trendDescription={stats.incomeChange >= 0 ? "Up from last month" : "Down from last month"}
-                    subtitle="Income this period"
-                    changeType={stats.incomeChange >= 0 ? "positive" : "negative"}
-                />
-                <StatCard
-                    title="Monthly Expenses"
-                    value={formatCurrency(stats.monthlyExpenses)}
-                    percentageChange={`${stats.expensesChange >= 0 ? '+' : ''}${stats.expensesChange.toFixed(1)}%`}
-                    trendDescription={stats.expensesChange <= 0 ? "Down from last month" : "Up from last month"}
-                    subtitle={stats.expensesChange <= 0 ? "Spending under control" : "Review spending"}
-                    changeType={stats.expensesChange <= 0 ? "positive" : "negative"}
-                />
-                <StatCard
-                    title="Monthly Net"
-                    value={formatCurrency(stats.monthlyNet)}
-                    percentageChange={`${stats.savingsRate >= 0 ? '+' : ''}${stats.savingsRate.toFixed(1)}%`}
-                    trendDescription={stats.monthlyNet >= 0 ? 'Savings rate' : 'Needs attention'}
-                    subtitle={stats.monthlyNet >= 0 ? 'Income saved' : 'Review spending'}
-                    changeType={stats.monthlyNet >= 0 ? 'positive' : 'negative'}
-                />
+                <div className="animate-fade-in-up animate-delay-100">
+                    <StatCard
+                        title="Total Balance"
+                        value={formatCurrency(stats.totalBalance)}
+                        trendDescription={stats.totalBalance >= 0 ? "Net worth positive" : "Building up"}
+                        subtitle="Across all accounts"
+                        changeType={stats.totalBalance >= 0 ? "positive" : "neutral"}
+                    />
+                </div>
+                <div className="animate-fade-in-up animate-delay-150">
+                    <StatCard
+                        title="Monthly Income"
+                        value={formatCurrency(stats.monthlyIncome)}
+                        percentageChange={`${stats.incomeChange >= 0 ? '+' : ''}${stats.incomeChange.toFixed(1)}%`}
+                        trendDescription={stats.incomeChange >= 0 ? "Up from last month" : "Down from last month"}
+                        subtitle="Income this period"
+                        changeType={stats.incomeChange >= 0 ? "positive" : "negative"}
+                    />
+                </div>
+                <div className="animate-fade-in-up animate-delay-200">
+                    <StatCard
+                        title="Monthly Expenses"
+                        value={formatCurrency(stats.monthlyExpenses)}
+                        percentageChange={`${stats.expensesChange >= 0 ? '+' : ''}${stats.expensesChange.toFixed(1)}%`}
+                        trendDescription={stats.expensesChange <= 0 ? "Down from last month" : "Up from last month"}
+                        subtitle={stats.expensesChange <= 0 ? "Spending under control" : "Review spending"}
+                        changeType={stats.expensesChange <= 0 ? "positive" : "negative"}
+                    />
+                </div>
+                <div className="animate-fade-in-up animate-delay-250">
+                    <StatCard
+                        title="Monthly Net"
+                        value={formatCurrency(stats.monthlyNet)}
+                        percentageChange={`${stats.savingsRate >= 0 ? '+' : ''}${stats.savingsRate.toFixed(1)}%`}
+                        trendDescription={stats.monthlyNet >= 0 ? 'Savings rate' : 'Needs attention'}
+                        subtitle={stats.monthlyNet >= 0 ? 'Income saved' : 'Review spending'}
+                        changeType={stats.monthlyNet >= 0 ? 'positive' : 'negative'}
+                    />
+                </div>
             </div>
 
             {/* Health Score & Spending Flow Row */}
-            <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
+            <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2 animate-fade-in-up animate-delay-300">
                 <FinancialHealthScore data={healthData} loading={healthLoading} />
                 <BudgetOverview spendingByCategory={spendingByCategory} />
             </div>
 
             {/* Monthly Trends Chart */}
-            <div className="w-full">
+            <div className="w-full animate-fade-in-up animate-delay-300">
                 <SpendingChart data={monthlyTrends} />
             </div>
 
             {/* Recent Transactions */}
-            <RecentTransactions transactions={recentTransactions} anomalies={anomalies} />
+            <div className="animate-fade-in-up animate-delay-300">
+                <RecentTransactions transactions={recentTransactions} anomalies={anomalies} />
+            </div>
         </div>
     )
 }

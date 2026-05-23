@@ -30,23 +30,19 @@ export function StatCard({
 
     const displayPercentage = percentageChange || (change && change.includes('%') ? change.split('%')[0] + '%' : null)
     const displayTrendDesc = trendDescription || (change && !change.includes('%') ? change : null)
-
     return (
-        <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
-            {/* Subtle gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
             {/* Header with title and percentage badge */}
-            <div className="relative flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium text-muted-foreground">
                     {title}
                 </span>
                 {displayPercentage && (
                     <div className={cn(
-                        "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                        changeType === 'positive' && "text-emerald-400",
-                        changeType === 'negative' && "text-rose-400",
-                        changeType === 'neutral' && "text-muted-foreground"
+                        "flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border",
+                        changeType === 'positive' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                        changeType === 'negative' && "bg-rose-500/10 text-rose-400 border-rose-500/20",
+                        changeType === 'neutral' && "bg-muted/50 text-muted-foreground border-border/30"
                     )}>
                         <TrendIcon className="h-3 w-3" />
                         <span>{displayPercentage}</span>
@@ -55,7 +51,7 @@ export function StatCard({
             </div>
 
             {/* Main Value */}
-            <div className="relative mb-3">
+            <div className="mb-3">
                 <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                     {value}
                 </span>
@@ -64,7 +60,7 @@ export function StatCard({
             {/* Trend Description */}
             {displayTrendDesc && (
                 <div className={cn(
-                    "flex items-center gap-1.5 text-sm font-medium mb-1",
+                    "flex items-center gap-1.5 text-sm font-semibold mb-1",
                     changeType === 'positive' && "text-emerald-400",
                     changeType === 'negative' && "text-rose-400",
                     changeType === 'neutral' && "text-muted-foreground"
@@ -76,18 +72,10 @@ export function StatCard({
 
             {/* Subtitle */}
             {subtitle && (
-                <p className="text-xs text-muted-foreground/70">
+                <p className="text-xs text-muted-foreground/60">
                     {subtitle}
                 </p>
             )}
-
-            {/* Decorative corner accent */}
-            <div className={cn(
-                "absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-10 blur-2xl transition-opacity group-hover:opacity-20",
-                changeType === 'positive' && "bg-emerald-500",
-                changeType === 'negative' && "bg-rose-500",
-                changeType === 'neutral' && "bg-primary"
-            )} />
         </div>
     )
 }

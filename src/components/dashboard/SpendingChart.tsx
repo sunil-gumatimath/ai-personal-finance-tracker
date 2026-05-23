@@ -10,6 +10,7 @@ import {
     ChartLegend,
     ChartLegendContent,
 } from '@/components/ui/chart'
+import { cn } from '@/lib/utils'
 
 interface MonthlyTrend {
     month: string
@@ -41,20 +42,25 @@ export function SpendingChart({ data }: SpendingChartProps) {
     const savingsRate = totalIncome > 0 ? ((netFlow / totalIncome) * 100) : 0
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
+        <Card className="border border-border bg-card">
+            <CardHeader className="pb-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <CardTitle>Income vs Expenses</CardTitle>
-                        <CardDescription>Last 6 months overview</CardDescription>
+                        <CardTitle className="text-base font-semibold">Income vs Expenses</CardTitle>
+                        <CardDescription className="text-xs">Last 6 months overview</CardDescription>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
-                        <div className={`flex items-center gap-1 ${netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {netFlow >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                            <span className="font-medium">{formatCurrency(Math.abs(netFlow))}</span>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
+                        <div className={cn(
+                            "flex items-center gap-1.5 px-3 py-1 rounded-full border font-semibold",
+                            netFlow >= 0 
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                                : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                        )}>
+                            {netFlow >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                            <span>{netFlow >= 0 ? 'Net Inflow' : 'Net Outflow'}: {formatCurrency(Math.abs(netFlow))}</span>
                         </div>
-                        <div className="text-muted-foreground">
-                            <span className="font-medium">{savingsRate.toFixed(0)}%</span> savings
+                        <div className="flex items-center gap-1 px-3 py-1 rounded-full border border-border/20 bg-muted/40 font-semibold text-muted-foreground/90">
+                            <span>{savingsRate.toFixed(0)}% Savings Rate</span>
                         </div>
                     </div>
                 </div>
@@ -63,24 +69,25 @@ export function SpendingChart({ data }: SpendingChartProps) {
                 <ChartContainer config={chartConfig} className="h-[300px] w-full">
                     <AreaChart
                         data={data}
-                        margin={{ top: 20, right: 20, left: 0, bottom: 0 }}
+                        margin={{ top: 20, right: 10, left: -10, bottom: 0 }}
                     >
                         <defs>
                             <linearGradient id="fillIncome" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="var(--color-income)" stopOpacity={0.8} />
-                                <stop offset="95%" stopColor="var(--color-income)" stopOpacity={0.1} />
+                                <stop offset="5%" stopColor="var(--color-income)" stopOpacity={0.4} />
+                                <stop offset="95%" stopColor="var(--color-income)" stopOpacity={0.0} />
                             </linearGradient>
                             <linearGradient id="fillExpenses" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.8} />
-                                <stop offset="95%" stopColor="var(--color-expenses)" stopOpacity={0.1} />
+                                <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.4} />
+                                <stop offset="95%" stopColor="var(--color-expenses)" stopOpacity={0.0} />
                             </linearGradient>
                         </defs>
-                        <CartesianGrid vertical={false} />
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.15} />
                         <XAxis
                             dataKey="month"
                             tickLine={false}
                             axisLine={false}
                             tickMargin={10}
+                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
                         />
                         <YAxis
                             tickLine={false}
@@ -91,15 +98,17 @@ export function SpendingChart({ data }: SpendingChartProps) {
                                 return value.toString()
                             }}
                             tickMargin={10}
+                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
                         />
                         <ChartTooltip
                             content={
                                 <ChartTooltipContent
-                                    indicator="line"
+                                    indicator="dot"
+                                    className="premium-glass border-border/40 min-w-[140px] rounded-xl shadow-xl p-2.5"
                                     formatter={(value, name) => (
-                                        <div className="flex items-center justify-between gap-8">
-                                            <span className="text-muted-foreground">{name}</span>
-                                            <span className="font-medium">{formatCurrency(Number(value))}</span>
+                                        <div className="flex items-center justify-between gap-8 text-xs font-semibold">
+                                            <span className="text-muted-foreground capitalize">{name}</span>
+                                            <span className="font-bold text-foreground">{formatCurrency(Number(value))}</span>
                                         </div>
                                     )}
                                 />
@@ -112,7 +121,7 @@ export function SpendingChart({ data }: SpendingChartProps) {
                             stroke="var(--color-income)"
                             strokeWidth={2}
                             activeDot={{
-                                r: 6,
+                                r: 5,
                                 fill: "var(--color-income)",
                                 stroke: "hsl(var(--background))",
                                 strokeWidth: 2,
@@ -125,7 +134,7 @@ export function SpendingChart({ data }: SpendingChartProps) {
                             stroke="var(--color-expenses)"
                             strokeWidth={2}
                             activeDot={{
-                                r: 6,
+                                r: 5,
                                 fill: "var(--color-expenses)",
                                 stroke: "hsl(var(--background))",
                                 strokeWidth: 2,
