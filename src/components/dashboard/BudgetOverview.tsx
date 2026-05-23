@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Pie, PieChart, Cell, ResponsiveContainer, Sector, type TooltipProps } from 'recharts'
+import { Pie, PieChart, Cell, ResponsiveContainer, type TooltipProps } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { SpendingByCategory } from '@/types'
@@ -25,18 +24,6 @@ type ChartDatum = {
     fill: string
 }
 
-type ActiveShapeProps = {
-    cx: number
-    cy: number
-    innerRadius: number
-    outerRadius: number
-    startAngle: number
-    endAngle: number
-    fill: string
-    payload: ChartDatum
-    percent: number
-}
-
 const COLORS = [
     'hsl(346.8 77.2% 49.8%)', // Rose
     'hsl(142.1 76.2% 36.3%)', // Green
@@ -52,57 +39,6 @@ const COLORS = [
     'hsl(60 70% 45%)',        // Olive
 ]
 
-// Custom active shape for enhanced hover effect
-const renderActiveShape = (props: unknown) => {
-    const {
-        cx, cy, innerRadius, outerRadius, startAngle, endAngle,
-        fill, payload, percent
-    } = props as ActiveShapeProps
-
-    return (
-        <g>
-            <Sector
-                cx={cx}
-                cy={cy}
-                innerRadius={innerRadius - 4}
-                outerRadius={outerRadius + 8}
-                startAngle={startAngle}
-                endAngle={endAngle}
-                fill={fill}
-                style={{
-                    filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))',
-                    transition: 'all 0.3s ease-out'
-                }}
-            />
-            <Sector
-                cx={cx}
-                cy={cy}
-                startAngle={startAngle}
-                endAngle={endAngle}
-                innerRadius={outerRadius + 10}
-                outerRadius={outerRadius + 14}
-                fill={fill}
-                opacity={0.6}
-            />
-            <text
-                x={cx}
-                y={cy - 12}
-                textAnchor="middle"
-                className="fill-foreground text-2xl font-bold"
-            >
-                {`${(percent * 100).toFixed(0)}%`}
-            </text>
-            <text
-                x={cx}
-                y={cy + 12}
-                textAnchor="middle"
-                className="fill-muted-foreground text-sm"
-            >
-                {payload.category}
-            </text>
-        </g>
-    )
-}
 
 // Custom tooltip component
 type CustomTooltipProps = TooltipProps<number, string> & {
@@ -139,7 +75,6 @@ const CustomTooltip = ({ active, payload, formatCurrency }: CustomTooltipProps) 
 
 export function BudgetOverview({ spendingByCategory, previousMonthData }: BudgetOverviewProps) {
     const { formatCurrency } = usePreferences()
-    const [activeIndex, setActiveIndex] = useState<number | undefined>(0)
 
     const totalSpending = spendingByCategory.reduce((sum, cat) => sum + cat.amount, 0)
     const topCategories = spendingByCategory.slice(0, 5)
@@ -181,13 +116,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
         }, {} as ChartConfig)
     } satisfies ChartConfig
 
-    const onPieEnter = (_: unknown, index: number) => {
-        setActiveIndex(index)
-    }
 
-    const onPieLeave = () => {
-        setActiveIndex(0)
-    }
 
     // Empty state with enhanced visuals
     if (spendingByCategory.length === 0) {
