@@ -100,27 +100,27 @@ serve({
         let filePath = "";
         const extraParams: Record<string, string> = {};
 
-        // 1. Check exact match: api/handlers/some/path.ts
-        const exactPath = path.join(process.cwd(), "api", "handlers", apiPath + ".ts");
+        // 1. Check exact match: api/_lib/handlers/some/path.ts
+        const exactPath = path.join(process.cwd(), "api", "_lib", "handlers", apiPath + ".ts");
         if (await Bun.file(exactPath).exists()) {
             filePath = exactPath;
         }
 
-        // 2. Check index match: api/handlers/some/path/index.ts
+        // 2. Check index match: api/_lib/handlers/some/path/index.ts
         if (!filePath) {
-            const indexPath = path.join(process.cwd(), "api", "handlers", apiPath, "index.ts");
+            const indexPath = path.join(process.cwd(), "api", "_lib", "handlers", apiPath, "index.ts");
             if (await Bun.file(indexPath).exists()) {
                 filePath = indexPath;
             }
         }
 
-        // 3. Check dynamic match: api/handlers/some/[id].ts
+        // 3. Check dynamic match: api/_lib/handlers/some/[id].ts
         if (!filePath) {
             const parts = apiPath.split("/");
             if (parts.length > 0) {
                 const lastPart = parts.pop();
                 const parentPath = parts.join("/");
-                const dynamicPath = path.join(process.cwd(), "api", "handlers", parentPath, "[id].ts");
+                const dynamicPath = path.join(process.cwd(), "api", "_lib", "handlers", parentPath, "[id].ts");
 
                 if (await Bun.file(dynamicPath).exists()) {
                     filePath = dynamicPath;
