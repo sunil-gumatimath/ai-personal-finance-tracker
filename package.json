@@ -13,7 +13,6 @@
     "build": "tsc -b && vite build",
     "lint": "bunx eslint .",
     "preview": "bunx --bun vite preview",
-    "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
     "typecheck:api": "cd api && bunx tsc --noEmit",
     "fix-imports": "bun scripts/fix-imports.js",
