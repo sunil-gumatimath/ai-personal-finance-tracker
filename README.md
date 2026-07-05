@@ -52,7 +52,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 | AI | Google Gemini, OpenRouter, React Markdown |
 | Charts | Recharts via Shadcn-style chart components |
 | Icons | Lucide React, Hugeicons React |
-| Deployment | Vercel functions, Docker, Nginx |
+| Deployment | Vercel functions |
 
 ## Prerequisites
 
@@ -94,8 +94,9 @@ A premium, AI-powered personal finance management platform for tracking transact
 4. **Database setup for Neon:**
 
    - Create a Neon project.
-   - Run `database/database-neon.sql` in the Neon SQL editor.
-   - Run `database/database-debts.sql` to add debt tracking tables and helpers.
+   - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql`, `002_debts_and_payments.sql`, `003_system_logs.sql`) in order in the Neon SQL editor.
+   - Optionally run `database/seeds/default-categories.sql` to seed default categories.
+   - The loose `database/database-neon.sql` and `database/database-debts.sql` files are convenience snapshots; the migrations under `database/migrations/` are the canonical source of truth.
    - Database tables are created empty; start adding your accounts and transactions in the UI.
 
 5. **AI setup:**
@@ -119,10 +120,23 @@ A premium, AI-powered personal finance management platform for tracking transact
 | `bun run dev` | Start API and Vite together for local fullstack development |
 | `bun run api` | Start only the Bun API server with watch mode |
 | `bun run vite` | Start only the frontend dev server |
-| `bun run typecheck` | Run TypeScript type checking |
-| `bun run lint` | Run ESLint |
+| `bun run typecheck` | Run TypeScript type checking for the frontend |
+| `bun run typecheck:api` | Run TypeScript type checking for the API |
+| `bun run lint` | Run ESLint across the whole project |
 | `bun run build` | Typecheck and build for production |
 | `bun run preview` | Preview the production Vite build |
+
+## CI / Continuous Integration
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request to `main`/`master`:
+
+1. `bun install --frozen-lockfile`
+2. `bun run lint`
+3. `bun run typecheck` (frontend)
+4. `bun run typecheck:api` (API)
+5. `bun run build`
+
+In-progress runs for the same branch are cancelled automatically so the latest commit is always what gets checked.
 
 ## AI Features
 
@@ -144,8 +158,8 @@ AI features require a valid provider key. Add it in **Settings > Preferences > A
 
 ### Vercel
 
-1. Push the repository to GitHub.
-2. Import it in [Vercel](https://vercel.com).
+1. Push the repository to GitHub (the included CI workflow runs lint, typecheck, and build on every push/PR to `main`).
+2. Import it in [Vercel](https://vercel.com) and set the framework to **Vite**.
 3. Configure environment variables:
    - `NEON_DATABASE_URL`
    - `AUTH_SECRET`
@@ -154,18 +168,9 @@ AI features require a valid provider key. Add it in **Settings > Preferences > A
 4. Deploy.
 
 Notes:
-- API files under `api/` are Vercel-compatible route handlers.
-- `api/_server.ts` is the local Bun API shim and is not the primary production entrypoint.
-
-### Docker
-
-Build and run with Docker Compose:
-
-```bash
-docker-compose up --build
-```
-
-Then open `http://localhost:8080`.
+- `vercel.json` is configured to use `bun install` and `bun run build`, matching the local toolchain and `bun.lock`. API requests under `/api/*` are routed to a single Vercel serverless function at `api/handler.ts`.
+- `api/handler.ts` and the local `api/_server.ts` share the same route registry, security headers, CORS allowlist, and rate-limit logic via `api/_lib/server/`, so runtime behavior stays consistent between local development and production.
+- A lightweight `GET /api/health` liveness probe is available for uptime monitoring and deploy checks.
 
 ## Project Structure
 
@@ -176,32 +181,40 @@ Then open `http://localhost:8080`.
 │   │   ├── dashboard/         # Dashboard widgets: stats, charts, AI coach, health score
 │   │   ├── debts/             # Debt tracking: cards, modals, payoff ring, strategy planner
 │   │   ├── layout/            # App shell: sidebar, header, main layout wrapper
-│   │   └── ui/                # Shared primitives: shadcn components, theme, logo, error boundary
+│   │   ├── system/            # App-level components: ErrorBoundary, Logo, theme provider/toggle
+│   │   └── ui/                # Pure shadcn primitives (button, card, dialog, table, etc.)
 │   ├── contexts/              # React contexts: authentication and global user preferences
 │   ├── hooks/                 # Custom hooks: financial health, insights, accounts, debts, sidebar
-│   ├── lib/                   # Frontend API client, auth helpers, log formatter, and utilities
+│   ├── lib/                   # Frontend utilities
+│   │   ├── api.ts             # Typed API client (throws ApiError on HTTP failures)
+│   │   ├── auth.ts            # Neon Auth client setup
+│   │   ├── config.ts          # Centralized import.meta.env access and env helpers
+│   │   ├── errors.ts          # ApiError class with isAuthError/isRateLimited/isRetryable
+│   │   ├── validate.ts        # Zod schemas for API payloads (login, account, transaction, etc.)
+│   │   ├── log-formatter.ts   # System log display formatting
+│   │   └── utils.ts           # cn() and shared helpers
 │   ├── pages/                 # Route pages: dashboard, transactions, budgets, goals, debts, etc.
 │   ├── types/                 # TypeScript type definitions: API, database, preferences
 │   ├── App.tsx                # Root React component with routing
 │   ├── index.css              # Global styles and Tailwind directives
 │   └── main.tsx               # Frontend entrypoint
 ├── api/                       # Bun & Vercel API backend
-│   ├── handlers/              # Route handlers: auth, accounts, transactions, budgets, goals, debts
-│   │   └── ai/                # AI handlers: chat, insights, query processor
-│   ├── middleware/            # Sliding-window rate limiter
-│   ├── services/              # DB adapters, AI providers (Gemini, OpenRouter), logger, auth, sessions
-│   ├── utils/                 # Crypto helpers, default categories, DNS bypass, shared types
-│   ├── handler.ts             # Vercel Serverless Function entrypoint
+│   ├── _lib/
+│   │   ├── handlers/          # Route handlers: auth, accounts, transactions, budgets, goals, debts, health
+│   │   │   └── ai/            # AI handlers: chat, insights, query processor
+│   │   ├── middleware/        # Sliding-window rate limiter
+│   │   ├── server/            # Shared server layer: config (CORS/security headers), route registry
+│   │   ├── services/          # DB adapters, AI providers (Gemini, OpenRouter), logger, auth, sessions
+│   │   └── utils/             # Crypto helpers, default categories, DNS bypass, shared types
+│   ├── handler.ts             # Vercel serverless function entrypoint
 │   ├── _server.ts             # Local development Bun HTTP server shim
 │   └── tsconfig.json          # API-specific TypeScript configuration
 ├── database/                  # Neon PostgreSQL schema and data
-│   ├── database-neon.sql      # Full schema definition
-│   ├── database-debts.sql     # Debt tables and helpers
-│   ├── migrations/            # Versioned migrations (initial schema, debts/payments)
+│   ├── migrations/            # Versioned migrations (canonical source of truth)
 │   └── seeds/                 # Seed data (default categories)
+├── .github/workflows/ci.yml   # CI: lint + typecheck (frontend + API) + build on push/PR
 ├── public/                    # Static assets: favicon, PWA icons
-├── scripts/                   # Dev helpers: fullstack runner, import fixer, PWA icon generator
-└── tests/                     # API and component test scaffolding
+└── scripts/                   # Dev helpers: fullstack runner, import fixer, PWA icon generator
 ```
 
 ## Database Schema
@@ -219,6 +232,7 @@ The app uses Neon PostgreSQL with these primary tables:
 | `debts` | Loans, cards, and other debts with interest and payoff metadata |
 | `debt_payments` | Debt payment history with principal and interest breakdown |
 | `ai_insights` | Persisted AI-generated anomalies, coaching tips, and kudos |
+| `system_logs` | Audit log of user actions, errors, and deployment events with severity and metadata |
 | `users` | Authentication user records |
 
 All user-owned tables are designed around user isolation through Row Level Security policies and user-scoped API queries.
