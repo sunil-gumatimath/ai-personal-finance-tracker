@@ -22,7 +22,7 @@ try {
             execSync(`kill -9 ${pid}`);
         }
     }
-} catch (e) {
+} catch (_e) {
     // Port is free or commands failed (meaning no process was found listening)
 }
 
