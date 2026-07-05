@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
-import { Logo } from '@/components/ui/Logo'
+import { Logo } from '@/components/system/Logo'
 
 export function ForgotPassword() {
     const { resetPassword } = useAuth()

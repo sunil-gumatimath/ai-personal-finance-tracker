@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { PreferencesProvider } from '@/contexts/PreferencesContext'
-import { ThemeProvider } from '@/components/ui/theme-provider'
+import { ThemeProvider } from '@/components/system/theme-provider'
 import { MainLayout } from '@/components/layout'
 import {
   Dashboard,

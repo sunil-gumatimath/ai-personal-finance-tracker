@@ -27,7 +27,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
-import { Logo } from '@/components/ui/Logo'
+import { Logo } from '@/components/system/Logo'
 
 const navItems = [
     { title: 'Dashboard', icon: LayoutDashboard, path: '/' },
