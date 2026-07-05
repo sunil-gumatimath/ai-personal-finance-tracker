@@ -12,7 +12,9 @@ import {
     Wallet,
     ArrowUpRight,
     ArrowDownRight,
-    Info
+    Info,
+    CircleDashed,
+    Plus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -60,7 +62,102 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
         )
     }
 
-    const { score, savingsRate, budgetAdherence, emergencyFundProgress, nextSteps, metrics } = data
+    const { score, savingsRate, budgetAdherence, emergencyFundProgress, hasEnoughData, nextSteps, metrics } = data
+
+    // Empty state for new users with no transaction data
+    if (!hasEnoughData) {
+        return (
+            <>
+                <Card className="h-full border border-dashed border-border bg-card flex flex-col relative">
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <div className="p-1.5 rounded-lg border bg-muted/30 border-border">
+                                    <Activity className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                Health Score
+                            </CardTitle>
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border text-muted-foreground bg-muted/20 border-border">
+                                <CircleDashed className="h-3.5 w-3.5" />
+                                Not Enough Data
+                            </div>
+                        </div>
+                    </CardHeader>
+
+                    <CardContent className="flex-1 flex items-center justify-center">
+                        <div className="flex flex-col items-center text-center py-6 px-4 max-w-[280px]">
+                            <div className="relative mb-5">
+                                <svg viewBox="0 0 120 120" className="w-[120px] h-[120px] transform -rotate-90 opacity-20">
+                                    <circle
+                                        cx="60" cy="60" r="50" fill="none"
+                                        stroke="hsl(var(--muted-foreground))" strokeWidth="8"
+                                        strokeDasharray="8 12" opacity="0.4"
+                                    />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-3xl font-extrabold text-muted-foreground/30">—</span>
+                                </div>
+                            </div>
+                            <p className="text-sm font-semibold text-foreground mb-1">Start tracking your finances</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                Add income and expense transactions this month to calculate your financial health score.
+                            </p>
+                        </div>
+                    </CardContent>
+
+                    {nextSteps.length > 0 && (
+                        <CardFooter className="pt-0 pb-4 relative z-10">
+                            <Button
+                                variant="ghost"
+                                className="w-full justify-between h-auto py-3 px-4 bg-primary/5 border border-primary/20 rounded-xl hover:bg-primary/10"
+                                onClick={() => setOpen(true)}
+                            >
+                                <div className="flex items-start gap-3 text-left">
+                                    <div className="p-1.5 rounded-full bg-primary/10 text-primary mt-0.5">
+                                        <Plus className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-xs font-semibold line-clamp-1">Get started</p>
+                                        <p className="text-[10px] text-muted-foreground line-clamp-1 opacity-80">
+                                            {nextSteps[0]}
+                                        </p>
+                                    </div>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                        </CardFooter>
+                    )}
+                </Card>
+
+                <Dialog open={open} onOpenChange={setOpen}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <div className="p-1.5 rounded-lg bg-primary/10">
+                                    <Lightbulb className="h-5 w-5 text-primary" />
+                                </div>
+                                Getting Started
+                            </DialogTitle>
+                            <DialogDescription>
+                                Follow these steps to start tracking your financial health.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 pt-4">
+                            {nextSteps.map((step, i) => (
+                                <div key={i} className="flex gap-3 p-3 rounded-xl bg-card border border-border/50 items-start">
+                                    <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 text-xs font-bold">
+                                        {i + 1}
+                                    </div>
+                                    <p className="text-sm font-medium leading-relaxed">{step}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </>
+        )
+    }
 
     const getScoreColor = (s: number) => {
         if (s >= 80) return 'text-emerald-500'

@@ -12,6 +12,7 @@ export interface FinancialHealth {
     savingsRate: number
     budgetAdherence: number
     emergencyFundProgress: number
+    hasEnoughData: boolean
     metrics: {
         monthlyIncome: number
         monthlyExpenses: number
@@ -122,25 +123,36 @@ export function useFinancialHealth() {
             const rawScore = (savingsScore * 0.4) + (budgetScore * 0.3) + (efScore * 0.3)
             const finalScore = Math.round(rawScore)
 
+            // Determine if we have enough data to show a meaningful score
+            const hasEnoughData = income > 0 || expenses > 0 || currentMonthTransactions.length > 0
+
             // Check if user has debt (for next steps)
             const hasDebt = typedAccounts.some(a => a.type === 'credit' && toNumber(a.balance) < 0)
 
             // 6. Generate Next Steps (Actionable Advice)
             const nextSteps: string[] = []
-            if (savingsRate < 0.2) {
-                nextSteps.push(`Increase monthly savings by ${formatCurrency(Math.round(income * 0.1))} to boost your score.`)
-            }
-            if (budgetAdherence < 0.8) {
-                nextSteps.push('Review categories that are over budget and adjust spending.')
-            }
-            if (emergencyFundProgress < 0.5) {
-                nextSteps.push(`Add ${formatCurrency(Math.round(targetEmergencyFund * 0.1))} to your emergency fund.`)
-            }
-            if (hasDebt) {
-                nextSteps.push('Prioritize paying off high-interest credit card debt.')
-            }
-            if (nextSteps.length === 0) {
-                nextSteps.push('Great job! Maintain your current habits to keep your score high.')
+
+            if (!hasEnoughData) {
+                nextSteps.push('Add your first income or expense transaction to start tracking.')
+                nextSteps.push('Set up budgets for your spending categories.')
+            } else {
+                if (savingsRate < 0.2 && income > 0) {
+                    nextSteps.push(`Increase monthly savings by ${formatCurrency(Math.round(income * 0.1))} to boost your score.`)
+                } else if (savingsRate < 0.2 && income === 0) {
+                    nextSteps.push('Add your income transactions to accurately track your savings rate.')
+                }
+                if (budgetAdherence < 0.8) {
+                    nextSteps.push('Review categories that are over budget and adjust spending.')
+                }
+                if (emergencyFundProgress < 0.5) {
+                    nextSteps.push(`Add ${formatCurrency(Math.round(targetEmergencyFund * 0.1))} to your emergency fund.`)
+                }
+                if (hasDebt) {
+                    nextSteps.push('Prioritize paying off high-interest credit card debt.')
+                }
+                if (nextSteps.length === 0) {
+                    nextSteps.push('Great job! Maintain your current habits to keep your score high.')
+                }
             }
 
             setData({
@@ -148,6 +160,7 @@ export function useFinancialHealth() {
                 savingsRate,
                 budgetAdherence,
                 emergencyFundProgress,
+                hasEnoughData,
                 metrics: {
                     monthlyIncome: income,
                     monthlyExpenses: expenses,
