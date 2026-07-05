@@ -19,9 +19,6 @@ if (process.env.NODE_ENV !== "production") {
   // Stable fallback IPs in case of resolution failures
   let NEON_AUTH_IPS = ['18.142.78.60', '18.139.181.85', '13.228.33.46'];
   let NEON_DB_IPS = ['52.220.170.93', '13.228.184.177', '13.228.46.236'];
-  
-  let isResolvingAuth = false;
-  let isResolvingDb = false;
 
   // Resolve fresh IPs dynamically
   const resolveFreshIPs = (domain: string, fallback: string[]): Promise<string[]> => {
@@ -39,16 +36,12 @@ if (process.env.NODE_ENV !== "production") {
   };
 
   // Run the background resolutions immediately
-  isResolvingAuth = true;
   resolveFreshIPs(NEON_AUTH_DOMAIN, NEON_AUTH_IPS).then(ips => {
     NEON_AUTH_IPS = ips;
-    isResolvingAuth = false;
   });
 
-  isResolvingDb = true;
   resolveFreshIPs(NEON_DB_DOMAIN, NEON_DB_IPS).then(ips => {
     NEON_DB_IPS = ips;
-    isResolvingDb = false;
   });
 
   let authIpIndex = 0;
