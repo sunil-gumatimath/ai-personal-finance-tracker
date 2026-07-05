@@ -34,8 +34,9 @@ import type {
   NotificationActionResponse,
   OkResponse,
 } from "@/types";
+import { ApiError } from "@/lib/errors";
 
-type ApiError = { error: string };
+export { ApiError } from "@/lib/errors";
 
 let authToken: string | null = null;
 
@@ -62,8 +63,7 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as ApiError;
-    throw new Error(data.error || `Request failed (${res.status})`);
+    throw await ApiError.fromResponse(res);
   }
 
   return (await res.json()) as T;
