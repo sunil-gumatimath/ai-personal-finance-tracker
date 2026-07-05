@@ -1,19 +1,19 @@
 {
-    "installCommand": "npm install",
-    "buildCommand": "npm run build",
-
-    "rewrites": [
-        {
-            "source": "/api/:path*",
-            "destination": "/api/handler"
-        },
-        {
-            "source": "/neon-auth/auth/:path*",
-            "destination": "https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth/:path*"
-        },
-        {
-            "source": "/:path*",
-            "destination": "/index.html"
-        }
-    ]
+  "installCommand": "bun install",
+  "buildCommand": "bun run build",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/handler"
+    },
+    {
+      "source": "/neon-auth/auth/:path*",
+      "destination": "https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ]
 }
