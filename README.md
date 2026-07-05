@@ -51,7 +51,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 | Auth | Neon Auth client plus local session fallback for development resilience |
 | AI | Google Gemini, OpenRouter, React Markdown |
 | Charts | Recharts via Shadcn-style chart components |
-| Icons | Lucide React, Hugeicons React |
+| Icons | Lucide React |
 | Deployment | Vercel functions |
 
 ## Prerequisites
@@ -96,7 +96,7 @@ A premium, AI-powered personal finance management platform for tracking transact
    - Create a Neon project.
    - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql`, `002_debts_and_payments.sql`, `003_system_logs.sql`) in order in the Neon SQL editor.
    - Optionally run `database/seeds/default-categories.sql` to seed default categories.
-   - The loose `database/database-neon.sql` and `database/database-debts.sql` files are convenience snapshots; the migrations under `database/migrations/` are the canonical source of truth.
+   - The migrations under `database/migrations/` are the canonical source of truth.
    - Database tables are created empty; start adding your accounts and transactions in the UI.
 
 5. **AI setup:**
@@ -214,7 +214,7 @@ Notes:
 │   └── seeds/                 # Seed data (default categories)
 ├── .github/workflows/ci.yml   # CI: lint + typecheck (frontend + API) + build on push/PR
 ├── public/                    # Static assets: favicon, PWA icons
-└── scripts/                   # Dev helpers: fullstack runner, import fixer, PWA icon generator
+└── scripts/                   # Dev helpers: fullstack runner
 ```
 
 ## Database Schema
