@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { api, setApiAuthToken } from '@/lib/api'
+import { api } from '@/lib/api-client'
 import { authClient } from '@/lib/auth'
 
 // Define types for Auth
@@ -18,14 +18,8 @@ type User = {
     created_at: string;
 }
 
-type Session = {
-    user: User;
-    access_token: string;
-}
-
 interface AuthContextType {
     user: User | null
-    session: Session | null
     loading: boolean
     signIn: (email: string, password: string) => Promise<{ error: Error | null }>
     signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
@@ -40,36 +34,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
 
     const [user, setUser] = useState<User | null>(null)
-    const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
-
-    const buildSession = (authedUser: User, token: string): Session => ({
-        user: authedUser,
-        access_token: token,
-    })
 
     useEffect(() => {
         const restoreSession = async () => {
-            const token = localStorage.getItem('auth_token')
-            if (!token) {
-                setUser(null)
-                setSession(null)
-                setApiAuthToken(null)
-                setLoading(false)
-                return
-            }
+            // Remove bearer tokens left by older releases. Authentication now
+            // uses an HttpOnly same-site cookie that JavaScript cannot read.
+            localStorage.removeItem('auth_token')
 
             try {
-                setApiAuthToken(token)
                 const { user: authedUser } = await api.auth.me()
                 setUser(authedUser)
-                setSession(buildSession(authedUser, token))
             } catch (err) {
                 console.error('Failed to restore auth session:', err)
-                localStorage.removeItem('auth_token')
-                setApiAuthToken(null)
                 setUser(null)
-                setSession(null)
             } finally {
                 setLoading(false)
             }
@@ -81,14 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signIn = async (email: string, password: string) => {
         try {
             setLoading(true)
-            const { user: authedUser, token } = await api.auth.login(email, password)
-            if (!token) {
-                throw new Error('Login succeeded but no auth token was returned')
-            }
-            localStorage.setItem('auth_token', token)
-            setApiAuthToken(token)
+            const { user: authedUser } = await api.auth.login(email, password)
             setUser(authedUser)
-            setSession(buildSession(authedUser, token))
             return { error: null }
         } catch (err) {
             console.error('Sign in error:', err)
@@ -101,13 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signUp = async (email: string, password: string, fullName: string) => {
         try {
             setLoading(true)
-            const { user: authedUser, token } = await api.auth.signup(email, password, fullName)
-            if (token) {
-                localStorage.setItem('auth_token', token)
-                setApiAuthToken(token)
-                setUser(authedUser)
-                setSession(buildSession(authedUser, token))
-            }
+            const { user: authedUser } = await api.auth.signup(email, password, fullName)
+            setUser(authedUser)
 
             return { error: null }
         } catch (err) {
@@ -123,8 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await authClient.signOut().catch(() => undefined)
         localStorage.removeItem('auth_token')
         setUser(null)
-        setSession(null)
-        setApiAuthToken(null)
     }
 
     const resetPassword = async (email: string) => {
@@ -147,8 +112,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await authClient.signOut().catch(() => undefined)
             localStorage.removeItem('auth_token')
             setUser(null)
-            setSession(null)
-            setApiAuthToken(null)
             return { error: null }
         } catch (err) {
             console.error('Delete account error:', err)
@@ -183,7 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             setUser(updatedUser)
-            setSession(prev => prev ? { ...prev, user: updatedUser } : null)
 
             return { error: null }
         } catch (err) {
@@ -195,7 +157,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         <AuthContext.Provider
             value={{
                 user,
-                session,
                 loading,
                 signIn,
                 signUp,

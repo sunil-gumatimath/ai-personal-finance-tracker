@@ -14,12 +14,17 @@ import {
   currencyLocales,
 } from "@/types/preferences";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
+import { normalizePreferences } from "@/lib/preferences-storage";
+import type { ProviderApiKeyUpdate } from "@/types/api";
 
 interface PreferencesContextType {
   preferences: Preferences;
   setPreferences: React.Dispatch<React.SetStateAction<Preferences>>;
-  savePreferences: (newPreferences: Partial<Preferences>) => Promise<void>;
+  savePreferences: (
+    newPreferences: Partial<Preferences>,
+    apiKeys?: ProviderApiKeyUpdate,
+  ) => Promise<void>;
   formatCurrency: (amount: number) => string;
   getCurrencySymbol: () => string;
 }
@@ -33,7 +38,9 @@ const loadInitialPreferences = (): Preferences => {
     const saved = localStorage.getItem(PREFERENCES_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...defaultPreferences, ...parsed };
+      const normalized = normalizePreferences(parsed);
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(normalized));
+      return normalized;
     }
   } catch {
     // Failed to parse preferences, using defaults
@@ -50,14 +57,18 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   // Sync from Database on Load
   useEffect(() => {
     const fetchPreferences = async () => {
-      if (!user) return;
+      if (!user) {
+        localStorage.removeItem(PREFERENCES_KEY);
+        setPreferences(defaultPreferences);
+        return;
+      }
       try {
         const res = await api.profile.get();
-        const dbPrefs = (res.preferences as Preferences) || {};
+        const dbPrefs = normalizePreferences(res.preferences);
         if (res.currency && res.currency !== dbPrefs.currency) {
           dbPrefs.currency = res.currency;
         }
-        const merged = { ...defaultPreferences, ...dbPrefs };
+        const merged = normalizePreferences(dbPrefs);
         setPreferences(merged);
         localStorage.setItem(PREFERENCES_KEY, JSON.stringify(merged));
       } catch (error) {
@@ -73,7 +84,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       if (e.key === PREFERENCES_KEY && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          setPreferences({ ...defaultPreferences, ...parsed });
+          setPreferences(normalizePreferences(parsed));
         } catch {
           // Ignore parse errors
         }
@@ -85,24 +96,27 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   // Save preferences to localStorage and Database
   const savePreferences = useCallback(
-    async (newPreferences: Partial<Preferences>) => {
+    async (
+      newPreferences: Partial<Preferences>,
+      apiKeys?: ProviderApiKeyUpdate,
+    ) => {
+      const currentState = normalizePreferences({ ...preferences, ...newPreferences });
       setPreferences((prev) => {
-        const updated = { ...prev, ...newPreferences };
+        const updated = normalizePreferences({ ...prev, ...newPreferences });
         localStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated));
         return updated;
       });
 
       if (user) {
         try {
-          // Get current state to merge - we rely on the state update inside setPreferences
-          // but since it's async, we reconstruct the expected state here for the DB call.
-          // Best effort sync.
-          const currentState = { ...preferences, ...newPreferences };
-
-          await api.profile.update({
+          const response = await api.profile.update({
             preferences: currentState,
+            apiKeys,
             currency: newPreferences.currency,
           });
+          const serverState = normalizePreferences(response.preferences);
+          setPreferences(serverState);
+          localStorage.setItem(PREFERENCES_KEY, JSON.stringify(serverState));
         } catch (error) {
           console.error("Failed to save preferences to DB:", error);
           throw error;
