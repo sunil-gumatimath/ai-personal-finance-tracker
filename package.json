@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "overrides": {
+    "caniuse-lite": "^1.0.30001803",
+    "baseline-browser-mapping": "^2.10.42"
+  },
   "scripts": {
     "dev": "bun scripts/dev.ts",
     "api": "bun --watch api/server.ts",
