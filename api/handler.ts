@@ -1,13 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import type { ApiRequest, ApiResponse } from './_lib/utils/types.js'
-import { checkRateLimit } from './_lib/middleware/rate-limiter.js'
+import type { ApiRequest, ApiResponse } from './utils/types.js'
+import { checkRateLimit } from './middleware/rate-limit.js'
 import {
   buildResponseHeaders,
   isRateLimitedPath,
   resolveCorsOrigin,
-} from './_lib/server/config.js'
-import { resolveRoute } from './_lib/server/routes.js'
-import { logEvent } from './_lib/services/logger.js'
+} from './config/server-config.js'
+import { resolveRoute } from './routes/index.js'
+import { logEvent } from './services/audit-log.service.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = new URL(req.url!, `https://${req.headers.host || 'localhost'}`)
@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       (req.headers['x-real-ip'] as string) ||
       'unknown'
     const isAuth = pathname.startsWith('/api/auth')
-    const { allowed, retryAfter } = checkRateLimit(clientId, pathname, isAuth)
+    const { allowed, retryAfter } = await checkRateLimit(clientId, pathname, isAuth)
     if (!allowed) {
       res.setHeader('Retry-After', String(retryAfter ?? 60))
       res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' })

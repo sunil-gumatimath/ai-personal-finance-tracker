@@ -8,12 +8,13 @@
         "skipLibCheck": true,
         "resolveJsonModule": true,
         "declaration": false,
-        "noEmit": true
+        "noEmit": true,
+        "types": ["bun"]
     },
     "include": [
         "./**/*.ts"
     ],
     "exclude": [
-        "_server.ts"
+        "server.ts"
     ]
 }
