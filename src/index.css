@@ -302,6 +302,49 @@
   color-scheme: dark;
 }
 
+/* ============================================
+   EMERALD THEME (Light)
+   ============================================ */
+.emerald {
+  --background: hsl(150 30% 98%);
+  --foreground: hsl(158 35% 12%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(158 35% 12%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(158 35% 12%);
+  --primary: hsl(160 84% 28%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(152 28% 92%);
+  --secondary-foreground: hsl(158 40% 18%);
+  --muted: hsl(150 20% 94%);
+  --muted-foreground: hsl(158 12% 38%);
+  --accent: hsl(150 35% 90%);
+  --accent-foreground: hsl(158 40% 18%);
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(154 18% 84%);
+  --input: hsl(154 18% 84%);
+  --ring: hsl(160 84% 28%);
+  --chart-1: hsl(160 70% 35%);
+  --chart-2: hsl(205 75% 45%);
+  --chart-3: hsl(38 92% 50%);
+  --chart-4: hsl(270 65% 55%);
+  --chart-5: hsl(345 75% 52%);
+  --sidebar: hsl(152 30% 96%);
+  --sidebar-foreground: hsl(158 35% 16%);
+  --sidebar-primary: hsl(160 84% 28%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(150 35% 90%);
+  --sidebar-accent-foreground: hsl(158 40% 18%);
+  --sidebar-border: hsl(154 18% 84%);
+  --sidebar-ring: hsl(160 84% 28%);
+  --income: oklch(0.52 0.15 155);
+  --expense: oklch(0.55 0.22 25);
+  --savings: oklch(0.52 0.18 245);
+  --investment: oklch(0.52 0.18 300);
+  color-scheme: light;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
