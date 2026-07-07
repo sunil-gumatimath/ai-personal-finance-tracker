@@ -9,7 +9,7 @@ import {
     AICoach,
     FinancialHealthScore
 } from '@/components/dashboard'
-import { api } from '@/lib/api'
+import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { Transaction, DashboardStats, SpendingByCategory, MonthlyTrend, Category } from '@/types'

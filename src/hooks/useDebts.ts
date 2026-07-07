@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { Debt, DebtPayment } from "@/types";

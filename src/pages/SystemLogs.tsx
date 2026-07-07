@@ -43,7 +43,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
-import { api } from '@/lib/api'
+import { api } from '@/lib/api-client'
 import {
     formatAction,
     formatResource,

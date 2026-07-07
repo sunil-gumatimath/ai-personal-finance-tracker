@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, Link } from 'react-router-dom'
-import { Bell, ChevronRight, LogOut, Settings, User } from 'lucide-react'
+import { ChevronRight, LogOut, Settings, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -86,16 +86,6 @@ export function Header() {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
-                {/* Notifications */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="relative"
-                    aria-label="Notifications"
-                >
-                    <Bell className="h-5 w-5" />
-                    <span className="sr-only">Notifications</span>
-                </Button>
 
                 {/* Theme Toggle */}
                 <ThemeToggle />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { api } from '@/lib/api'
+import { api } from '@/lib/api-client'
 
 export interface Insight {
     id: string

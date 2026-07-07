@@ -30,7 +30,6 @@ export interface AuthUser {
 
 export interface AuthResponse {
     user: AuthUser
-    token?: string | null
 }
 
 export interface LogoutResponse {
@@ -46,10 +45,15 @@ export interface UserPreferences {
     emailAlerts?: boolean
     budgetAlerts?: boolean
     aiProvider?: string
-    geminiApiKey?: string
+    geminiApiKeyConfigured?: boolean
     geminiModel?: string
-    openrouterApiKey?: string
+    openrouterApiKeyConfigured?: boolean
     openrouterModel?: string
+}
+
+export interface ProviderApiKeyUpdate {
+    geminiApiKey?: string | null
+    openrouterApiKey?: string | null
 }
 
 export interface ProfileResponse {
@@ -65,6 +69,7 @@ export interface ProfileUpdateResponse {
 
 export interface ProfileUpdatePayload {
     preferences?: UserPreferences
+    apiKeys?: ProviderApiKeyUpdate
     currency?: string
     full_name?: string
     avatar_url?: string | null

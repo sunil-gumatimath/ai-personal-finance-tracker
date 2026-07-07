@@ -5,9 +5,9 @@ export interface Preferences {
     emailAlerts: boolean
     budgetAlerts: boolean
     aiProvider?: 'gemini' | 'openrouter'
-    geminiApiKey?: string
+    geminiApiKeyConfigured: boolean
     geminiModel?: string
-    openrouterApiKey?: string
+    openrouterApiKeyConfigured: boolean
     openrouterModel?: string
 }
 
@@ -20,9 +20,9 @@ export const defaultPreferences: Preferences = {
     emailAlerts: true,
     budgetAlerts: true,
     aiProvider: 'gemini',
-    geminiApiKey: '',
+    geminiApiKeyConfigured: false,
     geminiModel: 'gemini-3.5-flash',
-    openrouterApiKey: '',
+    openrouterApiKeyConfigured: false,
     openrouterModel: 'openrouter/free',
 }
 

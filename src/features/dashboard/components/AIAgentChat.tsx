@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import Markdown from "react-markdown";
 
 interface Message {
@@ -154,9 +154,7 @@ export function AIAgentChat() {
         userMessage,
         {
           aiProvider: preferences.aiProvider,
-          geminiApiKey: preferences.geminiApiKey,
           geminiModel: preferences.geminiModel,
-          openrouterApiKey: preferences.openrouterApiKey,
           openrouterModel: preferences.openrouterModel,
         },
         history,

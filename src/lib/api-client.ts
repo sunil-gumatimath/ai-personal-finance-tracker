@@ -38,12 +38,6 @@ import { ApiError } from "@/lib/errors";
 
 export { ApiError } from "@/lib/errors";
 
-let authToken: string | null = null;
-
-export function setApiAuthToken(token: string | null) {
-  authToken = token;
-}
-
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
@@ -52,10 +46,6 @@ export async function apiFetch<T>(
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  if (authToken && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${authToken}`);
-  }
-
   const res = await fetch(path, {
     ...options,
     headers,
@@ -252,9 +242,7 @@ export const api = {
       message: string,
       aiPreferences?: {
         aiProvider?: string;
-        geminiApiKey?: string;
         geminiModel?: string;
-        openrouterApiKey?: string;
         openrouterModel?: string;
       },
       history?: Array<{ role: "user" | "assistant"; content: string }>,

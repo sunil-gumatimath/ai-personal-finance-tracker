@@ -5,9 +5,6 @@ import {
   Shield,
   Palette,
   LogOut,
-  Moon,
-  Sun,
-  Monitor,
   Brain,
   ChevronRight,
   Globe,
@@ -38,6 +35,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 
 import { cn } from "@/lib/utils";
+import { THEME_OPTIONS } from "@/components/system/themes";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,19 +51,18 @@ import {
 function ThemeSelector() {
   const { theme, setTheme } = useTheme();
 
-  const themes = [
-    { value: "light", label: "Light", icon: Sun },
-    { value: "dark", label: "Dark", icon: Moon },
-    { value: "system", label: "System", icon: Monitor },
-  ];
-
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {themes.map(({ value, label, icon: Icon }) => (
+    <div
+      className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+      role="group"
+      aria-label="Theme"
+    >
+      {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
         <button
           key={value}
           type="button"
           onClick={() => setTheme(value)}
+          aria-pressed={theme === value}
           className={cn(
             "flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all hover:bg-muted/50 cursor-pointer",
             theme === value
@@ -124,26 +121,24 @@ export function Settings() {
 
   const [aiSettings, setAiSettings] = useState({
     aiProvider: preferences.aiProvider || ("gemini" as "gemini" | "openrouter"),
-    geminiApiKey: preferences.geminiApiKey || "",
+    geminiApiKey: "",
     geminiModel: preferences.geminiModel || "gemini-3.5-flash",
-    openrouterApiKey: preferences.openrouterApiKey || "",
+    openrouterApiKey: "",
     openrouterModel: preferences.openrouterModel || "openrouter/free",
   });
 
   // Sync AI settings when preferences load from DB
   useEffect(() => {
-    setAiSettings({
+    setAiSettings((prev) => ({
       aiProvider: preferences.aiProvider || "gemini",
-      geminiApiKey: preferences.geminiApiKey || "",
+      geminiApiKey: prev.geminiApiKey,
       geminiModel: preferences.geminiModel || "gemini-3.5-flash",
-      openrouterApiKey: preferences.openrouterApiKey || "",
+      openrouterApiKey: prev.openrouterApiKey,
       openrouterModel: preferences.openrouterModel || "openrouter/free",
-    });
+    }));
   }, [
     preferences.aiProvider,
-    preferences.geminiApiKey,
     preferences.geminiModel,
-    preferences.openrouterApiKey,
     preferences.openrouterModel,
   ]);
 
@@ -170,22 +165,26 @@ export function Settings() {
       provider === "openrouter"
         ? aiSettings.openrouterApiKey
         : aiSettings.geminiApiKey;
+    const activeKeyConfigured =
+      provider === "openrouter"
+        ? preferences.openrouterApiKeyConfigured
+        : preferences.geminiApiKeyConfigured;
 
-    if (!activeKey?.trim()) {
+    if (!activeKey?.trim() && !activeKeyConfigured) {
       toast.error(
         `${provider === "openrouter" ? "OpenRouter" : "Gemini"} API key is required`,
       );
       return;
     }
 
-    if (provider === "openrouter" && !activeKey.trim().startsWith("sk-or-")) {
+    if (provider === "openrouter" && activeKey.trim() && !activeKey.trim().startsWith("sk-or-")) {
       toast.error(
         "OpenRouter API keys usually start with sk-or-. Please paste your OpenRouter key, not a Gemini key.",
       );
       return;
     }
 
-    if (provider === "gemini" && !activeKey.trim().startsWith("AIza")) {
+    if (provider === "gemini" && activeKey.trim() && !activeKey.trim().startsWith("AIza")) {
       toast.error(
         "Gemini API keys usually start with AIza. Please paste your Gemini key, not an OpenRouter key.",
       );
@@ -194,12 +193,25 @@ export function Settings() {
 
     setAiSaving(true);
     try {
+      const apiKeys: {
+        geminiApiKey?: string;
+        openrouterApiKey?: string;
+      } = {};
+      const geminiKey = aiSettings.geminiApiKey.trim();
+      const openrouterKey = aiSettings.openrouterApiKey.trim();
+      if (geminiKey) apiKeys.geminiApiKey = geminiKey;
+      if (openrouterKey) apiKeys.openrouterApiKey = openrouterKey;
+
       await savePreferences({
-        ...aiSettings,
-        geminiApiKey: aiSettings.geminiApiKey.trim(),
-        openrouterApiKey: aiSettings.openrouterApiKey.trim(),
+        aiProvider: provider,
+        geminiModel: aiSettings.geminiModel.trim() || "gemini-3.5-flash",
         openrouterModel: aiSettings.openrouterModel.trim() || "openrouter/free",
-      });
+      }, apiKeys);
+      setAiSettings((prev) => ({
+        ...prev,
+        geminiApiKey: "",
+        openrouterApiKey: "",
+      }));
       toast.success("AI settings saved successfully");
     } catch (error) {
       console.error("Failed to save AI settings:", error);
@@ -444,9 +456,15 @@ export function Settings() {
                       id="aiApiKey"
                       type={showKey ? "text" : "password"}
                       placeholder={
-                        aiSettings.aiProvider === "openrouter"
-                          ? "sk-or-v1-..."
-                          : "AIza..."
+                        (
+                          aiSettings.aiProvider === "openrouter"
+                            ? preferences.openrouterApiKeyConfigured
+                            : preferences.geminiApiKeyConfigured
+                        )
+                          ? "Configured — enter a new key to replace"
+                          : aiSettings.aiProvider === "openrouter"
+                            ? "sk-or-v1-..."
+                            : "AIza..."
                       }
                       value={
                         aiSettings.aiProvider === "openrouter"
@@ -481,6 +499,15 @@ export function Settings() {
                       )}
                     </button>
                   </div>
+                  <p className="text-[10px] text-muted-foreground leading-normal">
+                    {(
+                      aiSettings.aiProvider === "openrouter"
+                        ? preferences.openrouterApiKeyConfigured
+                        : preferences.geminiApiKeyConfigured
+                    )
+                      ? "A key is saved server-side. This field stays empty so the key is not stored in your browser."
+                      : "No key saved yet. It will be encrypted and stored server-side."}
+                  </p>
                 </div>
 
                 {/* Model — switches based on provider */}
