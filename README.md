@@ -48,7 +48,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 | Styling | Tailwind CSS 4, Radix UI / Shadcn-style components |
 | State | React Context API and custom hooks |
 | Database | Neon PostgreSQL with `@neondatabase/serverless` |
-| Auth | Neon Auth client plus local session fallback for development resilience |
+| Auth | Neon Auth with HttpOnly session cookies |
 | AI | Google Gemini, OpenRouter, React Markdown |
 | Charts | Recharts via Shadcn-style chart components |
 | Icons | Lucide React |
@@ -82,10 +82,14 @@ A premium, AI-powered personal finance management platform for tracking transact
    # Production / persistent database
    NEON_DATABASE_URL=your_neon_database_url
    AUTH_SECRET=your_long_random_secret
+   API_KEY_ENCRYPTION_SECRET=your_long_random_api_key_encryption_secret
 
    # Optional, if your Neon Auth origin differs from the configured fallback
    NEON_AUTH_URL=your_neon_auth_url
    VITE_NEON_AUTH_URL=your_neon_auth_url
+
+   # Optional local development flags
+   ALLOW_INSECURE_COOKIES=true
 
    # Local development without Neon
    USE_MOCK_DB=true
@@ -94,7 +98,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 4. **Database setup for Neon:**
 
    - Create a Neon project.
-   - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql`, `002_debts_and_payments.sql`, `003_system_logs.sql`) in order in the Neon SQL editor.
+   - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql`, `002_debts_and_payments.sql`, `003_system_logs.sql`, `004_security_hardening.sql`) in order in the Neon SQL editor.
    - Optionally run `database/seeds/default-categories.sql` to seed default categories.
    - The migrations under `database/migrations/` are the canonical source of truth.
    - Database tables are created empty; start adding your accounts and transactions in the UI.
@@ -103,7 +107,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 
    - Gemini: create a key in [Google AI Studio](https://aistudio.google.com).
    - OpenRouter: create a key in [OpenRouter](https://openrouter.ai/keys).
-   - Add the key inside **Settings > Preferences > AI Integration**. Keys are saved in your profile preferences rather than hardcoded in the source.
+   - Add the key inside **Settings > Preferences > AI Integration**. Keys are encrypted and stored server-side; the browser only receives configured/not-configured flags.
 
 6. **Start local fullstack development:**
 
@@ -123,6 +127,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 | `bun run typecheck` | Run TypeScript type checking for the frontend |
 | `bun run typecheck:api` | Run TypeScript type checking for the API |
 | `bun run lint` | Run ESLint across the whole project |
+| `bun run test` | Run Bun unit tests |
 | `bun run build` | Typecheck and build for production |
 | `bun run preview` | Preview the production Vite build |
 
@@ -163,59 +168,73 @@ AI features require a valid provider key. Add it in **Settings > Preferences > A
 3. Configure environment variables:
    - `NEON_DATABASE_URL`
    - `AUTH_SECRET`
+   - `API_KEY_ENCRYPTION_SECRET`
    - `NEON_AUTH_URL` if needed by your Neon Auth project
    - Optional provider-level AI keys only if you later add global server-side key support. The current UI is designed around per-user keys in Settings.
 4. Deploy.
 
 Notes:
 - `vercel.json` is configured to use `bun install` and `bun run build`, matching the local toolchain and `bun.lock`. API requests under `/api/*` are routed to a single Vercel serverless function at `api/handler.ts`.
-- `api/handler.ts` and the local `api/_server.ts` share the same route registry, security headers, CORS allowlist, and rate-limit logic via `api/_lib/server/`, so runtime behavior stays consistent between local development and production.
+- `api/handler.ts` and the local `api/server.ts` share the same route registry, security headers, CORS allowlist, and rate-limit logic via `api/config/` and `api/routes/`, so runtime behavior stays consistent between local development and production.
 - A lightweight `GET /api/health` liveness probe is available for uptime monitoring and deploy checks.
 
 ## Project Structure
 
 ```text
 ├── src/
+│   ├── app/                   # Frontend entrypoint and root router (main.tsx, App.tsx)
 │   ├── components/
-│   │   ├── accounts/          # Account management: cards, modals, delete confirmation
-│   │   ├── dashboard/         # Dashboard widgets: stats, charts, AI coach, health score
-│   │   ├── debts/             # Debt tracking: cards, modals, payoff ring, strategy planner
+│   │   ├── accounts/          # Compatibility barrels re-exporting src/features/accounts/components
+│   │   ├── dashboard/         # Compatibility barrels re-exporting src/features/dashboard/components
+│   │   ├── debts/             # Compatibility barrels re-exporting src/features/debts/components
 │   │   ├── layout/            # App shell: sidebar, header, main layout wrapper
 │   │   ├── system/            # App-level components: ErrorBoundary, Logo, theme provider/toggle
-│   │   └── ui/                # Pure shadcn primitives (button, card, dialog, table, etc.)
-│   ├── contexts/              # React contexts: authentication and global user preferences
+│   │   └── ui/                # Shadcn/Radix primitives (button, card, dialog, table, etc.)
+│   ├── contexts/              # React contexts: authentication (HttpOnly cookie) and global preferences
+│   ├── features/              # Feature modules with colocated components
+│   │   ├── accounts/components/   # AccountCard, AccountModal, DeleteConfirmation
+│   │   ├── dashboard/components/  # StatCard, charts, AI coach/chat, health score
+│   │   └── debts/components/      # DebtCard, modals, payoff ring, strategy planner
 │   ├── hooks/                 # Custom hooks: financial health, insights, accounts, debts, sidebar
 │   ├── lib/                   # Frontend utilities
-│   │   ├── api.ts             # Typed API client (throws ApiError on HTTP failures)
+│   │   ├── api-client.ts      # Typed API client (throws ApiError on HTTP failures)
 │   │   ├── auth.ts            # Neon Auth client setup
 │   │   ├── config.ts          # Centralized import.meta.env access and env helpers
 │   │   ├── errors.ts          # ApiError class with isAuthError/isRateLimited/isRetryable
-│   │   ├── validate.ts        # Zod schemas for API payloads (login, account, transaction, etc.)
+│   │   ├── preferences-storage.ts # Preference persistence helpers
+│   │   ├── validate.ts        # Validation helpers for API payloads
 │   │   ├── log-formatter.ts   # System log display formatting
 │   │   └── utils.ts           # cn() and shared helpers
 │   ├── pages/                 # Route pages: dashboard, transactions, budgets, goals, debts, etc.
+│   ├── tests/                 # Frontend test helpers
 │   ├── types/                 # TypeScript type definitions: API, database, preferences
-│   ├── App.tsx                # Root React component with routing
-│   ├── index.css              # Global styles and Tailwind directives
-│   └── main.tsx               # Frontend entrypoint
-├── api/                       # Bun & Vercel API backend
-│   ├── _lib/
-│   │   ├── handlers/          # Route handlers: auth, accounts, transactions, budgets, goals, debts, health
-│   │   │   └── ai/            # AI handlers: chat, insights, query processor
-│   │   ├── middleware/        # Sliding-window rate limiter
-│   │   ├── server/            # Shared server layer: config (CORS/security headers), route registry
-│   │   ├── services/          # DB adapters, AI providers (Gemini, OpenRouter), logger, auth, sessions
-│   │   └── utils/             # Crypto helpers, default categories, DNS bypass, shared types
+│   └── index.css              # Global styles and Tailwind directives
+├── api/                       # Bun & Vercel API backend (flat layout; no _lib/ prefix)
+│   ├── config/                # Runtime configuration, CORS allowlist, security headers
+│   ├── domain/                # Pure domain rules and finance validation
+│   ├── errors/                # AppError and API error helpers
+│   ├── middleware/            # Sliding-window + DB-backed rate limiter
+│   ├── repositories/          # Data access layer and query builder
+│   ├── routes/                # HTTP route modules and route registry (index.ts)
+│   ├── services/              # Business logic, ownership checks, auth, audit log, AI providers
+│   ├── tests/                 # API test support
+│   ├── utils/                 # Crypto, response, query-processor, DNS bypass, default categories, types
 │   ├── handler.ts             # Vercel serverless function entrypoint
-│   ├── _server.ts             # Local development Bun HTTP server shim
+│   ├── server.ts              # Local Bun HTTP server shim (also serves /api/ws-logs)
 │   └── tsconfig.json          # API-specific TypeScript configuration
 ├── database/                  # Neon PostgreSQL schema and data
 │   ├── migrations/            # Versioned migrations (canonical source of truth)
+│   ├── scripts/               # Database helper scripts
 │   └── seeds/                 # Seed data (default categories)
-├── .github/workflows/ci.yml   # CI: lint + typecheck (frontend + API) + build on push/PR
+├── docs/                      # Additional project documentation
+├── .github/workflows/ci.yml   # CI: lint + typecheck (frontend + API) + test + build on push/PR
 ├── public/                    # Static assets: favicon, PWA icons
-└── scripts/                   # Dev helpers: fullstack runner
+└── scripts/                   # Dev helpers: fullstack runner (dev.ts)
 ```
+
+> **Layout note:** `api/routes/*` are the controllers; there is no separate `api/controllers/`
+> or `api/schemas/` layer (those directories were removed as empty scaffolding). `src/components/{accounts,dashboard,debts}`
+> are thin re-export barrels — the real implementations live in `src/features/*/components`.
 
 ## Database Schema
 
@@ -233,9 +252,12 @@ The app uses Neon PostgreSQL with these primary tables:
 | `debt_payments` | Debt payment history with principal and interest breakdown |
 | `ai_insights` | Persisted AI-generated anomalies, coaching tips, and kudos |
 | `system_logs` | Audit log of user actions, errors, and deployment events with severity and metadata |
+| `rate_limits` | Sliding-window rate-limit counters (DB-backed limiter) |
 | `users` | Authentication user records |
 
-All user-owned tables are designed around user isolation through Row Level Security policies and user-scoped API queries.
+User isolation is enforced primarily through user-scoped API queries and `ownership.service.ts`
+reference checks (see `security_best_practices_report.md`, SEC-002 / SEC-010). No PostgreSQL Row
+Level Security policies are defined yet; tenant isolation depends entirely on the API layer.
 
 ## Support
 

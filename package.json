@@ -8,10 +8,11 @@
   },
   "scripts": {
     "dev": "bun scripts/dev.ts",
-    "api": "bun --watch api/_server.ts",
+    "api": "bun --watch api/server.ts",
     "vite": "bunx --bun vite",
-    "build": "tsc -b && vite build",
+    "build": "bunx tsc -b && bunx vite build",
     "lint": "bunx eslint .",
+    "test": "bun test",
     "preview": "bunx --bun vite preview",
     "typecheck": "bunx tsc --noEmit",
     "typecheck:api": "cd api && bunx tsc --noEmit"

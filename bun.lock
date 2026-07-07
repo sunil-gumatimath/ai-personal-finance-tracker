@@ -6,7 +6,6 @@
       "name": "personal-finance-tracker",
       "dependencies": {
         "@google/generative-ai": "^0.24.1",
-        "@hugeicons/react": "^0.3.0",
         "@neondatabase/auth": "^0.3.0-beta",
         "@neondatabase/serverless": "^1.1.0",
         "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -366,8 +365,6 @@
     "@hexagon/base64": ["@hexagon/base64@1.1.28", "", {}, ""],
 
     "@hookform/resolvers": ["@hookform/resolvers@5.2.2", "", { "dependencies": { "@standard-schema/utils": "^0.3.0" }, "peerDependencies": { "react-hook-form": "^7.55.0" } }, ""],
-
-    "@hugeicons/react": ["@hugeicons/react@0.3.4", "", { "peerDependencies": { "react": ">=16.0.0" } }, ""],
 
     "@humanfs/core": ["@humanfs/core@0.19.1", "", {}, ""],
 

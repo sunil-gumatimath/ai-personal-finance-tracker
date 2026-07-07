@@ -26,7 +26,7 @@ try {
     // Port is free or commands failed (meaning no process was found listening)
 }
 
-const api = spawn("bun", ["--watch", "api/_server.ts"], {
+const api = spawn("bun", ["--watch", "api/server.ts"], {
     stdio: "inherit",
     shell: true,
     env: { ...process.env, PORT: String(PORT) }

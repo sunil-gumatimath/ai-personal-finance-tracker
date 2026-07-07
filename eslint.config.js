@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'node_modules', '.agents', 'coverage']),
+  globalIgnores(['dist', 'node_modules', '.agents', 'coverage', '.kimchi']),
 
   // Base rules for the whole codebase (frontend + API + scripts + tests)
   {
