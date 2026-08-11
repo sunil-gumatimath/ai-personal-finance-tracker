@@ -1,0 +1,105 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.*
+
+# Bun
+bun-debug.log*
+bun.lockb
+
+# Lock files from other package managers
+# This project uses bun.lock as the canonical lockfile.
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+dist-ssr/
+build/
+out/
+.vite/
+
+# TypeScript / framework caches
+*.tsbuildinfo
+node_modules/.tmp/
+.cache/
+.eslintcache
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Test and coverage output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+*.lcov
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# Local deployment and tool state
+.vercel/
+.netlify/
+.wrangler/
+.turbo/
+.kimchi/
+.opencode/
+
+# Local generated files and temporary API/debug output
+output/
+tmp/
+temp/
+*.local
+create-test-token.js
+cookies.txt
+*.network-request
+*.network-response
+test-*.json
+!test-ai-chat.md
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Agent-local files
+.agents/
+skills.md
+skills-lock.json
+
+# Local scratch/test directories
+api/tests/
+database/scripts/
+src/tests/
+
+# Editor local history and merge artifacts
+.history/
+*.orig
+*.rej

@@ -1,0 +1,15 @@
+# Gitleaks configuration for the Personal Finance Tracker.
+#
+# The local env files below contain real credentials (Neon database URL,
+# KiloCode API key, JWT secret) but are gitignored and never committed —
+# see .gitignore and git check-ignore. Only .env.example (placeholders) is
+# tracked. Allowlisting them keeps the secret scanner focused on code paths
+# that actually reach the repository.
+title = "Personal Finance Tracker gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local-only env files that never reach git"
+paths = ['''^\.env$''', '''^\.vercel/\.env\.development\.local$''']
