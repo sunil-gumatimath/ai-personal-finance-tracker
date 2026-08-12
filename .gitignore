@@ -19,6 +19,7 @@ dist-ssr/
 build/
 out/
 .vite/
+dev-dist/
 
 # TypeScript / framework caches
 *.tsbuildinfo
@@ -65,6 +66,10 @@ pnpm-debug.log*
 output/
 tmp/
 temp/
+stats.html
+*.sqlite
+*.sqlite3
+*.db
 *.local
 create-test-token.js
 cookies.txt
