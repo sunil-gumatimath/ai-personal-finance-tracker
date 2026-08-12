@@ -75,7 +75,7 @@ function DropdownMenuItem({
   )
 }
 
-function DropdownMenuItem({
+function DropdownMenuLabel({
   className,
   inset,
   ...props
