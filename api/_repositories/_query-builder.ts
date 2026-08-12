@@ -86,7 +86,7 @@ const MAX_LENGTHS: Record<string, Record<string, number>> = {
 /**
  * Validates that input string values do not exceed maximum lengths
  */
-export function validateInputLengths(
+function validateInputLengths(
 	table: string,
 	data: Record<string, unknown>,
 ): void {
@@ -108,7 +108,7 @@ export function validateInputLengths(
 /**
  * Validates that column names are allowed for the given table
  */
-export function validateColumns(table: string, columns: string[]): string[] {
+function validateColumns(table: string, columns: string[]): string[] {
 	const allowed = ALLOWED_COLUMNS[table];
 	if (!allowed) {
 		throw new Error("Invalid request");

@@ -5,7 +5,7 @@
  * parse is rejected when the shape is unusable).
  */
 
-export type ParsedTransactionType = "income" | "expense" | "transfer";
+type ParsedTransactionType = "income" | "expense" | "transfer";
 
 export interface ParsedTransaction {
 	type: ParsedTransactionType;

@@ -17,7 +17,7 @@ function escapeCSVField(field: string | number | null | undefined): string {
 }
 
 /** Serializes transactions to CSV (with BOM for Excel UTF-8 compatibility). */
-export function buildTransactionsCsv(transactions: Transaction[]): string {
+function buildTransactionsCsv(transactions: Transaction[]): string {
 	const headers = [
 		"Type",
 		"Description",

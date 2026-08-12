@@ -1,7 +1,7 @@
 import { createAuthClient } from "@neondatabase/auth";
 import { queryOne } from "../_repositories/db.js";
 
-export const SESSION_COOKIE_NAME = "pft_session";
+const SESSION_COOKIE_NAME = "pft_session";
 
 /**
  * Neon Auth client initialized with the URL from environment variables.
@@ -67,23 +67,6 @@ export function getAuthOrigin(req?: {
     return `${url.protocol}//${url.host}`;
   } catch {
     return "https://personal-finance-tracker-ted.vercel.app";
-  }
-}
-
-export function getAuthUrlDiagnostics() {
-  try {
-    const url = new URL(authUrl);
-    return {
-      host: url.host,
-      path: url.pathname,
-      source: process.env.NEON_AUTH_URL ? "NEON_AUTH_URL" : "fallback",
-    };
-  } catch {
-    return {
-      host: "invalid",
-      path: "invalid",
-      source: process.env.NEON_AUTH_URL ? "NEON_AUTH_URL" : "fallback",
-    };
   }
 }
 
@@ -232,24 +215,4 @@ export async function getAuthedUserId(req: {
   }
 
   return null;
-}
-
-export type AuthedUser = {
-  id: string;
-  email: string;
-  full_name: string;
-  avatar_url: string | null;
-  created_at: string;
-};
-
-export async function getAuthedUser(req: {
-  headers?: Record<string, string | string[] | undefined>;
-}): Promise<AuthedUser | null> {
-  const userId = await getAuthedUserId(req);
-  if (!userId) return null;
-
-  return queryOne<AuthedUser>(
-    "SELECT id, email, full_name, avatar_url, created_at FROM users WHERE id = $1",
-    [userId],
-  );
 }

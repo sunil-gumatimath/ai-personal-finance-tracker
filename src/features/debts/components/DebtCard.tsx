@@ -28,7 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Debt, DebtPayment } from "@/types";
 
-export const debtTypes = [
+const debtTypes = [
   { value: "mortgage", label: "Mortgage", icon: Home },
   { value: "car_loan", label: "Car Loan", icon: Car },
   { value: "student_loan", label: "Student Loan", icon: GraduationCap },

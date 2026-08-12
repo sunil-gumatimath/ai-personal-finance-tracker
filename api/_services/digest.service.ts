@@ -275,7 +275,7 @@ Rules:
  * digest stays consistent with the app's no-emoji style rules even when the
  * model ignores them.
  */
-export function stripEmojis(text: string): string {
+function stripEmojis(text: string): string {
 	return text
 		.replace(/[\u{1F000}-\u{1FAFF}]/gu, "")
 		.replace(/[\u{2600}-\u{27BF}]/gu, "")

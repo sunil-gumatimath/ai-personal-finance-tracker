@@ -6,7 +6,7 @@
  * logic from drifting between the two runtimes.
  */
 
-export const SECURITY_HEADERS: Record<string, string> = {
+const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "X-XSS-Protection": "1; mode=block",
@@ -14,7 +14,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
 };
 
-export const HSTS_HEADER: Record<string, string> =
+const HSTS_HEADER: Record<string, string> =
   process.env.NODE_ENV === "production"
     ? {
         "Strict-Transport-Security":
@@ -26,27 +26,20 @@ export const HSTS_HEADER: Record<string, string> =
  * Origins permitted to make credentialed cross-origin requests.
  * In production the deployed Vercel URL should be in here.
  */
-export const ALLOWED_ORIGINS = [
+const ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:3000",
   "https://personal-finance-tracker-ted.vercel.app",
 ];
 
 /** Endpoints with stricter rate limits. Auth routes are limited inside auth.ts. */
-export const RATE_LIMITED_PREFIXES = ["/api/ai/chat", "/api/ai/insights"];
+const RATE_LIMITED_PREFIXES = ["/api/ai/chat", "/api/ai/insights"];
 
 /**
  * Fallback currency used when a profile has none set. Kept in one place so
  * the AI routes never disagree about formatting defaults.
  */
 export const DEFAULT_CURRENCY = "INR";
-
-export const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "",
-  "Access-Control-Allow-Credentials": "true",
-  "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Cookie, Authorization",
-};
 
 /** Resolve an allowed CORS origin or reject the request. */
 export function resolveCorsOrigin(

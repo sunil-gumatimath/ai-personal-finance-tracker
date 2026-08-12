@@ -56,8 +56,3 @@ export class ApiError extends Error {
     return new ApiError(message, { status: res.status, code, details })
   }
 }
-
-/** True if the given value was thrown as an ApiError. */
-export function isApiError(value: unknown): value is ApiError {
-  return value instanceof ApiError
-}

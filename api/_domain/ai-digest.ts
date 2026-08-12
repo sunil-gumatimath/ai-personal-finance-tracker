@@ -16,7 +16,7 @@ export interface DigestProse {
 	debt_callouts: string[];
 }
 
-export interface DigestBudgetStat {
+interface DigestBudgetStat {
 	category: string;
 	spent: number;
 	limit: number;

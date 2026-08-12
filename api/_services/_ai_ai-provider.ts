@@ -6,13 +6,10 @@ import {
 } from "./_ai_kilocode.js";
 
 export {
-	FREE_MODELS,
-	DEFAULT_MODEL,
 	getFreeModelIds,
 	isFreeModel,
 	KiloCodeApiError,
 } from "./_ai_kilocode.js";
-export type { FreeModel } from "./_ai_kilocode.js";
 
 export interface AIProviderPreferences {
 	aiProvider?: string;

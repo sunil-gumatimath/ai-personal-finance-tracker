@@ -4,7 +4,6 @@ import { neon } from '@neondatabase/serverless'
 // @neondatabase/serverless HTTP driver - designed for serverless environments like Vercel.
 // Each query is a separate HTTP request, but this is the most reliable approach for serverless.
 let sql: ReturnType<typeof neon> | null = null
-let useMock = false
 
 function getSql(): ReturnType<typeof neon> {
   if (sql) return sql
@@ -19,7 +18,6 @@ function getSql(): ReturnType<typeof neon> {
       )
     }
     console.warn('⚠️ Using mock database for development (USE_MOCK_DB=true).')
-    useMock = true
     throw new Error('MOCK_MODE')
   }
 
@@ -35,19 +33,6 @@ async function mockQuery<T = unknown>(
 ): Promise<{ rows: T[]; rowCount: number }> {
   console.log('🏗️ Mock DB: Returning empty results for query:', _queryText, _params)
   return { rows: [], rowCount: 0 }
-}
-
-async function mockTransaction<T>(
-  callback: (client: {
-    query: (text: string, params?: unknown[]) => Promise<{ rows: T[]; rowCount: number }>
-  }) => Promise<T>,
-): Promise<T> {
-  console.log('🏗️ Mock DB: Simulating transaction...')
-  const mockClient = {
-    query: async () => ({ rows: [], rowCount: 0 }),
-    release: () => {},
-  }
-  return await callback(mockClient as any)
 }
 
 export async function query<T = unknown>(
@@ -79,19 +64,4 @@ export async function queryOne<T = unknown>(
 ): Promise<T | null> {
   const { rows } = await query<T>(queryText, params)
   return rows[0] || null
-}
-
-export async function transaction<T>(
-  callback: (client: {
-    query: (text: string, params?: unknown[]) => Promise<{ rows: T[]; rowCount: number }>
-  }) => Promise<T>,
-): Promise<T> {
-  if (useMock) {
-    return await mockTransaction<T>(callback)
-  }
-
-  // HTTP driver doesn't support interactive transactions natively.
-  // We simulate a transaction by wrapping queries in a single call.
-  // For most use cases in this app, this is sufficient.
-  throw new Error('Interactive transactions are not supported over HTTP driver.')
 }

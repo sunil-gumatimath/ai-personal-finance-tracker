@@ -25,9 +25,9 @@ const VALID_RECURRING_FREQUENCIES = new Set<RecurringFrequency>([
 	"yearly",
 ]);
 
-export const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-export function parseTransactionType(value: unknown): TransactionType {
+function parseTransactionType(value: unknown): TransactionType {
 	if (
 		typeof value !== "string" ||
 		!VALID_TRANSACTION_TYPES.has(value as TransactionType)
@@ -69,7 +69,7 @@ export function normalizeTransactionLimit(limit: unknown): number | null {
 // ---------------------------------------------------------------------------
 
 /** Formats a Date as YYYY-MM-DD in LOCAL time (never UTC-shifted). */
-export function formatDateLocal(d: Date): string {
+function formatDateLocal(d: Date): string {
 	const y = d.getFullYear();
 	const m = String(d.getMonth() + 1).padStart(2, "0");
 	const day = String(d.getDate()).padStart(2, "0");
@@ -123,7 +123,7 @@ export function computeNextDueDate(
 }
 
 /** True when `value` is a plausible YYYY-MM-DD calendar date. */
-export function isDateString(value: unknown): value is string {
+function isDateString(value: unknown): value is string {
 	if (typeof value !== "string" || !DATE_REGEX.test(value)) return false;
 	const [y, m, d] = value.split("-").map(Number);
 	const date = new Date(y, m - 1, d);
@@ -144,12 +144,6 @@ function assertRecurringFrequency(value: unknown): RecurringFrequency {
 		);
 	}
 	return value as RecurringFrequency;
-}
-
-export interface RecurringState {
-	is_recurring?: boolean;
-	date?: string;
-	next_due_date?: string | null;
 }
 
 /**

@@ -8,7 +8,7 @@ export function toNumber(value: unknown): number {
 	return 0;
 }
 
-export interface SimulationResult {
+interface SimulationResult {
 	months: number;
 	totalInterest: number;
 	monthlyData: { month: number; remainingBalance: number }[];

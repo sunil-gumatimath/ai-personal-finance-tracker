@@ -150,17 +150,3 @@ export interface DebtPayment {
 	// Joined fields
 	debt?: Debt;
 }
-
-export interface DebtPayoffStrategy {
-	name: "snowball" | "avalanche";
-	totalInterest: number;
-	payoffMonths: number;
-	monthlyPayment: number;
-	debts: {
-		id: string;
-		name: string;
-		payoffOrder: number;
-		payoffDate: Date;
-		totalInterestPaid: number;
-	}[];
-}

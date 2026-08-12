@@ -3,7 +3,7 @@
  * The route layer fetches data, formats currency, and persists results.
  */
 
-export type InsightType = "anomaly" | "coaching" | "kudo";
+type InsightType = "anomaly" | "coaching" | "kudo";
 
 export interface DetectedInsight {
   type: InsightType;
@@ -27,7 +27,7 @@ export interface AnomalyCandidate {
  * flagged. A flat "$50" threshold is meaningless for JPY (≈$0.33) or INR, so
  * the cutoff scales with the currency.
  */
-export const ANOMALY_THRESHOLDS: Record<string, number> = {
+const ANOMALY_THRESHOLDS: Record<string, number> = {
   USD: 50,
   EUR: 50,
   GBP: 40,
@@ -39,10 +39,10 @@ export const ANOMALY_THRESHOLDS: Record<string, number> = {
   CNY: 300,
 };
 
-export const DEFAULT_ANOMALY_THRESHOLD = 50;
+const DEFAULT_ANOMALY_THRESHOLD = 50;
 
 /** A transaction is an anomaly when it exceeds the category average by this factor. */
-export const ANOMALY_MULTIPLIER = 1.8;
+const ANOMALY_MULTIPLIER = 1.8;
 /** Inspect the N most recent transactions per category (input must be newest-first). */
 export const ANOMALY_LOOKBACK = 10;
 /** Never emit more than this many anomaly insights per generation. */

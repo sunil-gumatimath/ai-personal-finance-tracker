@@ -17,7 +17,7 @@ interface DigestRow {
 }
 
 /** Monday of the current week (week starts on Monday). */
-export function getWeekStart(date = new Date()): string {
+function getWeekStart(date = new Date()): string {
 	const d = new Date(date);
 	const day = d.getDay(); // 0 = Sunday
 	const diff = day === 0 ? -6 : 1 - day;

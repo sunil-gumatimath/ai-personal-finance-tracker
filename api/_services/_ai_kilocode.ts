@@ -7,7 +7,7 @@ const KILOCODE_BASE_URL = "https://api.kilo.ai/api/gateway/v1";
  */
 const REQUEST_TIMEOUT_MS = 60_000;
 
-export interface FreeModel {
+interface FreeModel {
 	id: string;
 	label: string;
 	context: string;
@@ -20,7 +20,7 @@ export interface FreeModel {
  * time — when it does, update this list or set the KILOCODE_FREE_MODELS env
  * var (comma-separated model IDs) to override it without code changes.
  */
-export const FREE_MODELS: FreeModel[] = [
+const FREE_MODELS: FreeModel[] = [
 	{
 		id: "nvidia/nemotron-3-ultra-550b-a55b:free",
 		label: "Nemotron 3 Ultra (Free)",
@@ -84,7 +84,7 @@ export const FREE_MODELS: FreeModel[] = [
 	},
 ];
 
-export const DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
+const DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
 
 /** Allowed model IDs: the curated free list, overridable via env var. */
 export function getFreeModelIds(): string[] {

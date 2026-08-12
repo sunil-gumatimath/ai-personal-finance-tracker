@@ -278,12 +278,3 @@ class AIQueryProcessor {
 }
 
 export { AIQueryProcessor };
-export type {
-  ProcessedQuery,
-  ProcessedIntent,
-  IntentResult,
-  Timeframe,
-  IntentType,
-  OperationType,
-  ComparisonType,
-};

@@ -32,7 +32,7 @@ async function assertOwned(
   }
 }
 
-export async function assertOwnedAccount(
+async function assertOwnedAccount(
   userId: string,
   accountId: unknown,
   label = "Account",
@@ -40,7 +40,7 @@ export async function assertOwnedAccount(
   await assertOwned("accounts", userId, accountId, label);
 }
 
-export async function assertOwnedCategory(
+async function assertOwnedCategory(
   userId: string,
   categoryId: unknown,
   label = "Category",
@@ -102,15 +102,4 @@ export async function assertCategoryReferencesOwned(userId: string, data: Record
 
 export async function assertDebtPaymentReferencesOwned(userId: string, data: RecordLike) {
   await assertOwnedDebt(userId, data.debt_id, "Debt");
-}
-
-export function sendOwnershipError(
-  res: { status: (code: number) => { json: (data: unknown) => unknown } },
-  error: unknown,
-) {
-  if (error instanceof OwnershipError) {
-    res.status(error.statusCode).json({ error: error.message });
-    return true;
-  }
-  return false;
 }

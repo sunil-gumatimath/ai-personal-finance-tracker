@@ -40,9 +40,7 @@ import type {
 } from "@/types";
 import { ApiError } from "@/lib/errors";
 
-export { ApiError } from "@/lib/errors";
-
-export async function apiFetch<T>(
+async function apiFetch<T>(
 	path: string,
 	options?: RequestInit,
 ): Promise<T> {

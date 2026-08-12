@@ -34,7 +34,7 @@ export type TransactionFormData = {
 	recurring_end_date: string;
 };
 
-export type TransactionFormState = {
+type TransactionFormState = {
 	formData: TransactionFormData;
 	setFormData: Dispatch<SetStateAction<TransactionFormData>>;
 };

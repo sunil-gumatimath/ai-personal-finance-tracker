@@ -4,8 +4,8 @@ import type { ApiRequest } from "../_utils/types.js";
 import path from "path";
 import fs from "fs";
 
-export type LogSeverity = "info" | "warning" | "error" | "critical";
-export type LogStatus = "success" | "failure";
+type LogSeverity = "info" | "warning" | "error" | "critical";
+type LogStatus = "success" | "failure";
 
 export interface LogEventOptions {
 	action: string;
@@ -19,7 +19,7 @@ export interface LogEventOptions {
 	userEmail?: string | null;
 }
 
-export interface SystemLogEntry {
+interface SystemLogEntry {
 	id?: string;
 	timestamp?: string;
 	action: string;

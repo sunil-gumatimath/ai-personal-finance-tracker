@@ -48,7 +48,7 @@ export function formatTimestamp(timestamp: string): {
 	return { absolute, relative };
 }
 
-export function formatCurrency(amount: string | number): string {
+function formatCurrency(amount: string | number): string {
 	const num = typeof amount === "string" ? parseFloat(amount) : amount;
 	if (isNaN(num)) return String(amount);
 	return `$${num.toFixed(2)}`;
@@ -228,11 +228,4 @@ export function formatMetadata(
 
 		return { label, value: formattedValue };
 	});
-}
-
-export function getActionIcon(action: string): string {
-	if (action === "TRANSACTION_CREATED") return "plus";
-	if (action === "TRANSACTION_EDITED") return "edit";
-	if (action === "TRANSACTION_DELETED") return "trash";
-	return "info";
 }

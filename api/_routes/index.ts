@@ -59,16 +59,3 @@ export function resolveRoute(apiPath: string): RouteHandler | null {
 
 	return null;
 }
-
-/** Returns true if any registered route matches the given prefix. */
-export function isKnownRoutePrefix(apiPath: string): boolean {
-	if (ROUTES[apiPath]) return true;
-	const parts = apiPath.split("/");
-	if (parts.length > 1) {
-		const parent = parts.slice(0, -1).join("/");
-		if (ROUTES[parent]) return true;
-	}
-	return false;
-}
-
-export { ROUTES };

@@ -1,7 +1,5 @@
 import { assertEnum, assertRequiredString } from "./common.js";
 
-export type CategoryType = "income" | "expense";
-
 export function validateCategoryType(value: unknown) {
   assertEnum(
     value,
