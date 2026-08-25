@@ -8,7 +8,10 @@ import {
 import { decryptPreferences } from "../_utils/crypto.js";
 import type { ApiRequest, ApiResponse } from "../_utils/types.js";
 import { detectAnomalies, parseAiInsightsJson } from "../_domain/ai-insights.js";
+import { assertUuid } from "../_domain/common.js";
 import { DEFAULT_CURRENCY } from "../_config/server-config.js";
+import { formatCurrency } from "../_utils/format.js";
+import { sendApiError } from "../_utils/respond.js";
 
 type Insight = {
 	id: string;
@@ -22,6 +25,21 @@ type Insight = {
 	created_at?: string;
 };
 
+/** Active (non-dismissed) insights generated within the last 7 days. */
+async function listActiveInsights(userId: string) {
+	const { rows } = await query<Insight>(
+		`
+    SELECT * FROM ai_insights
+    WHERE user_id = $1
+    AND is_dismissed = false
+    AND created_at > NOW() - INTERVAL '7 days'
+    ORDER BY created_at DESC
+    `,
+		[userId],
+	);
+	return rows;
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
 	const userId = await getAuthedUserId(req);
 	if (!userId) {
@@ -34,6 +52,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 	if (id && typeof id === "string") {
 		if (req.method === "PATCH") {
 			try {
+				assertUuid(id, "insight ID");
 				await query(
 					"UPDATE ai_insights SET is_dismissed = true WHERE id = $1 AND user_id = $2",
 					[id, userId],
@@ -41,7 +60,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 				res.status(200).json({ ok: true });
 			} catch (error) {
 				console.error("AI insight PATCH error:", error);
-				res.status(500).json({ error: "Server error" });
+				sendApiError(res, error);
 			}
 			return;
 		}
@@ -52,16 +71,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
 	if (req.method === "GET") {
 		try {
-			const { rows } = await query<Insight>(
-				`
-        SELECT * FROM ai_insights
-        WHERE user_id = $1
-        AND is_dismissed = false
-        AND created_at > NOW() - INTERVAL '7 days'
-        ORDER BY created_at DESC
-        `,
-				[userId],
-			);
+			const rows = await listActiveInsights(userId);
 			res.status(200).json({ insights: rows });
 		} catch (error) {
 			console.error("AI insights GET error:", error);
@@ -74,16 +84,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 		try {
 			const { forceRefresh } = req.body || {};
 			if (!forceRefresh) {
-				const { rows } = await query<Insight>(
-					`
-          SELECT * FROM ai_insights
-          WHERE user_id = $1
-          AND is_dismissed = false
-          AND created_at > NOW() - INTERVAL '7 days'
-          ORDER BY created_at DESC
-          `,
-					[userId],
-				);
+				const rows = await listActiveInsights(userId);
 				if (rows.length > 0) {
 					res.status(200).json({ insights: rows });
 					return;
@@ -105,18 +106,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 				typeof rawPrefs["currency"] === "string"
 					? (rawPrefs["currency"] as string)
 					: profile?.currency || DEFAULT_CURRENCY;
-			const currencyLocales: Record<string, string> = {
-				USD: "en-US",
-				INR: "en-IN",
-				EUR: "de-DE",
-				GBP: "en-GB",
-				JPY: "ja-JP",
-			};
-			const formatCurrency = (amount: number) =>
-				new Intl.NumberFormat(currencyLocales[currency] || "en-US", {
-					style: "currency",
-					currency,
-				}).format(amount);
 			const hasKiloKey =
 				typeof prefs.kilocodeApiKey === "string" &&
 				prefs.kilocodeApiKey.length > 0;
@@ -133,7 +122,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 				`
         SELECT t.*, row_to_json(c.*) as category
         FROM transactions t
-        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN categories c ON t.category_id = c.id AND c.user_id = t.user_id
         WHERE t.user_id = $1
         AND t.date >= NOW() - INTERVAL '6 months'
         ORDER BY t.date DESC
@@ -155,7 +144,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 						categoryName: t.category?.name ?? null,
 					})),
 				currency,
-				(amount: number) => formatCurrency(amount),
+				(amount: number) => formatCurrency(amount, currency),
 			);
 			newInsights.push(...anomalies);
 
@@ -241,31 +230,35 @@ No markdown, no extra text, and NO emojis.
 
 			// Replace the previously generated, still-active insights so repeated
 			// refreshes never accumulate duplicate rows. Dismissed history is kept.
-			await query(
-				"DELETE FROM ai_insights WHERE user_id = $1 AND is_dismissed = false",
-				[userId],
-			);
-
-			const saved: Insight[] = [];
-			for (const insight of newInsights) {
-				const { rows } = await query<Insight>(
-					`
-          INSERT INTO ai_insights (user_id, type, title, description, category, amount, date)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          RETURNING *
-          `,
-					[
-						userId,
-						insight.type,
-						insight.title,
-						insight.description,
-						insight.category || null,
-						insight.amount || null,
-						insight.date || null,
-					],
+			// Atomic single statement (the Neon HTTP driver has no multi-statement
+			// transactions): one CTE deletes stale rows, the INSERT writes all new
+			// ones — readers never observe an empty or half-written state.
+			const insertValues: unknown[] = [userId];
+			const valueRows = newInsights.map((insight) => {
+				const base = insertValues.length;
+				insertValues.push(
+					insight.type,
+					insight.title,
+					insight.description,
+					insight.category || null,
+					insight.amount ?? null,
+					insight.date || null,
 				);
-				if (rows[0]) saved.push(rows[0]);
-			}
+				const p = (offset: number) => `$${base + offset}`;
+				return `($1, ${p(1)}, ${p(2)}, ${p(3)}, ${p(4)}, ${p(5)}, ${p(6)})`;
+			});
+
+			const { rows: saved } = await query<Insight>(
+				`
+        WITH del AS (
+          DELETE FROM ai_insights WHERE user_id = $1 AND is_dismissed = false RETURNING 1
+        )
+        INSERT INTO ai_insights (user_id, type, title, description, category, amount, date)
+        VALUES ${valueRows.join(", ")}
+        RETURNING *
+        `,
+				insertValues,
+			);
 
 			res.status(200).json({ insights: saved });
 		} catch (error) {

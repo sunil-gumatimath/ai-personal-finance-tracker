@@ -49,7 +49,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           b.start_date,
           b.end_date
         FROM budgets b
-        LEFT JOIN categories c ON b.category_id = c.id
+        LEFT JOIN categories c ON b.category_id = c.id AND c.user_id = b.user_id
         LEFT JOIN transactions t ON b.category_id = t.category_id
           AND t.user_id = b.user_id
           AND t.type = 'expense'

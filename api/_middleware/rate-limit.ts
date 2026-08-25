@@ -35,14 +35,28 @@ function getEntry(key: string): RateLimitEntry {
 function cleanup(): void {
   const now = Date.now()
   for (const [key, entry] of store.entries()) {
-    if (!entry.blocked && now > entry.resetTime) {
+    // Evict finished windows AND expired blocks — otherwise blocked entries
+    // linger forever after their block lapses.
+    if (entry.blocked) {
+      if (now > entry.blockExpiry) store.delete(key)
+    } else if (now > entry.resetTime) {
       store.delete(key)
     }
   }
 }
 
-// Periodic cleanup every 10 minutes
-setInterval(cleanup, 10 * 60 * 1000)
+// Cleanup runs opportunistically inside checkLocalRateLimit instead of on a
+// setInterval: serverless invocations must not keep a timer alive.
+const CLEANUP_INTERVAL_MS = 10 * 60 * 1000
+let lastCleanupAt = Date.now()
+
+function maybeCleanup(): void {
+  const now = Date.now()
+  if (now - lastCleanupAt >= CLEANUP_INTERVAL_MS) {
+    lastCleanupAt = now
+    cleanup()
+  }
+}
 
 function checkLocalRateLimit(
   identifier: string,
@@ -50,6 +64,7 @@ function checkLocalRateLimit(
   isAuthEndpoint = false,
   weight = 1,
 ): { allowed: boolean; retryAfter?: number } {
+  maybeCleanup()
   const key = getLocalKey(identifier, endpoint)
   const entry = getEntry(key)
   const maxRequests = isAuthEndpoint ? AUTH_MAX_REQUESTS : MAX_REQUESTS

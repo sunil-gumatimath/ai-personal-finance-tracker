@@ -4,6 +4,7 @@ import {
   getBudgetPeriodStartDate,
   toDateString,
   validateCreateBudgetInput,
+  validateUpdateBudgetInput,
 } from "../_domain/budgets.js";
 import { assertBudgetReferencesOwned } from "./ownership.service.js";
 import {
@@ -59,6 +60,7 @@ export async function updateUserBudget(
   data: Record<string, unknown>,
 ) {
   assertUuid(id, "budget ID");
+  validateUpdateBudgetInput(data);
   const existing = await findBudgetById(userId, id);
   if (!existing) throw new NotFoundError("Budget not found");
 

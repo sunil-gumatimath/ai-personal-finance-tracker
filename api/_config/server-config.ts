@@ -68,7 +68,46 @@ const ALLOWED_ORIGINS = computeAllowedOrigins();
 const FALLBACK_ORIGIN = LOCAL_ORIGINS[0];
 
 /** Endpoints with stricter rate limits. Auth routes are limited inside auth.ts. */
-const RATE_LIMITED_PREFIXES = ["/api/ai/chat", "/api/ai/insights"];
+const RATE_LIMITED_PREFIXES = [
+  "/api/ai/chat",
+  "/api/ai/insights",
+  "/api/ai/digest",
+  "/api/ai/parse-transaction",
+];
+
+/**
+ * Ordered list of preferred origins, used wherever a server-side default
+ * Origin is needed (e.g. Neon Auth calls):
+ *   1. ALLOWED_ORIGINS env var (comma-separated)
+ *   2. VERCEL_PROJECT_PRODUCTION_URL / VERCEL_URL (Vercel injects bare hosts)
+ *   3. localhost dev fallback
+ */
+export function resolveAllowedOrigins(): string[] {
+  const origins: string[] = [];
+
+  if (process.env.ALLOWED_ORIGINS) {
+    for (const entry of process.env.ALLOWED_ORIGINS.split(",")) {
+      const trimmed = entry.trim().replace(/\/$/, "");
+      if (trimmed) origins.push(trimmed);
+    }
+  }
+
+  for (const key of [
+    "VERCEL_PROJECT_PRODUCTION_URL",
+    "VERCEL_URL",
+  ]) {
+    const host = process.env[key];
+    if (host) origins.push(`https://${host.trim().replace(/\/$/, "")}`);
+  }
+
+  origins.push(LOCAL_ORIGINS[0]);
+  return origins;
+}
+
+/** First-choice origin when a request does not provide one. */
+export function getAuthOriginFallback(): string {
+  return resolveAllowedOrigins()[0];
+}
 
 /**
  * Fallback currency used when a profile has none set. Kept in one place so

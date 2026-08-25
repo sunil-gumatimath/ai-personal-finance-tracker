@@ -33,9 +33,12 @@ const service = mockService("../_services/debts.service.js", {
 		},
 	],
 	createUserDebtPayment: async () => ({
-		id: "pay-new",
-		debtId: "debt-1",
-		amount: "75.00",
+		payment: {
+			id: "pay-new",
+			debtId: "debt-1",
+			amount: "75.00",
+		},
+		debt: { id: "debt-1", current_balance: "925.00" },
 	}),
 });
 const { default: handler } = await import("./debts.routes.js");
@@ -132,7 +135,7 @@ describe("debts route", () => {
 		);
 	});
 
-	test("POST action=payments records a payment with 201", async () => {
+	test("POST action=payments records a payment with 201 and returns the updated debt", async () => {
 		authMock.mockImplementation(() => Promise.resolve("user-123"));
 		const { res, captured } = makeResponse();
 		await handler(
@@ -146,6 +149,7 @@ describe("debts route", () => {
 		expect(captured.statusCode).toBe(201);
 		expect(captured.body).toEqual({
 			payment: { id: "pay-new", debtId: "debt-1", amount: "75.00" },
+			debt: { id: "debt-1", current_balance: "925.00" },
 		});
 	});
 

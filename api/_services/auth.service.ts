@@ -1,5 +1,6 @@
 import { createAuthClient } from "@neondatabase/auth";
 import { queryOne } from "../_repositories/db.js";
+import { getAuthOriginFallback } from "../_config/server-config.js";
 
 const SESSION_COOKIE_NAME = "pft_session";
 
@@ -26,11 +27,14 @@ if (!authUrl && process.env.NODE_ENV === "production") {
   );
 }
 
-console.log("🔐 Neon Auth URL:", authUrl);
-console.log(
-  "🔐 NEON_AUTH_URL env var:",
-  process.env.NEON_AUTH_URL ? "SET" : "NOT SET",
-);
+// Never log the auth URL in production — it leaks infrastructure details.
+if (process.env.NODE_ENV !== "production") {
+  console.log("🔐 Neon Auth URL:", authUrl);
+  console.log(
+    "🔐 NEON_AUTH_URL env var:",
+    process.env.NEON_AUTH_URL ? "SET" : "NOT SET",
+  );
+}
 
 export const authClient = createAuthClient(authUrl || "");
 
@@ -58,16 +62,9 @@ export function getAuthOrigin(req?: {
     return process.env.VITE_APP_URL.trim().replace(/\/$/, "");
   }
 
-  if (process.env.NODE_ENV === "production") {
-    return "https://personal-finance-tracker-ted.vercel.app";
-  }
-
-  try {
-    const url = new URL(authUrl);
-    return `${url.protocol}//${url.host}`;
-  } catch {
-    return "https://personal-finance-tracker-ted.vercel.app";
-  }
+  // Env-derived fallback (ALLOWED_ORIGINS → VERCEL_PROJECT_PRODUCTION_URL →
+  // localhost) instead of a stale hardcoded production URL.
+  return getAuthOriginFallback();
 }
 
 /**
@@ -132,6 +129,10 @@ export function getRequestToken(req: {
 function requestUsesHttps(req?: {
   headers?: Record<string, string | string[] | undefined>;
 }): boolean {
+  // Local HTTP development escape hatch: when ALLOW_INSECURE_COOKIES=true,
+  // force the Secure flag off so the session cookie works over http://.
+  if (process.env.ALLOW_INSECURE_COOKIES === "true") return false;
+
   const forwardedProto = req?.headers?.["x-forwarded-proto"];
   if (typeof forwardedProto === "string") {
     return forwardedProto.split(",")[0]?.trim().toLowerCase() === "https";

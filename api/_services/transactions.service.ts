@@ -7,6 +7,7 @@ import {
 	sanitizeRecurringInput,
 	validateCreateTransactionInput,
 	validateListTransactionsOptions,
+	validateUpdateTransactionInput,
 	type RecurringFrequency,
 } from "../_domain/transactions.js";
 import { assertTransactionReferencesOwned } from "./ownership.service.js";
@@ -74,6 +75,7 @@ export async function updateUserTransaction(
 	data: Record<string, unknown>,
 ) {
 	ensureTransactionId(id);
+	validateUpdateTransactionInput(data);
 
 	const oldTransaction = await findTransactionById(userId, id);
 	if (!oldTransaction) {
@@ -150,8 +152,18 @@ export async function deleteUserTransaction(
  * for traceability. The template's `next_due_date` then advances one
  * interval; a series whose end date has passed is deactivated.
  *
- * Safe to run repeatedly: advancing `next_due_date` is what prevents
- * double-creation, so overlapping cron invocations cannot duplicate rows.
+ * Concurrency invariant (no multi-statement transactions are available on
+ * the Neon HTTP driver, so each step is an atomic single statement):
+ *
+ *   1. ADVANCE FIRST via compare-and-swap — `UPDATE … SET next_due_date =
+ *      $new WHERE next_due_date = $expected`. Exactly one concurrent worker
+ *      wins the swap; losers see 0 updated rows and skip the template.
+ *   2. INSERT the occurrence only after winning the swap.
+ *
+ * Advance-first means at-most-once materialization per due cycle: if a worker
+ * crashes between advancing and inserting, that cycle is skipped rather than
+ * duplicated. Duplicate money rows are worse than a missed occurrence (the
+ * next cron run picks up any later cycles).
  */
 export async function processDueRecurringTransactions(
 	userId: string,
@@ -175,7 +187,52 @@ export async function processDueRecurringTransactions(
 	for (const template of due) {
 		const dueDate = template.next_due_date as string;
 		const frequency = template.recurring_frequency as RecurringFrequency;
+		const next = computeNextDueDate(dueDate, frequency);
+		const endDate = template.recurring_end_date as string | null;
+		const seriesEnds = Boolean(endDate && next > endDate);
 
+		// Compare-and-swap: claim this cycle by advancing next_due_date (or
+		// completing the series) only if it still holds the value we read.
+		// Another worker won the race when 0 rows come back — skip entirely.
+		const { rowCount } = seriesEnds
+			? await query(
+					`
+        UPDATE transactions
+        SET is_recurring = false, next_due_date = NULL
+        WHERE id = $1 AND user_id = $2 AND next_due_date = $3
+        `,
+					[template.id, userId, dueDate],
+				)
+			: await query<TransactionRow>(
+					`
+        UPDATE transactions
+        SET next_due_date = $1, updated_at = NOW()
+        WHERE id = $2 AND user_id = $3 AND next_due_date = $4
+        RETURNING *
+        `,
+					[next, template.id, userId, dueDate],
+				);
+
+		if (!rowCount || rowCount === 0) {
+			continue; // another worker already advanced/completed this series
+		}
+
+		if (seriesEnds) {
+			completed++;
+			await logEvent(null, {
+				action: "RECURRING_SERIES_COMPLETED",
+				resource: `transactions/${template.id}`,
+				newValue: JSON.stringify({ endedAt: dueDate }),
+				severity: "info",
+				status: "success",
+				metadata: {
+					templateId: template.id,
+					description: template.description,
+				},
+			});
+		}
+
+		// We own this cycle — insert the occurrence for `dueDate`.
 		const { rows } = await query<TransactionRow>(
 			`
       INSERT INTO transactions (
@@ -217,33 +274,6 @@ export async function processDueRecurringTransactions(
 					date: dueDate,
 				},
 			});
-		}
-
-		const next = computeNextDueDate(dueDate, frequency);
-		const endDate = template.recurring_end_date as string | null;
-		if (endDate && next > endDate) {
-			await query(
-				`UPDATE transactions SET is_recurring = false, next_due_date = NULL
-         WHERE id = $1 AND user_id = $2`,
-				[template.id, userId],
-			);
-			completed++;
-			await logEvent(null, {
-				action: "RECURRING_SERIES_COMPLETED",
-				resource: `transactions/${template.id}`,
-				newValue: JSON.stringify({ endedAt: dueDate }),
-				severity: "info",
-				status: "success",
-				metadata: {
-					templateId: template.id,
-					description: template.description,
-				},
-			});
-		} else {
-			await query(
-				`UPDATE transactions SET next_due_date = $1 WHERE id = $2 AND user_id = $3`,
-				[next, template.id, userId],
-			);
 		}
 	}
 

@@ -50,6 +50,71 @@ export function validateCreateTransactionInput(data: TransactionInput) {
 	assertPositiveAmount(data.amount);
 }
 
+/** Sane ceiling for money amounts (DECIMAL(15,2) columns). */
+const MAX_AMOUNT = 1_000_000_000_000;
+
+const MAX_TEXT_LENGTHS = { description: 500, notes: 2000 } as const;
+
+function assertBoundedText(value: unknown, max: number, message: string) {
+	if (typeof value !== "string" || value.length > max) {
+		throw new ValidationError(message);
+	}
+}
+
+/**
+ * Partial update semantics: only validate the keys that are present, but
+ * validate those strictly so bad values never reach Postgres. Recurring
+ * fields are normalized separately by sanitizeRecurringInput.
+ */
+export function validateUpdateTransactionInput(data: TransactionInput) {
+	if ("type" in data && data.type !== undefined) {
+		parseTransactionType(data.type);
+	}
+	if ("amount" in data) {
+		if (
+			typeof data.amount !== "number" ||
+			!Number.isFinite(data.amount) ||
+			data.amount <= 0 ||
+			data.amount > MAX_AMOUNT
+		) {
+			throw new ValidationError("Valid amount is required");
+		}
+	}
+	if ("description" in data && data.description !== null) {
+		assertBoundedText(
+			data.description,
+			MAX_TEXT_LENGTHS.description,
+			`Description must be at most ${MAX_TEXT_LENGTHS.description} characters`,
+		);
+	}
+	if ("notes" in data && data.notes !== null) {
+		assertBoundedText(
+			data.notes,
+			MAX_TEXT_LENGTHS.notes,
+			`Notes must be at most ${MAX_TEXT_LENGTHS.notes} characters`,
+		);
+	}
+	if ("date" in data && data.date !== undefined && data.date !== null) {
+		if (typeof data.date !== "string" || !DATE_REGEX.test(data.date)) {
+			throw new ValidationError("Invalid date format. Use YYYY-MM-DD");
+		}
+	}
+	for (const key of ["account_id", "to_account_id", "category_id"] as const) {
+		const value = data[key];
+		if (value === undefined || value === null || value === "") continue;
+		if (typeof value !== "string") {
+			throw new ValidationError(`Invalid ${key.replace("_", " ")}`);
+		}
+	}
+	if (
+		"is_recurring" in data &&
+		data.is_recurring !== undefined &&
+		typeof data.is_recurring !== "boolean"
+	) {
+		throw new ValidationError("is_recurring must be a boolean");
+	}
+}
+
 export function validateListTransactionsOptions(
 	options: TransactionListOptions,
 ) {
@@ -58,10 +123,26 @@ export function validateListTransactionsOptions(
 	}
 }
 
+/**
+ * Parse the `limit` query param. Absent/blank means "no limit". Anything
+ * present must be a positive integer within the page-size ceiling — invalid
+ * values are a client error, not something to silently coerce.
+ */
 export function normalizeTransactionLimit(limit: unknown): number | null {
-	if (typeof limit !== "string" || limit.trim() === "") return null;
-	const parsed = parseInt(limit, 10);
-	return parsed > 0 && parsed <= 1000 ? parsed : null;
+	if (limit === undefined || limit === null) return null;
+	if (typeof limit !== "string") {
+		throw new ValidationError("Invalid limit parameter");
+	}
+	const trimmed = limit.trim();
+	if (trimmed === "") return null;
+	if (!/^\d+$/.test(trimmed)) {
+		throw new ValidationError("Limit must be a positive integer");
+	}
+	const parsed = Number.parseInt(trimmed, 10);
+	if (parsed <= 0 || parsed > 1000) {
+		throw new ValidationError("Limit must be an integer between 1 and 1000");
+	}
+	return parsed;
 }
 
 // ---------------------------------------------------------------------------

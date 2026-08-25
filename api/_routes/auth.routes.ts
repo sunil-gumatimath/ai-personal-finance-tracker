@@ -14,6 +14,7 @@ import {
 } from "../_middleware/rate-limit.js";
 import type { ApiRequest, ApiResponse } from "../_utils/types.js";
 import { logEvent } from "../_services/audit-log.service.js";
+import { migrateLegacyUser } from "../_services/legacy-user-migration.service.js";
 
 type ErrorWithDetails = {
 	code?: unknown;
@@ -42,6 +43,51 @@ async function tryEnsureDefaultCategories(userId: string): Promise<void> {
 		await ensureDefaultCategories(userId);
 	} catch (dbError: unknown) {
 		console.error("Database sync error (default categories):", dbError);
+	}
+}
+
+/**
+ * Adopt a legacy user row when the fresh Neon Auth id collides with an
+ * existing email. The migration itself is a single atomic statement in
+ * legacy-user-migration.service.ts.
+ */
+async function tryMigrateLegacyUser(
+	context: "signup" | "login",
+	neonAuthUserId: string,
+	email: string,
+	fullName: string,
+	dbError: unknown,
+): Promise<void> {
+	const details = asErrorDetails(dbError);
+	const message = typeof details.message === "string" ? details.message : "";
+	if (details.code !== "23505" || !message.includes("email")) {
+		console.error(
+			`Database sync error during ${context} (users table):`,
+			dbError,
+		);
+		return;
+	}
+
+	console.warn(
+		`Migrating legacy user during ${context} for Neon Auth ID:`,
+		neonAuthUserId,
+	);
+	try {
+		const { migrated } = await migrateLegacyUser({
+			newUserId: neonAuthUserId,
+			email,
+			fullName,
+		});
+		if (migrated) {
+			console.log(`Legacy user migration during ${context} complete.`);
+		} else {
+			console.warn(`No legacy user found to migrate during ${context}.`);
+		}
+	} catch (migrationError) {
+		console.error(
+			`Legacy user migration during ${context} failed:`,
+			migrationError,
+		);
 	}
 }
 
@@ -321,62 +367,13 @@ async function handleSignup(req: ApiRequest, res: ApiResponse) {
 					[data.user.id, email, fullName],
 				);
 			} catch (dbError: unknown) {
-				const details = asErrorDetails(dbError);
-				const message =
-					typeof details.message === "string" ? details.message : "";
-				if (details.code === "23505" && message.includes("email")) {
-					// Legacy user migration during signup
-					console.warn(
-						"Migrating legacy user during signup for Neon Auth ID:",
-						data.user.id,
-					);
-					try {
-						const legacy = await queryOne<{ id: string }>(
-							"SELECT id FROM users WHERE email = $1 AND id != $2",
-							[email, data.user.id],
-						);
-						if (legacy) {
-							const oldId = legacy.id;
-							await queryOne(
-								`UPDATE users SET email = 'migrating_' || email WHERE id = $1`,
-								[oldId],
-							);
-							await queryOne(
-								`INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, full_name = EXCLUDED.full_name`,
-								[data.user.id, email, fullName],
-							);
-							const childTables = [
-								"debt_payments",
-								"debts",
-								"ai_insights",
-								"goals",
-								"budgets",
-								"transactions",
-								"categories",
-								"accounts",
-								"profiles",
-							];
-							for (const table of childTables) {
-								await queryOne(
-									`UPDATE ${table} SET user_id = $1 WHERE user_id = $2`,
-									[data.user.id, oldId],
-								);
-							}
-							await queryOne("DELETE FROM users WHERE id = $1", [oldId]);
-							console.log("Legacy user migration during signup complete.");
-						}
-					} catch (migrationError) {
-						console.error(
-							"Legacy user migration during signup failed:",
-							migrationError,
-						);
-					}
-				} else {
-					console.error(
-						"Database sync error during signup (users table):",
-						dbError,
-					);
-				}
+				await tryMigrateLegacyUser(
+					"signup",
+					data.user.id,
+					email,
+					fullName,
+					dbError,
+				);
 			}
 
 			// Ensure profile exists in our database
@@ -515,62 +512,13 @@ async function handleLogin(req: ApiRequest, res: ApiResponse) {
 					[data.user.id, data.user.email, data.user.name || "Unknown"],
 				);
 			} catch (dbError: unknown) {
-				const details = asErrorDetails(dbError);
-				const message =
-					typeof details.message === "string" ? details.message : "";
-				if (details.code === "23505" && message.includes("email")) {
-					// Legacy user migration during login
-					console.warn(
-						"Migrating legacy user during login for Neon Auth ID:",
-						data.user.id,
-					);
-					try {
-						const legacy = await queryOne<{ id: string }>(
-							"SELECT id FROM users WHERE email = $1 AND id != $2",
-							[data.user.email, data.user.id],
-						);
-						if (legacy) {
-							const oldId = legacy.id;
-							await queryOne(
-								`UPDATE users SET email = 'migrating_' || email WHERE id = $1`,
-								[oldId],
-							);
-							await queryOne(
-								`INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, full_name = EXCLUDED.full_name`,
-								[data.user.id, data.user.email, data.user.name || "Unknown"],
-							);
-							const childTables = [
-								"debt_payments",
-								"debts",
-								"ai_insights",
-								"goals",
-								"budgets",
-								"transactions",
-								"categories",
-								"accounts",
-								"profiles",
-							];
-							for (const table of childTables) {
-								await queryOne(
-									`UPDATE ${table} SET user_id = $1 WHERE user_id = $2`,
-									[data.user.id, oldId],
-								);
-							}
-							await queryOne("DELETE FROM users WHERE id = $1", [oldId]);
-							console.log("Legacy user migration during login complete.");
-						}
-					} catch (migrationError) {
-						console.error(
-							"Legacy user migration during login failed:",
-							migrationError,
-						);
-					}
-				} else {
-					console.error(
-						"Database sync error during login (users table):",
-						dbError,
-					);
-				}
+				await tryMigrateLegacyUser(
+					"login",
+					data.user.id,
+					data.user.email,
+					data.user.name || "Unknown",
+					dbError,
+				);
 			}
 
 			// Ensure profile exists in our database

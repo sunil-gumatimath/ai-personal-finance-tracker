@@ -1,4 +1,4 @@
-import { assertEnum, assertPositiveNumber, assertRequiredString } from "./common.js";
+import { assertEnum, assertIsoDateString, assertPositiveNumber, assertRequiredString } from "./common.js";
 
 export type BudgetPeriod = "weekly" | "monthly" | "yearly";
 
@@ -17,6 +17,32 @@ export function validateCreateBudgetInput(data: Record<string, unknown>) {
     ["weekly", "monthly", "yearly"] as const,
     "Valid period is required (weekly, monthly, yearly)",
   );
+}
+
+/**
+ * Partial update semantics: only validate the keys that are present, but
+ * validate those strictly so bad values never reach Postgres.
+ */
+export function validateUpdateBudgetInput(data: Record<string, unknown>) {
+  if ("category_id" in data && data.category_id !== undefined) {
+    assertRequiredString(data.category_id, "Category is required");
+  }
+  if ("amount" in data && data.amount !== undefined) {
+    assertPositiveNumber(data.amount, "Valid budget amount is required");
+  }
+  if ("period" in data && data.period !== undefined) {
+    assertEnum(
+      data.period,
+      ["weekly", "monthly", "yearly"] as const,
+      "Valid period is required (weekly, monthly, yearly)",
+    );
+  }
+  if ("start_date" in data) {
+    assertIsoDateString(data.start_date, "Invalid start date format. Use YYYY-MM-DD");
+  }
+  if ("end_date" in data) {
+    assertIsoDateString(data.end_date, "Invalid end date format. Use YYYY-MM-DD");
+  }
 }
 
 export function getBudgetPeriodStartDate(period: BudgetPeriod, now = new Date()) {

@@ -1,6 +1,10 @@
 import { NotFoundError, ValidationError } from "../_errors/AppError.js";
 import { assertUuid } from "../_domain/common.js";
-import { validateCreateDebtInput, validateCreateDebtPaymentInput } from "../_domain/debts.js";
+import {
+  validateCreateDebtInput,
+  validateCreateDebtPaymentInput,
+  validateUpdateDebtInput,
+} from "../_domain/debts.js";
 import {
   assertDebtPaymentReferencesOwned,
   assertOwnedDebt,
@@ -35,6 +39,7 @@ export async function createUserDebt(userId: string, data: Record<string, unknow
 
 export async function updateUserDebt(userId: string, id: string, data: Record<string, unknown>) {
   assertUuid(id, "debt ID");
+  validateUpdateDebtInput(data);
   const existing = await findDebtById(userId, id);
   if (!existing) throw new NotFoundError("Debt not found");
 
@@ -51,11 +56,24 @@ export async function deleteUserDebt(userId: string, id: string) {
 export async function createUserDebtPayment(
   userId: string,
   data: Record<string, unknown>,
-) {
+): Promise<{ payment: Record<string, unknown>; debt: Record<string, unknown> }> {
   validateCreateDebtPaymentInput(data);
   await assertDebtPaymentReferencesOwned(userId, data);
 
-  const payment = await createDebtPayment(userId, data);
-  if (!payment) throw new Error("Debt payment creation failed");
-  return payment;
+  // Friendly pre-check so a routine overpayment is a 400, not the DB
+  // trigger's raw exception (500). The trigger remains the authoritative
+  // backstop for races between this check and the insert.
+  const principal =
+    data.principal_amount !== undefined ? Number(data.principal_amount) : Number(data.amount);
+  const existing = await findDebtById(userId, String(data.debt_id));
+  if (!existing) throw new NotFoundError("Debt not found");
+  if (!Number.isFinite(principal) || principal > Number(existing.current_balance)) {
+    throw new ValidationError("Payment principal exceeds remaining balance");
+  }
+
+  // Inserts the payment; the DB trigger (migration 006) atomically maintains
+  // debts.current_balance. Returns the payment plus the post-payment debt row.
+  const result = await createDebtPayment(userId, data);
+  if (!result) throw new NotFoundError("Debt not found");
+  return result;
 }

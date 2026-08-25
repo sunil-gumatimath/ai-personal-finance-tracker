@@ -143,28 +143,27 @@ async function callKiloCode(
 	});
 }
 
-function formatKiloCodeError(status: number, errorBody: string, model: string) {
-	let errorMessage = `KiloCode API error (${status}) while using model "${model}".`;
-
+/**
+ * Canned, client-safe error messages. Upstream response bodies are logged
+ * server-side (see the caller) but never forwarded to clients.
+ */
+function formatKiloCodeError(status: number, model: string) {
 	if (status === 400) {
-		errorMessage = `KiloCode rejected model "${model}". Only the free model list is supported — pick one in Settings > Preferences > AI Integration.`;
-	} else if (status === 401) {
-		errorMessage =
-			"Invalid KiloCode API key or the model requires a signed-in Kilo account. Please check your key in Settings > Preferences > AI Integration.";
-	} else if (status === 402) {
-		errorMessage =
-			"KiloCode account has insufficient credits. Please add credits to your Kilo account.";
-	} else if (status === 429) {
-		errorMessage = "KiloCode rate limit exceeded. Please try again later.";
-	} else if (status >= 500) {
-		errorMessage =
-			"KiloCode service is temporarily unavailable. Please try again later.";
+		return `KiloCode rejected model "${model}". Only the free model list is supported — pick one in Settings > Preferences > AI Integration.`;
 	}
-
-	const details = errorBody.trim().slice(0, 300);
-	return details
-		? `I encountered an error with KiloCode. ${errorMessage}\n\nDetails: ${details}`
-		: `I encountered an error with KiloCode. ${errorMessage}`;
+	if (status === 401) {
+		return "Invalid KiloCode API key or the model requires a signed-in Kilo account. Please check your key in Settings > Preferences > AI Integration.";
+	}
+	if (status === 402) {
+		return "KiloCode account has insufficient credits. Please add credits to your Kilo account.";
+	}
+	if (status === 429) {
+		return "KiloCode rate limit exceeded. Please try again later.";
+	}
+	if (status >= 500) {
+		return "KiloCode service is temporarily unavailable. Please try again later.";
+	}
+	return `KiloCode API error (${status}) while using model "${model}".`;
 }
 
 /**
@@ -205,19 +204,23 @@ export async function generateWithKiloCode(
 				504,
 			);
 		}
+		// Log the underlying cause server-side; the client gets a canned message.
+		console.error(
+			"KiloCode connection failure details:",
+			error instanceof Error ? error.message : String(error),
+		);
 		throw new KiloCodeApiError(
-			`Could not reach the KiloCode API. Please check your connection and try again. Details: ${
-				error instanceof Error ? error.message : "Unknown error"
-			}`,
+			"Could not reach the KiloCode API. Please check your connection and try again.",
 			503,
 		);
 	}
 
 	if (!response.ok) {
 		const errorBody = await response.text();
+		// Upstream body stays in server logs only — never echoed to clients.
 		console.error("KiloCode API error:", response.status, errorBody);
 		throw new KiloCodeApiError(
-			formatKiloCodeError(response.status, errorBody, model),
+			formatKiloCodeError(response.status, model),
 			response.status,
 		);
 	}

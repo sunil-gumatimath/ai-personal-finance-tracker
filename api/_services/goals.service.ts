@@ -1,6 +1,6 @@
 import { NotFoundError, ValidationError } from "../_errors/AppError.js";
 import { assertUuid } from "../_domain/common.js";
-import { validateCreateGoalInput } from "../_domain/goals.js";
+import { validateCreateGoalInput, validateUpdateGoalInput } from "../_domain/goals.js";
 import {
   createGoal,
   deleteGoal,
@@ -23,6 +23,7 @@ export async function createUserGoal(userId: string, data: Record<string, unknow
 
 export async function updateUserGoal(userId: string, id: string, data: Record<string, unknown>) {
   assertUuid(id, "goal ID");
+  validateUpdateGoalInput(data);
   const existing = await findGoalById(userId, id);
   if (!existing) throw new NotFoundError("Goal not found");
 

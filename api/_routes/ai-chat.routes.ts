@@ -14,6 +14,12 @@ import type { ApiRequest, ApiResponse } from "../_utils/types.js";
 import { ensureSystemLogsTable } from "../_services/audit-log.service.js";
 import { AIQueryProcessor } from "../_utils/query-processor.js";
 import { DEFAULT_CURRENCY } from "../_config/server-config.js";
+import { formatCurrency } from "../_utils/format.js";
+
+/** Upper bound for a single chat message (chars). */
+const MAX_MESSAGE_LENGTH = 4000;
+/** Keep only the most recent conversation turns for context. */
+const MAX_HISTORY_TURNS = 20;
 
 type IntentType =
 	| "comparison"
@@ -151,7 +157,7 @@ async function fetchFinancialData(
 		const transactionQuery = `
       SELECT t.type, t.amount, t.date, t.description, c.name as category_name
       FROM transactions t
-      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN categories c ON t.category_id = c.id AND c.user_id = t.user_id
       WHERE ${conditions.join(" AND ")}
       ORDER BY t.date DESC
       LIMIT 30
@@ -167,7 +173,7 @@ async function fetchFinancialData(
 		const { rows: budgets } = await query<BudgetRow>(
 			`SELECT b.amount, b.period, c.name as category_name
        FROM budgets b
-       LEFT JOIN categories c ON b.category_id = c.id
+       LEFT JOIN categories c ON b.category_id = c.id AND c.user_id = b.user_id
        WHERE b.user_id = $1`,
 			[userId],
 		);
@@ -380,20 +386,6 @@ function formatFinancialData(data: FinancialData, currency: string) {
 	return formatted;
 }
 
-function formatCurrency(amount: number, currency: string) {
-	const formatters = {
-		USD: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }),
-		EUR: new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }),
-		GBP: new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }),
-		INR: new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }),
-		JPY: new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY" }),
-	};
-	return (
-		formatters[currency as keyof typeof formatters]?.format(amount) ||
-		`$${amount.toFixed(2)}`
-	);
-}
-
 export default async function handler(req: ApiRequest, res: ApiResponse) {
 	const userId = await getAuthedUserId(req);
 	if (!userId) {
@@ -412,10 +404,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 			res.status(400).json({ error: "Message is required" });
 			return;
 		}
+		if (message.length > MAX_MESSAGE_LENGTH) {
+			res.status(400).json({
+				error: `Message is too long (max ${MAX_MESSAGE_LENGTH} characters)`,
+			});
+			return;
+		}
 
 		// Process the query using advanced NLP
 		const processedQuery = queryProcessor.processQuery(message);
-		console.log("Processed query:", processedQuery);
 
 		const profile = await queryOne<{
 			preferences: Record<string, unknown> | null;
@@ -495,6 +492,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 							((h as { role?: unknown }).role === "user" ||
 								(h as { role?: unknown }).role === "assistant"),
 					)
+					// Only the most recent turns fit in the prompt budget.
+					.slice(-MAX_HISTORY_TURNS)
 					.map((h) => {
 						const label = h.role === "user" ? "User" : "Assistant";
 						return `- **${label}**: ${h.content.slice(0, 500)}`;

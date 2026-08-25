@@ -46,9 +46,12 @@ describe("transaction domain validation", () => {
 
 	test("normalizes transaction list limits", () => {
 		expect(normalizeTransactionLimit("25")).toBe(25);
-		expect(normalizeTransactionLimit("0")).toBeNull();
-		expect(normalizeTransactionLimit("1001")).toBeNull();
+		expect(normalizeTransactionLimit("1000")).toBe(1000);
 		expect(normalizeTransactionLimit(undefined)).toBeNull();
+		expect(() => normalizeTransactionLimit("0")).toThrow(ValidationError);
+		expect(() => normalizeTransactionLimit("1001")).toThrow(ValidationError);
+		expect(() => normalizeTransactionLimit("abc")).toThrow(ValidationError);
+		expect(() => normalizeTransactionLimit("12.5")).toThrow(ValidationError);
 	});
 
 	test("rejects invalid since date filters", () => {

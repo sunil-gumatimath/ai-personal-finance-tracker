@@ -8,14 +8,7 @@ import {
 	type DigestStats,
 } from "../_domain/ai-digest.js";
 import { KiloCodeApiError } from "./_ai_ai-provider.js";
-
-const CURRENCY_LOCALES: Record<string, string> = {
-	USD: "en-US",
-	INR: "en-IN",
-	EUR: "de-DE",
-	GBP: "en-GB",
-	JPY: "ja-JP",
-};
+import { formatCurrency } from "../_utils/format.js";
 
 interface DigestContextRow {
 	type: string;
@@ -77,11 +70,7 @@ export async function generateWeeklyDigestContent(
 	const formatNumber = (value: unknown): number =>
 		typeof value === "number" ? value : Number(value || 0);
 
-	const money = (amount: number) =>
-		new Intl.NumberFormat(CURRENCY_LOCALES[currency] || "en-US", {
-			style: "currency",
-			currency,
-		}).format(amount);
+	const money = (amount: number) => formatCurrency(amount, currency);
 
 	const [
 		{ rows: transactions },

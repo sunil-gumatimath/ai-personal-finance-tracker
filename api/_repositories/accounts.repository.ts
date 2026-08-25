@@ -45,10 +45,20 @@ export async function updateAccount(userId: string, id: string, data: Record<str
 
 export async function deleteAccount(userId: string, id: string, cascade: boolean) {
   if (cascade) {
-    await query("DELETE FROM transactions WHERE (account_id = $1 OR to_account_id = $1) AND user_id = $2", [
-      id,
-      userId,
-    ]);
+    // Single atomic statement: both deletes succeed together or neither does.
+    // (The Neon HTTP driver cannot wrap statements in a transaction.)
+    await query(
+      `
+      WITH deleted_tx AS (
+        DELETE FROM transactions
+        WHERE (account_id = $1 OR to_account_id = $1) AND user_id = $2
+        RETURNING 1
+      )
+      DELETE FROM accounts WHERE id = $1 AND user_id = $2
+      `,
+      [id, userId],
+    );
+    return;
   }
   await query("DELETE FROM accounts WHERE id = $1 AND user_id = $2", [id, userId]);
 }

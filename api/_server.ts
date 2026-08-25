@@ -1,9 +1,12 @@
 import './_utils/dns-bypass.js'
 import { serve } from 'bun'
-import path from 'path'
 import type { ApiRequest, ApiResponse } from './_utils/types.js'
 import { checkRateLimit } from './_middleware/rate-limit.js'
-import { logEvent, activeWsClients } from './_services/audit-log.service.js'
+import {
+  activeWsClients,
+  ensureSystemLogsTable,
+  logEvent,
+} from './_services/audit-log.service.js'
 import { getAuthedUserId } from './_services/auth.service.js'
 import {
   buildResponseHeaders,
@@ -16,29 +19,11 @@ const PORT = process.env.PORT || 3001
 
 console.log(`🚀 API Server starting on http://localhost:${PORT}`)
 
-async function ensureSystemLogsTable() {
+async function bootstrapSystemLogs() {
   try {
-    // Best-effort: only relevant when a database is configured.
-    const { query } = await import('./_repositories/db.js')
-    await query(`
-      CREATE TABLE IF NOT EXISTS system_logs (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        action TEXT NOT NULL,
-        resource TEXT NOT NULL,
-        old_value TEXT,
-        new_value TEXT,
-        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-        user_email TEXT,
-        severity TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'error', 'critical')),
-        status TEXT NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'failure')),
-        metadata JSONB NOT NULL DEFAULT '{}'::jsonb
-      );
-    `)
-    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs(timestamp DESC);`)
-    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_action ON system_logs(action);`)
-    await query(`CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity);`)
-    console.log('✅ Database system_logs table and indexes verified.')
+    // Canonical DDL lives in audit-log.service.ts; the dev server just makes
+    // sure the table exists at boot so early logs are not lost.
+    await ensureSystemLogsTable()
 
     await logEvent(null, {
       action: 'DEPLOYMENT_EVENT',
@@ -53,7 +38,7 @@ async function ensureSystemLogsTable() {
   }
 }
 
-ensureSystemLogsTable()
+bootstrapSystemLogs()
 
 try {
   serve({
@@ -117,51 +102,8 @@ try {
         return new Response(null, { status: 204, headers })
       }
 
-      // Resolve route. Bun dev supports both file-based (handlers/<path>.ts)
-      // and the shared registry. File-based takes precedence so individual
-      // handler modules can be hot-reloaded during development.
-      let handler: ((req: ApiRequest, res: ApiResponse) => Promise<unknown>) | null = null
-      const extraParams: Record<string, string> = {}
-
-      // 1. Exact file: api/routes/<path>.ts
-      const exactPath = path.join(process.cwd(), 'api', 'routes', apiPath + '.ts')
-      if (await Bun.file(exactPath).exists()) {
-        const mod = await import(exactPath)
-        if (typeof mod.default === 'function') handler = mod.default
-      }
-
-      // 2. Index file: api/routes/<path>/index.ts
-      if (!handler) {
-        const indexPath = path.join(process.cwd(), 'api', 'routes', apiPath, 'index.ts')
-        if (await Bun.file(indexPath).exists()) {
-          const mod = await import(indexPath)
-          if (typeof mod.default === 'function') handler = mod.default
-        }
-      }
-
-      // 3. Dynamic [id].ts
-      if (!handler) {
-        const parts = apiPath.split('/')
-        if (parts.length > 0) {
-          const lastPart = parts.pop()
-          const parentPath = parts.join('/')
-          const dynamicPath = path.join(
-            process.cwd(),
-            'api',
-            'routes',
-            parentPath,
-            '[id].ts',
-          )
-          if (await Bun.file(dynamicPath).exists()) {
-            const mod = await import(dynamicPath)
-            if (typeof mod.default === 'function') handler = mod.default
-            if (lastPart) extraParams.id = lastPart
-          }
-        }
-      }
-
-      // 4. Fall back to the shared registry (matches Vercel routing)
-      if (!handler) handler = resolveRoute(apiPath)
+      // Resolve route through the shared registry (matches Vercel routing).
+      const handler = resolveRoute(apiPath)
 
       if (!handler) {
         console.log(`❌ 404: ${pathname}`)
@@ -171,12 +113,15 @@ try {
         })
       }
 
-      // Rate limiting for sensitive endpoints
+      // Rate limiting for sensitive endpoints. Auth routes do their own
+      // stricter limiting inside auth.routes.ts, so isAuthEndpoint stays off.
       if (isRateLimitedPath(pathname)) {
+        const forwardedFor = req.headers.get('x-forwarded-for')
         const clientId =
-          req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
-        const isAuth = pathname.startsWith('/api/auth')
-        const { allowed, retryAfter } = await checkRateLimit(clientId, pathname, isAuth)
+          (forwardedFor ? forwardedFor.split(',')[0]?.trim() : '') ||
+          req.headers.get('x-real-ip') ||
+          'unknown'
+        const { allowed, retryAfter } = await checkRateLimit(clientId, pathname)
         if (!allowed) {
           headers.set('Retry-After', String(retryAfter ?? 60))
           return new Response(
@@ -198,7 +143,7 @@ try {
         method: req.method,
         body,
         headers: Object.fromEntries(req.headers.entries()),
-        query: { ...Object.fromEntries(url.searchParams.entries()), ...extraParams },
+        query: Object.fromEntries(url.searchParams.entries()),
       }
 
       let status = 200

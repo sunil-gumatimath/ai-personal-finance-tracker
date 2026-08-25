@@ -90,11 +90,8 @@ export async function logEvent(
 	options: LogEventOptions,
 ): Promise<void> {
 	try {
-		// Rework: Only log transaction actions (TRANSACTION_CREATED, TRANSACTION_EDITED, TRANSACTION_DELETED)
-		if (!options.action.startsWith("TRANSACTION_")) {
-			return;
-		}
-
+		// Log ALL actions (USER_*, ACCOUNT_*, RECURRING_*, ERROR, …).
+		// Sensitive values are masked downstream in writeLogToDb/broadcastLog.
 		let finalUserId = options.userId || null;
 		let finalUserEmail = options.userEmail || null;
 

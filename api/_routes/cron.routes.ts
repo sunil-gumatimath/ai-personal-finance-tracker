@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { ApiRequest, ApiResponse } from "../_utils/types.js";
 import {
 	listUsersWithDueRecurring,
@@ -5,19 +6,34 @@ import {
 } from "../_services/transactions.service.js";
 
 /**
+ * Constant-time comparison of two secrets. Both sides are hashed with
+ * SHA-256 first so the inputs always have the same byte length —
+ * `timingSafeEqual` throws on length mismatch.
+ */
+function secretsMatch(a: string, b: string): boolean {
+	const ha = createHash("sha256").update(a).digest();
+	const hb = createHash("sha256").update(b).digest();
+	return timingSafeEqual(ha, hb);
+}
+
+/**
  * Cron endpoint for scheduled maintenance jobs.
  *
- * NOT user-authenticated — it is invoked by Vercel Cron with
- * `Authorization: Bearer <CRON_SECRET>` (see vercel.json `crons`), or by any
- * scheduler that knows the secret. When `CRON_SECRET` is not configured the
- * endpoint refuses to run (fail-safe: never expose unauthenticated writes).
+ * NOT user-authenticated — it is invoked by Vercel Cron with an HTTP GET and
+ * `Authorization: Bearer <CRON_SECRET>` (see vercel.json `crons`; schedule is
+ * daily at 03:00 UTC), or by any scheduler that knows the secret. POST is
+ * accepted too for manual triggering. When `CRON_SECRET` is not configured
+ * the endpoint refuses to run (fail-safe: never expose unauthenticated writes).
  *
  * Actions:
- *   POST /api/cron?action=recurring  — materialize due recurring transactions
- *                                      for every user (no AI, cheap, run hourly).
+ *   GET|POST /api/cron[?action=recurring]  — materialize due recurring
+ *       transactions for every user (no AI, cheap; `recurring` is the default
+ *       action so a bare `/api/cron` invocation works regardless of how the
+ *       scheduler handles the query string).
  */
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-	if (req.method !== "POST") {
+	// Vercel Crons issue GET requests; POST is kept for manual runs.
+	if (req.method !== "GET" && req.method !== "POST") {
 		res.status(405).json({ error: "Method not allowed" });
 		return;
 	}
@@ -43,14 +59,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 	}
 
 	const authorized =
-		(bearer.length > 0 && bearer === expected) ||
-		(headerSecret.length > 0 && headerSecret === expected);
+		(bearer.length > 0 && secretsMatch(bearer, expected)) ||
+		(headerSecret.length > 0 && secretsMatch(headerSecret, expected));
 	if (!authorized) {
 		res.status(403).json({ error: "Forbidden" });
 		return;
 	}
 
-	const action = req.query?.action;
+	// Default to the only supported action when the query param is absent.
+	const action = req.query?.action || "recurring";
 
 	if (action === "recurring") {
 		try {

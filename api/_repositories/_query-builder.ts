@@ -2,6 +2,8 @@
  * Safe query builder utilities to prevent SQL injection
  */
 
+import { ValidationError } from "../_errors/AppError.js";
+
 // Allowed column names for each table to prevent SQL injection
 const ALLOWED_COLUMNS: Record<string, string[]> = {
 	accounts: [
@@ -84,7 +86,8 @@ const MAX_LENGTHS: Record<string, Record<string, number>> = {
 };
 
 /**
- * Validates that input string values do not exceed maximum lengths
+ * Validates that input string values do not exceed maximum lengths.
+ * Throws ValidationError so sendApiError maps it to a 400 response.
  */
 function validateInputLengths(
 	table: string,
@@ -98,25 +101,29 @@ function validateInputLengths(
 			limits[key] &&
 			value.length > limits[key]
 		) {
-			throw new Error(
+			throw new ValidationError(
 				`Field '${key}' exceeds maximum length of ${limits[key]} characters`,
 			);
 		}
 	}
 }
 
+/** Server-side identifier pattern for generated column keys. */
+const IDENTIFIER_REGEX = /^[a-z_][a-z0-9_]*$/;
+
 /**
- * Validates that column names are allowed for the given table
+ * Validates that column names are allowed for the given table.
+ * Throws ValidationError so sendApiError maps it to a 400 response.
  */
 function validateColumns(table: string, columns: string[]): string[] {
 	const allowed = ALLOWED_COLUMNS[table];
 	if (!allowed) {
-		throw new Error("Invalid request");
+		throw new ValidationError(`Unknown resource type: ${table}`);
 	}
 
 	const invalid = columns.filter((col) => !allowed.includes(col));
 	if (invalid.length > 0) {
-		throw new Error("Invalid request: one or more fields are not allowed");
+		throw new ValidationError("One or more fields are not allowed");
 	}
 
 	return columns;
@@ -176,9 +183,13 @@ export function buildInsertQuery(
 
 	const values = keys.map((k) => data[k]);
 
-	// Add additional columns (like user_id)
+	// Add additional columns (like user_id). These are server-supplied, but
+	// still validate the keys so nothing unexpected can reach the SQL text.
 	if (additionalColumns) {
 		Object.entries(additionalColumns).forEach(([key, value]) => {
+			if (!IDENTIFIER_REGEX.test(key)) {
+				throw new ValidationError("Invalid insert column name");
+			}
 			keys.push(key);
 			values.push(value);
 		});

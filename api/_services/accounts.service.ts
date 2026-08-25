@@ -1,7 +1,7 @@
 import type { ApiRequest } from "../_utils/types.js";
 import { NotFoundError, ValidationError } from "../_errors/AppError.js";
 import { assertUuid } from "../_domain/common.js";
-import { validateCreateAccountInput } from "../_domain/accounts.js";
+import { validateCreateAccountInput, validateUpdateAccountInput } from "../_domain/accounts.js";
 import { logEvent } from "./audit-log.service.js";
 import {
   countLinkedTransactions,
@@ -49,6 +49,7 @@ export async function updateUserAccount(
   data: Record<string, unknown>,
 ) {
   assertUuid(id, "account ID");
+  validateUpdateAccountInput(data);
   const oldAccount = await findAccountById(userId, id);
   if (!oldAccount) throw new NotFoundError("Account not found");
 

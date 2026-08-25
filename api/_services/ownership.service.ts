@@ -1,14 +1,17 @@
 import { queryOne } from "../_repositories/db.js";
+import { AppError, NotFoundError, ValidationError } from "../_errors/AppError.js";
 
 type RecordLike = Record<string, unknown>;
 
-export class OwnershipError extends Error {
-  statusCode: number;
-
-  constructor(message: string, statusCode = 400) {
-    super(message);
+/**
+ * Cross-user / cross-tenant access error (403 by default). Part of the
+ * AppError hierarchy so sendApiError handles it through the generic path.
+ * Kept as a distinct class so callers can still branch on it explicitly.
+ */
+export class OwnershipError extends AppError {
+  constructor(message: string, statusCode = 403) {
+    super(message, statusCode, true);
     this.name = "OwnershipError";
-    this.statusCode = statusCode;
   }
 }
 
@@ -19,7 +22,7 @@ async function assertOwned(
   label: string,
 ) {
   if (typeof id !== "string" || id.trim().length === 0) {
-    throw new OwnershipError(`${label} is required`);
+    throw new ValidationError(`${label} is required`);
   }
 
   const row = await queryOne<{ id: string }>(
@@ -28,7 +31,8 @@ async function assertOwned(
   );
 
   if (!row) {
-    throw new OwnershipError(`${label} not found`, 404);
+    // Row filtered by user_id — report not-found without leaking existence.
+    throw new NotFoundError(`${label} not found`);
   }
 }
 
@@ -69,7 +73,7 @@ export async function assertTransactionReferencesOwned(
   const type = tx.type;
 
   if (!["income", "expense", "transfer"].includes(String(type))) {
-    throw new OwnershipError("Valid transaction type is required");
+    throw new ValidationError("Valid transaction type is required");
   }
 
   await assertOwnedAccount(userId, tx.account_id, "Account");
@@ -77,7 +81,7 @@ export async function assertTransactionReferencesOwned(
   if (type === "transfer") {
     await assertOwnedAccount(userId, tx.to_account_id, "Destination account");
     if (tx.account_id === tx.to_account_id) {
-      throw new OwnershipError("Transfer accounts must be different");
+      throw new ValidationError("Transfer accounts must be different");
     }
   }
 

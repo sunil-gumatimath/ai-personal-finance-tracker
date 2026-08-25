@@ -36,8 +36,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === "POST") {
       try {
-        const payment = await createUserDebtPayment(userId, req.body || {});
-        res.status(201).json({ payment });
+        // Response includes the post-update debt (new balance) alongside the
+        // payment — the frontend consumes `response.debt`.
+        const { payment, debt } = await createUserDebtPayment(
+          userId,
+          req.body || {},
+        );
+        res.status(201).json({ payment, debt });
       } catch (error) {
         console.error("Debt payments POST error:", error);
         sendApiError(res, error);

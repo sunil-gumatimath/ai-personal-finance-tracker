@@ -48,16 +48,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 	}
 
 	if (isRateLimitedPath(pathname)) {
+		// Key on the leftmost x-forwarded-for entry — that is the original
+		// client; the raw header may chain multiple proxy IPs and would let
+		// anyone rotate their key by spoofing an extra hop.
+		const forwardedFor = req.headers["x-forwarded-for"] as string | undefined;
 		const clientId =
-			(req.headers["x-forwarded-for"] as string) ||
-			(req.headers["x-real-ip"] as string) ||
+			forwardedFor?.split(",")[0]?.trim() ||
+			(req.headers["x-real-ip"] as string | undefined) ||
 			"unknown";
-		const isAuth = pathname.startsWith("/api/auth");
-		const { allowed, retryAfter } = await checkRateLimit(
-			clientId,
-			pathname,
-			isAuth,
-		);
+		// Auth routes apply their own stricter limiting inside auth.routes.ts.
+		const { allowed, retryAfter } = await checkRateLimit(clientId, pathname);
 		if (!allowed) {
 			res.setHeader("Retry-After", String(retryAfter ?? 60));
 			res

@@ -21,6 +21,7 @@ const service = mockService("../_services/transactions.service.js", {
 	}),
 	updateUserTransaction: async () => ({ id: "tx-1", amount: "-15.00" }),
 	deleteUserTransaction: async () => undefined,
+	listUsersWithDueRecurring: async () => [],
 	processDueRecurringTransactions: async () => ({
 		created: [{ id: "tx-occ" }],
 		completed: 1,
