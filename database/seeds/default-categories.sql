@@ -2,6 +2,11 @@
 -- SEED: Default Categories
 -- Inserts default income and expense categories for a new user.
 -- Usage: Replace <USER_ID> with the actual user UUID before running.
+--
+-- ⚠ KEEP IN SYNC: this file mirrors api/_utils/default-categories.ts
+--   (DEFAULT_CATEGORIES). Any category added/removed/renamed here MUST
+--   be mirrored there (and vice versa) or new users will get divergent
+--   default sets depending on how they were created.
 -- ====================================================================
 
 INSERT INTO categories (user_id, name, type, color, icon)

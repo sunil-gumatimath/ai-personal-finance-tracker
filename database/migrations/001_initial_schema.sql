@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- =====================================================
 -- TABLE: users
 -- =====================================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   encrypted_password TEXT,
@@ -24,7 +24,7 @@ CREATE TABLE users (
 -- =====================================================
 -- TABLE: profiles
 -- =====================================================
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   full_name TEXT,
@@ -38,7 +38,7 @@ CREATE TABLE profiles (
 -- =====================================================
 -- TABLE: accounts
 -- =====================================================
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE accounts (
 -- =====================================================
 -- TABLE: categories
 -- =====================================================
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE categories (
 -- =====================================================
 -- TABLE: transactions
 -- =====================================================
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE transactions (
 -- =====================================================
 -- TABLE: budgets
 -- =====================================================
-CREATE TABLE budgets (
+CREATE TABLE IF NOT EXISTS budgets (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   category_id UUID REFERENCES categories(id) ON DELETE CASCADE NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE budgets (
 -- =====================================================
 -- TABLE: goals
 -- =====================================================
-CREATE TABLE goals (
+CREATE TABLE IF NOT EXISTS goals (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -126,7 +126,7 @@ CREATE TABLE goals (
 -- =====================================================
 -- TABLE: ai_insights
 -- =====================================================
-CREATE TABLE ai_insights (
+CREATE TABLE IF NOT EXISTS ai_insights (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('anomaly', 'coaching', 'kudo')),
@@ -208,41 +208,48 @@ $$ LANGUAGE plpgsql;
 -- =====================================================
 -- TRIGGERS
 -- =====================================================
+DROP TRIGGER IF EXISTS trigger_update_account_balance ON transactions;
 CREATE TRIGGER trigger_update_account_balance
   AFTER INSERT OR UPDATE OR DELETE ON transactions
   FOR EACH ROW EXECUTE FUNCTION update_account_balance();
 
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_accounts_updated_at ON accounts;
 CREATE TRIGGER update_accounts_updated_at BEFORE UPDATE ON accounts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_transactions_updated_at ON transactions;
 CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_budgets_updated_at ON budgets;
 CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_goals_updated_at ON goals;
 CREATE TRIGGER update_goals_updated_at BEFORE UPDATE ON goals
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
 -- INDEXES
 -- =====================================================
-CREATE INDEX idx_accounts_user_id ON accounts(user_id);
-CREATE INDEX idx_categories_user_id ON categories(user_id);
-CREATE INDEX idx_transactions_user_id ON transactions(user_id);
-CREATE INDEX idx_transactions_date ON transactions(date);
-CREATE INDEX idx_transactions_account_id ON transactions(account_id);
-CREATE INDEX idx_transactions_category_id ON transactions(category_id);
-CREATE INDEX idx_transactions_to_account_id ON transactions(to_account_id);
-CREATE INDEX idx_transactions_user_date ON transactions(user_id, date DESC);
-CREATE INDEX idx_budgets_user_id ON budgets(user_id);
-CREATE INDEX idx_budgets_category_id ON budgets(category_id);
-CREATE INDEX idx_goals_user_id ON goals(user_id);
-CREATE INDEX idx_profiles_user_id ON profiles(user_id);
-CREATE INDEX idx_ai_insights_user_id ON ai_insights(user_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_to_account_id ON transactions(to_account_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_budgets_user_id ON budgets(user_id);
+CREATE INDEX IF NOT EXISTS idx_budgets_category_id ON budgets(category_id);
+CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_insights_user_id ON ai_insights(user_id);

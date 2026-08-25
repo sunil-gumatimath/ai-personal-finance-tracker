@@ -77,9 +77,11 @@ $$ LANGUAGE plpgsql;
 -- =====================================================
 -- TRIGGERS
 -- =====================================================
+DROP TRIGGER IF EXISTS update_debts_updated_at ON debts;
 CREATE TRIGGER update_debts_updated_at BEFORE UPDATE ON debts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_update_debt_balance ON debt_payments;
 CREATE TRIGGER trigger_update_debt_balance
   AFTER INSERT OR UPDATE OR DELETE ON debt_payments
   FOR EACH ROW EXECUTE FUNCTION update_debt_balance_on_payment();
