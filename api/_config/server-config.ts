@@ -24,13 +24,48 @@ const HSTS_HEADER: Record<string, string> =
 
 /**
  * Origins permitted to make credentialed cross-origin requests.
- * In production the deployed Vercel URL should be in here.
+ *
+ * Built from:
+ *  - local dev origins (always)
+ *  - the known production URL(s)
+ *  - Vercel's automatic domain env vars (per-deployment / per-project), so
+ *    preview deployments and URL changes keep working without code edits
+ *  - an optional comma-separated ALLOWED_ORIGINS env var for custom domains
  */
-const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://personal-finance-tracker-ted.vercel.app",
+const LOCAL_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
+
+const KNOWN_PRODUCTION_ORIGINS = [
+  "https://personal-finance-tracker-six-zeta.vercel.app",
 ];
+
+function computeAllowedOrigins(): Set<string> {
+  const origins = new Set<string>([...LOCAL_ORIGINS, ...KNOWN_PRODUCTION_ORIGINS]);
+
+  // Extra origins configured via env (comma-separated list).
+  if (process.env.ALLOWED_ORIGINS) {
+    for (const entry of process.env.ALLOWED_ORIGINS.split(",")) {
+      const trimmed = entry.trim();
+      if (trimmed) origins.add(trimmed);
+    }
+  }
+
+  // Vercel injects bare hostnames (no scheme) for each project/deployment.
+  for (const key of [
+    "VERCEL_PROJECT_PRODUCTION_URL",
+    "VERCEL_BRANCH_URL",
+    "VERCEL_URL",
+  ]) {
+    const host = process.env[key];
+    if (host) origins.add(`https://${host}`);
+  }
+
+  return origins;
+}
+
+const ALLOWED_ORIGINS = computeAllowedOrigins();
+
+/** Origin echoed back when a request arrives without one (curl, cron, etc.). */
+const FALLBACK_ORIGIN = LOCAL_ORIGINS[0];
 
 /** Endpoints with stricter rate limits. Auth routes are limited inside auth.ts. */
 const RATE_LIMITED_PREFIXES = ["/api/ai/chat", "/api/ai/insights"];
@@ -45,8 +80,8 @@ export const DEFAULT_CURRENCY = "INR";
 export function resolveCorsOrigin(
   origin: string,
 ): { ok: true; origin: string } | { ok: false } {
-  if (!origin) return { ok: true, origin: ALLOWED_ORIGINS[0] };
-  if (!ALLOWED_ORIGINS.includes(origin)) return { ok: false };
+  if (!origin) return { ok: true, origin: FALLBACK_ORIGIN };
+  if (!ALLOWED_ORIGINS.has(origin)) return { ok: false };
   return { ok: true, origin };
 }
 
