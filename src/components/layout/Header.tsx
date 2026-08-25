@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext'
 const routeConfig: Record<string, { title: string; breadcrumb: string }> = {
     '/': { title: 'Dashboard', breadcrumb: 'Dashboard' },
     '/transactions': { title: 'Transactions', breadcrumb: 'Transactions' },
+    '/reports': { title: 'Reports', breadcrumb: 'Reports' },
     '/calendar': { title: 'Calendar', breadcrumb: 'Calendar' },
     '/budgets': { title: 'Budgets', breadcrumb: 'Budgets' },
     '/goals': { title: 'Savings Goals', breadcrumb: 'Goals' },
@@ -109,7 +110,7 @@ export function Header() {
                             </Avatar>
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuContent className="w-56" align="end">
                         <DropdownMenuLabel className="font-normal">
                             <div className="flex flex-col space-y-1">
                                 <p className="text-sm font-medium leading-none">

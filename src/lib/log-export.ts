@@ -7,6 +7,7 @@ import {
 	generateHumanDescription,
 	getFieldChanges,
 } from "./log-formatter";
+import { escapeCsvField } from "./csv";
 
 export interface LogExport {
 	content: string;
@@ -68,7 +69,7 @@ export function buildLogExport(
 	});
 	const content = [
 		headers.join(","),
-		...rows.map((row) => row.map((value) => `"${value}"`).join(",")),
+		...rows.map((row) => row.map((value) => escapeCsvField(value)).join(",")),
 	].join("\n");
 	return { content, filename: `${baseName}.csv` };
 }

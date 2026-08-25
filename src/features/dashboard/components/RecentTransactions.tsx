@@ -3,6 +3,8 @@ import { ArrowDownLeft, ArrowUpRight, ArrowRight, Receipt } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { usePreferences } from '@/hooks/usePreferences'
+import { parseTransactionDate } from '@/lib/date-utils'
+import { toNumber } from '@/lib/number'
 import type { Transaction } from '@/types'
 import { Link } from 'react-router-dom'
 import type { Insight } from '@/hooks/useAIInsights'
@@ -115,7 +117,7 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground">
-                                        {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                        {format(parseTransactionDate(transaction.date), 'MMM d, yyyy')}
                                     </p>
                                 </div>
                             </div>
@@ -127,7 +129,7 @@ export function RecentTransactions({ transactions, anomalies = [] }: RecentTrans
                                     )}
                                 >
                                     {transaction.type === 'income' ? '+' : '-'}
-                                    {formatCurrency(Math.abs(transaction.amount))}
+                                    {formatCurrency(Math.abs(toNumber(transaction.amount)))}
                                 </p>
                                 {transaction.category && (
                                     <Badge

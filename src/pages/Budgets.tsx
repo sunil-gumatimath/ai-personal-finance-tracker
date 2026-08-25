@@ -11,6 +11,16 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog'
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -24,6 +34,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
+import { toNumber } from '@/lib/number'
 import { cn } from '@/lib/utils'
 import type { Budget, Category } from '@/types'
 
@@ -35,6 +46,7 @@ export function Budgets() {
     const [categories, setCategories] = useState<Category[]>([])
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
+    const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null)
     const [formData, setFormData] = useState({
         category_id: '',
         amount: '',
@@ -136,8 +148,8 @@ export function Budgets() {
         )
     }
 
-    const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0)
-    const totalSpent = budgets.reduce((sum, b) => sum + (b.spent || 0), 0)
+    const totalBudget = budgets.reduce((sum, b) => sum + toNumber(b.amount), 0)
+    const totalSpent = budgets.reduce((sum, b) => sum + toNumber(b.spent), 0)
 
     return (
         <div className="space-y-6">
@@ -272,9 +284,11 @@ export function Budgets() {
             ) : (
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {budgets.map((budget) => {
-                        const spent = budget.spent || 0
-                        const percentage = Math.min((spent / budget.amount) * 100, 100)
-                        const isOverBudget = spent > budget.amount
+                        // DECIMAL fields may arrive as strings — normalize once
+                        const spent = toNumber(budget.spent)
+                        const limit = toNumber(budget.amount)
+                        const percentage = Math.min((spent / limit) * 100, 100)
+                        const isOverBudget = spent > limit
 
                         return (
                             <div key={budget.id} className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
@@ -289,7 +303,7 @@ export function Budgets() {
                                         </Badge>
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                        {formatCurrency(spent)} of {formatCurrency(budget.amount)}
+                                        {formatCurrency(spent)} of {formatCurrency(limit)}
                                     </p>
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
@@ -301,7 +315,7 @@ export function Budgets() {
                                         <Progress
                                             value={percentage}
                                             className="h-2"
-                                            style={{ '--progress-color': getProgressColor(spent, budget.amount) } as React.CSSProperties}
+                                            style={{ '--progress-color': getProgressColor(spent, limit) } as React.CSSProperties}
                                         />
                                     </div>
                                     <div className="flex justify-between text-sm">
@@ -313,10 +327,12 @@ export function Budgets() {
                                             )}
                                         >
                                             {isOverBudget ? '-' : ''}
-                                            {formatCurrency(Math.abs(budget.amount - spent))}
+                                            {formatCurrency(Math.abs(limit - spent))}
                                         </span>
                                     </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {/* Always visible but subdued; fully opaque on
+                                        hover or keyboard focus within the card */}
+                                    <div className="flex gap-2 opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -337,7 +353,7 @@ export function Budgets() {
                                             variant="outline"
                                             size="sm"
                                             className="flex-1 text-destructive hover:text-destructive"
-                                            onClick={() => handleDelete(budget.id)}
+                                            onClick={() => setBudgetToDelete(budget)}
                                         >
                                             Delete
                                         </Button>
@@ -426,6 +442,39 @@ export function Budgets() {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Delete confirmation */}
+            <AlertDialog
+                open={budgetToDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) setBudgetToDelete(null)
+                }}
+            >
+                <AlertDialogContent className="sm:max-w-[425px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-destructive">
+                            Delete Budget
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Delete the budget for{" "}
+                            <strong>"{budgetToDelete?.category?.name || 'Unknown Category'}"</strong>?
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:gap-2">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                                if (budgetToDelete) handleDelete(budgetToDelete.id)
+                                setBudgetToDelete(null)
+                            }}
+                        >
+                            Delete Budget
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

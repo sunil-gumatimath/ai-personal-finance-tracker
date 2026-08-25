@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import {
 	Download,
@@ -61,10 +62,13 @@ export function Transactions() {
 	const [editingTransaction, setEditingTransaction] =
 		useState<Transaction | null>(null);
 	const [formData, setFormData] = useState<TransactionFormData>(EMPTY_FORM);
+	const [formError, setFormError] = useState<string | null>(null);
 	const [aiPrompt, setAiPrompt] = useState("");
 	const [aiLoading, setAiLoading] = useState(false);
 	const [processingRecurring, setProcessingRecurring] = useState(false);
 
+	// TODO(product): the transactions page loads the full history without a
+	// limit; decide on pagination/virtualization for large datasets.
 	const fetchData = useCallback(async () => {
 		if (!user) {
 			setLoading(false);
@@ -122,10 +126,25 @@ export function Transactions() {
 		e.preventDefault();
 		if (!user) return;
 
+		// Explicit submit-time guards — native `required` can't cover the Radix
+		// Selects, and NaN/zero amounts must never reach the API.
+		const amount = Number.parseFloat(formData.amount);
+		if (!formData.account_id) {
+			setFormError("Please select an account.");
+			toast.error("Please select an account");
+			return;
+		}
+		if (!Number.isFinite(amount) || amount <= 0) {
+			setFormError("Amount must be a number greater than 0.");
+			toast.error("Amount must be greater than 0");
+			return;
+		}
+		setFormError(null);
+
 		try {
 			const transactionData: TransactionCreatePayload = {
 				type: formData.type,
-				amount: parseFloat(formData.amount),
+				amount,
 				description: formData.description || null,
 				category_id: formData.category_id || null,
 				account_id: formData.account_id,
@@ -184,18 +203,31 @@ export function Transactions() {
 			recurring_frequency: transaction.recurring_frequency || "",
 			recurring_end_date: transaction.recurring_end_date || "",
 		});
+		setFormError(null);
 		setIsDialogOpen(true);
 	};
 
-	const resetForm = () => {
+	const resetForm = useCallback(() => {
 		setEditingTransaction(null);
 		setFormData({ ...EMPTY_FORM, account_id: accounts[0]?.id || "" });
-	};
+		setFormError(null);
+	}, [accounts]);
 
-	const openAddDialog = () => {
+	const openAddDialog = useCallback(() => {
 		resetForm();
 		setIsDialogOpen(true);
-	};
+	}, [resetForm]);
+
+	const [searchParams, setSearchParams] = useSearchParams();
+
+	// Deep link support: /transactions?action=new opens the create dialog once,
+	// then strips the param so back/refresh don't re-trigger it.
+	useEffect(() => {
+		if (searchParams.get("action") === "new" && !loading) {
+			setSearchParams({}, { replace: true });
+			openAddDialog();
+		}
+	}, [searchParams, setSearchParams, loading, openAddDialog]);
 
 	/** Natural-language quick entry: parse the prompt, prefill the dialog. */
 	const handleAiParse = async () => {
@@ -402,6 +434,7 @@ export function Transactions() {
 				categories={categories}
 				accounts={accounts}
 				onSubmit={handleSubmit}
+				error={formError}
 			/>
 		</div>
 	);

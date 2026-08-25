@@ -217,6 +217,12 @@ export interface DebtPaymentsListResponse {
 
 export interface DebtPaymentResponse {
 	payment: DebtPayment;
+	/**
+	 * Updated debt row returned by the server (with server-computed
+	 * current_balance). Optional so older backends without it still work —
+	 * consumers fall back to refetching the debts list.
+	 */
+	debt?: Debt;
 }
 
 export interface DebtPaymentPayload {

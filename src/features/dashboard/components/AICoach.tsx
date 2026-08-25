@@ -11,12 +11,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAIInsights } from "@/hooks/useAIInsights";
 import type { Insight } from "@/hooks/useAIInsights";
 import { cn } from "@/lib/utils";
 
-export function AICoach() {
-	const { insights, loading, dismissInsight } = useAIInsights();
+interface AICoachProps {
+	/**
+	 * Insights are owned by the Dashboard's single useAIInsights instance and
+	 * passed down, so the card and other consumers share one fetch + one
+	 * dismissal state.
+	 */
+	insights: Insight[];
+	isLoading: boolean;
+	dismissInsight: (id: string) => Promise<void> | void;
+}
+
+export function AICoach({
+	insights,
+	isLoading,
+	dismissInsight,
+}: AICoachProps) {
 	const [currentIndex, setCurrentIndex] = useState(0);
 
 	useEffect(() => {
@@ -29,7 +42,7 @@ export function AICoach() {
 	}, [insights.length]);
 
 	// Loading skeleton
-	if (loading) {
+	if (isLoading) {
 		return (
 			<Card className="border-border/50 bg-card/50">
 				<CardContent className="p-4">

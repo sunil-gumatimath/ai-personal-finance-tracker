@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { useDebts, debtTypes, debtColors } from "@/hooks/useDebts";
+import { useDebts } from "@/hooks/useDebts";
 import {
   PayoffProgressRing,
   DebtCard,
@@ -337,5 +337,3 @@ export function Debts() {
   );
 }
 
-// Re-export icon and label configurations for subcomponents if needed
-export { debtTypes, debtColors };

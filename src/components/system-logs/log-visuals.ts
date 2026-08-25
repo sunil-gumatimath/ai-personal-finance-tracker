@@ -28,7 +28,9 @@ export function getActionColor(action: string): ActionColor {
 			bg: "bg-emerald-500/10",
 			border: "border-emerald-500/20",
 			text: "text-emerald-600",
-			glow: "shadow-emerald-500/10",
+			// Full static class strings — dynamically composed variants like
+			// `group-hover:${glow}` never compile in Tailwind's source scan.
+			glow: "group-hover:shadow-emerald-500/10",
 		};
 	}
 	if (action === "TRANSACTION_EDITED") {
@@ -36,14 +38,14 @@ export function getActionColor(action: string): ActionColor {
 			bg: "bg-blue-500/10",
 			border: "border-blue-500/20",
 			text: "text-blue-600",
-			glow: "shadow-blue-500/10",
+			glow: "group-hover:shadow-blue-500/10",
 		};
 	}
 	return {
 		bg: "bg-rose-500/10",
 		border: "border-rose-500/20",
 		text: "text-rose-600",
-		glow: "shadow-rose-500/10",
+		glow: "group-hover:shadow-rose-500/10",
 	};
 }
 

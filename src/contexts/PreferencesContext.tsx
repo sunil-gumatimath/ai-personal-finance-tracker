@@ -4,6 +4,8 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import {
@@ -54,6 +56,13 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     loadInitialPreferences,
   );
 
+  // Latest preferences for callbacks that must not re-create on every state
+  // change (avoids both stale closures and unstable identities).
+  const preferencesRef = useRef(preferences);
+  useEffect(() => {
+    preferencesRef.current = preferences;
+  }, [preferences]);
+
   // Sync from Database on Load
   useEffect(() => {
     const fetchPreferences = async () => {
@@ -100,17 +109,20 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       newPreferences: Partial<Preferences>,
       apiKeys?: ProviderApiKeyUpdate,
     ) => {
-      const currentState = normalizePreferences({ ...preferences, ...newPreferences });
-      setPreferences((prev) => {
-        const updated = normalizePreferences({ ...prev, ...newPreferences });
-        localStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated));
-        return updated;
+      // Compute the next state from the latest preferences (ref, not closure)
+      // and persist OUTSIDE any setState updater — updaters must stay pure
+      // because React may invoke them twice (e.g. StrictMode).
+      const merged = normalizePreferences({
+        ...preferencesRef.current,
+        ...newPreferences,
       });
+      setPreferences(merged);
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(merged));
 
       if (user) {
         try {
           const response = await api.profile.update({
-            preferences: currentState,
+            preferences: merged,
             apiKeys,
             currency: newPreferences.currency,
           });
@@ -123,7 +135,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [user, preferences],
+    [user],
   );
 
   // Format currency based on user preference
@@ -143,16 +155,19 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     return currencySymbols[preferences.currency] || "$";
   }, [preferences.currency]);
 
+  const contextValue = useMemo(
+    () => ({
+      preferences,
+      setPreferences,
+      savePreferences,
+      formatCurrency,
+      getCurrencySymbol,
+    }),
+    [preferences, savePreferences, formatCurrency, getCurrencySymbol],
+  );
+
   return (
-    <PreferencesContext.Provider
-      value={{
-        preferences,
-        setPreferences,
-        savePreferences,
-        formatCurrency,
-        getCurrencySymbol,
-      }}
-    >
+    <PreferencesContext.Provider value={contextValue}>
       {children}
     </PreferencesContext.Provider>
   );

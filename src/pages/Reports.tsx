@@ -5,6 +5,7 @@ import {
 	ArrowRight,
 	Download,
 	FileText,
+	Info,
 	TrendingDown,
 	TrendingUp,
 	Wallet,
@@ -36,6 +37,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import { api } from "@/lib/api-client";
 import { downloadTransactionsCsv } from "@/lib/transaction-csv";
+import { parseTransactionDate } from "@/lib/date-utils";
+import { toNumber } from "@/lib/number";
 import type { Account, Transaction } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -51,11 +54,6 @@ interface MonthlyPoint {
 	income: number;
 	expenses: number;
 }
-
-const toNumber = (value: unknown): number => {
-	const n = typeof value === "number" ? value : Number(value);
-	return Number.isFinite(n) ? n : 0;
-};
 
 const MONTH_LABELS = [
 	"Jan",
@@ -83,12 +81,16 @@ const CATEGORY_COLORS = [
 	"#6366f1",
 ];
 
+/** Max transactions fetched for reports — beyond this, results are capped server-side. */
+const REPORTS_TX_LIMIT = 1000;
+
 export function Reports() {
 	const { user } = useAuth();
 	const { formatCurrency } = usePreferences();
 	const [loading, setLoading] = useState(true);
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [accounts, setAccounts] = useState<Account[]>([]);
+	const [truncated, setTruncated] = useState(false);
 	const [viewMode, setViewMode] = useState<"month" | "year">("month");
 	const [periodDate, setPeriodDate] = useState(() => new Date());
 	const [exporting, setExporting] = useState(false);
@@ -100,14 +102,15 @@ export function Reports() {
 		}
 		try {
 			const [transactionsRes, accountsRes] = await Promise.all([
-				api.transactions.list({ limit: 1000 }),
+				api.transactions.list({ limit: REPORTS_TX_LIMIT }),
 				api.accounts.list(),
 			]);
-			setTransactions(
-				(Array.isArray(transactionsRes.transactions)
-					? transactionsRes.transactions
-					: []) as Transaction[],
-			);
+			const fetched = Array.isArray(transactionsRes.transactions)
+				? transactionsRes.transactions
+				: [];
+			setTransactions(fetched as Transaction[]);
+			// The API caps results; flag when we may be looking at a subset.
+			setTruncated(fetched.length >= REPORTS_TX_LIMIT);
 			setAccounts(
 				(Array.isArray(accountsRes.accounts)
 					? accountsRes.accounts
@@ -125,24 +128,35 @@ export function Reports() {
 		fetchData();
 	}, [fetchData]);
 
+	// Shared trailing-12-month window. Keys are LOCAL year-month pairs so both
+	// the period filter and the monthly chart agree on what "last 12 months"
+	// means regardless of timezone.
+	const last12Months = useMemo(() => {
+		const now = new Date();
+		const months: Array<{ key: string; label: string }> = [];
+		for (let i = 11; i >= 0; i--) {
+			const monthDate = subMonths(now, i);
+			months.push({
+				key: `${monthDate.getFullYear()}-${monthDate.getMonth()}`,
+				label: `${MONTH_LABELS[monthDate.getMonth()]} ${String(monthDate.getFullYear()).slice(2)}`,
+			});
+		}
+		return months;
+	}, []);
+
 	const inPeriod = useCallback(
 		(t: Transaction): boolean => {
+			const d = parseTransactionDate(t.date);
 			if (viewMode === "month") {
-				const d = new Date(t.date);
 				return (
 					d.getFullYear() === periodDate.getFullYear() &&
 					d.getMonth() === periodDate.getMonth()
 				);
 			}
-			const d = new Date(t.date);
-			const now = new Date();
-			return (
-				d.getFullYear() === now.getFullYear() &&
-				d.getMonth() >= now.getMonth() - 11 &&
-				d.getMonth() <= now.getMonth()
-			);
+			const key = `${d.getFullYear()}-${d.getMonth()}`;
+			return last12Months.some((m) => m.key === key);
 		},
-		[viewMode, periodDate],
+		[viewMode, periodDate, last12Months],
 	);
 
 	const periodTransactions = useMemo(
@@ -189,27 +203,24 @@ export function Reports() {
 	}, [periodTransactions]);
 
 	const monthlyTrend = useMemo<MonthlyPoint[]>(() => {
-		const now = new Date();
 		const points: MonthlyPoint[] = [];
-		for (let i = 11; i >= 0; i--) {
-			const monthDate = subMonths(now, i);
-			const key = `${monthDate.getFullYear()}-${monthDate.getMonth()}`;
+		for (const { key, label } of last12Months) {
 			let income = 0;
 			let expenses = 0;
 			for (const t of transactions) {
-				const d = new Date(t.date);
+				const d = parseTransactionDate(t.date);
 				if (`${d.getFullYear()}-${d.getMonth()}` !== key) continue;
 				if (t.type === "income") income += toNumber(t.amount);
 				else if (t.type === "expense") expenses += toNumber(t.amount);
 			}
 			points.push({
-				month: `${MONTH_LABELS[monthDate.getMonth()]} ${String(monthDate.getFullYear()).slice(2)}`,
+				month: label,
 				income: Math.round(income * 100) / 100,
 				expenses: Math.round(expenses * 100) / 100,
 			});
 		}
 		return points;
-	}, [transactions]);
+	}, [transactions, last12Months]);
 
 	const periodTransactionsSorted = useMemo(
 		() => [...periodTransactions].sort((a, b) => b.date.localeCompare(a.date)),
@@ -349,6 +360,14 @@ export function Reports() {
 					</Button>
 				</div>
 			</div>
+
+			{/* Truncation notice — the API caps the fetch size */}
+			{truncated && (
+				<div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+					<Info className="h-3.5 w-3.5 shrink-0" />
+					Showing most recent {REPORTS_TX_LIMIT} transactions.
+				</div>
+			)}
 
 			{/* Period selector */}
 			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-all duration-300 hover:border-border hover:bg-card/80">

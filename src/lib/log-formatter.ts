@@ -48,10 +48,21 @@ export function formatTimestamp(timestamp: string): {
 	return { absolute, relative };
 }
 
-function formatCurrency(amount: string | number): string {
+/**
+ * Formats an amount as currency. Currency-blind callers keep the "USD"
+ * default; TODO: thread preferences.currency through the log UI when the
+ * formatter gains access to PreferencesContext.
+ */
+function formatCurrency(
+	amount: string | number,
+	currency: string = "USD",
+): string {
 	const num = typeof amount === "string" ? parseFloat(amount) : amount;
 	if (isNaN(num)) return String(amount);
-	return `$${num.toFixed(2)}`;
+	return new Intl.NumberFormat("en-US", {
+		style: "currency",
+		currency,
+	}).format(num);
 }
 
 export function formatFieldName(field: string): string {
@@ -96,7 +107,7 @@ export function formatFieldValue(field: string, value: any): string {
 	return String(value);
 }
 
-function safeJsonParse<T>(value: string | null): T | null {
+export function safeJsonParse<T>(value: string | null | undefined): T | null {
 	if (!value) return null;
 	try {
 		return JSON.parse(value) as T;

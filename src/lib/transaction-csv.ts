@@ -1,20 +1,6 @@
 import { format } from "date-fns";
 import type { Transaction } from "@/types";
-
-/** RFC 4180 field escaping: quote when needed, double internal quotes. */
-function escapeCSVField(field: string | number | null | undefined): string {
-	if (field === null || field === undefined) return "";
-	const str = String(field);
-	if (
-		str.includes(",") ||
-		str.includes("\n") ||
-		str.includes("\r") ||
-		str.includes('"')
-	) {
-		return `"${str.replace(/"/g, '""')}"`;
-	}
-	return str;
-}
+import { escapeCsvField as escapeCSVField } from "./csv";
 
 /** Serializes transactions to CSV (with BOM for Excel UTF-8 compatibility). */
 function buildTransactionsCsv(transactions: Transaction[]): string {

@@ -21,6 +21,16 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
     Dialog,
     DialogContent,
     DialogHeader,
@@ -41,6 +51,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
+import { toNumber } from '@/lib/number'
 import { cn } from '@/lib/utils'
 import type { Goal } from '@/types'
 
@@ -71,6 +82,7 @@ export function Goals() {
     const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
     const [contributeAmount, setContributeAmount] = useState('')
+    const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null)
     const [formData, setFormData] = useState({
         name: '',
         target_amount: '',
@@ -136,17 +148,25 @@ export function Goals() {
         e.preventDefault()
         if (!selectedGoal) return
 
+        // Reject invalid input instead of computing NaN balances.
+        const contributionAmount = parseFloat(contributeAmount)
+        if (!Number.isFinite(contributionAmount) || contributionAmount <= 0) {
+            toast.error('Enter an amount greater than 0')
+            return
+        }
+
         try {
-            const contributionAmount = parseFloat(contributeAmount)
-            const remaining = selectedGoal.target_amount - selectedGoal.current_amount
+            const remaining =
+                toNumber(selectedGoal.target_amount) -
+                toNumber(selectedGoal.current_amount)
 
             // Cap contribution at the remaining amount to prevent exceeding target
             const actualContribution = Math.min(contributionAmount, remaining)
-            const newAmount = selectedGoal.current_amount + actualContribution
+            const newAmount = toNumber(selectedGoal.current_amount) + actualContribution
 
             await api.goals.update(selectedGoal.id, { current_amount: newAmount })
 
-            const isCompleted = newAmount >= selectedGoal.target_amount
+            const isCompleted = newAmount >= toNumber(selectedGoal.target_amount)
 
             if (contributionAmount > remaining) {
                 toast.success(
@@ -209,7 +229,10 @@ export function Goals() {
     }
 
     const getProgress = (goal: Goal) => {
-        return Math.min((goal.current_amount / goal.target_amount) * 100, 100)
+        return Math.min(
+            (toNumber(goal.current_amount) / toNumber(goal.target_amount)) * 100,
+            100,
+        )
     }
 
     const getDaysRemaining = (deadline: string | null) => {
@@ -225,9 +248,11 @@ export function Goals() {
 
     // Stats
     const totalGoals = goals.length
-    const completedGoals = goals.filter((g) => g.current_amount >= g.target_amount).length
-    const totalSaved = goals.reduce((sum, g) => sum + g.current_amount, 0)
-    const totalTarget = goals.reduce((sum, g) => sum + g.target_amount, 0)
+    const completedGoals = goals.filter(
+        (g) => toNumber(g.current_amount) >= toNumber(g.target_amount),
+    ).length
+    const totalSaved = goals.reduce((sum, g) => sum + toNumber(g.current_amount), 0)
+    const totalTarget = goals.reduce((sum, g) => sum + toNumber(g.target_amount), 0)
 
     if (loading) {
         return (
@@ -438,7 +463,7 @@ export function Goals() {
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="text-destructive"
-                                                    onClick={() => handleDelete(goal.id)}
+                                                    onClick={() => setGoalToDelete(goal)}
                                                 >
                                                     <Trash2 className="mr-2 h-4 w-4" />
                                                     Delete
@@ -462,10 +487,10 @@ export function Goals() {
                                         />
                                         <div className="flex justify-between text-sm">
                                             <span className="font-semibold">
-                                                {formatCurrency(goal.current_amount)}
+                                                {formatCurrency(toNumber(goal.current_amount))}
                                             </span>
                                             <span className="text-muted-foreground">
-                                                of {formatCurrency(goal.target_amount)}
+                                                of {formatCurrency(toNumber(goal.target_amount))}
                                             </span>
                                         </div>
                                     </div>
@@ -629,7 +654,9 @@ export function Goals() {
                             <Input
                                 id="contribute-amount"
                                 type="number"
+                                min="0"
                                 step="0.01"
+                                inputMode="decimal"
                                 placeholder="100"
                                 value={contributeAmount}
                                 onChange={(e) => setContributeAmount(e.target.value)}
@@ -638,7 +665,7 @@ export function Goals() {
                             />
                             {selectedGoal && (
                                 <p className="text-xs text-muted-foreground">
-                                    Remaining: {formatCurrency(selectedGoal.target_amount - selectedGoal.current_amount)}
+                                    Remaining: {formatCurrency(toNumber(selectedGoal.target_amount) - toNumber(selectedGoal.current_amount))}
                                 </p>
                             )}
                         </div>
@@ -651,6 +678,39 @@ export function Goals() {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Delete confirmation */}
+            <AlertDialog
+                open={goalToDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) setGoalToDelete(null)
+                }}
+            >
+                <AlertDialogContent className="sm:max-w-[425px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-destructive">
+                            Delete Goal
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Delete the goal{" "}
+                            <strong>"{goalToDelete?.name}"</strong>? This action cannot
+                            be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:gap-2">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                                if (goalToDelete) handleDelete(goalToDelete.id)
+                                setGoalToDelete(null)
+                            }}
+                        >
+                            Delete Goal
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

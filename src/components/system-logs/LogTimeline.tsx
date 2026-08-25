@@ -85,15 +85,24 @@ export function LogTimeline({
 							return (
 								<div
 									key={log.id}
+									role="button"
+									tabIndex={0}
+									aria-label={`${formatAction(log.action)} — view details`}
 									onClick={() => onSelectLog(log)}
-									className="group relative flex items-center gap-4 px-4 py-3.5 cursor-pointer transition-all duration-200 hover:bg-muted/40 active:bg-muted/60"
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											onSelectLog(log);
+										}
+									}}
+									className="group relative flex items-center gap-4 px-4 py-3.5 cursor-pointer transition-all duration-200 hover:bg-muted/40 active:bg-muted/60 focus-visible:bg-muted/40 focus-visible:outline-none"
 									style={{
 										animationDelay: `${Math.min(index * 30, 300)}ms`,
 									}}
 								>
 									{/* Icon node */}
 									<div
-										className={`relative z-10 flex items-center justify-center h-10 w-10 rounded-full border shrink-0 transition-shadow duration-200 group-hover:shadow-md ${actionColors.bg} ${actionColors.border} ${actionColors.text} group-hover:${actionColors.glow}`}
+										className={`relative z-10 flex items-center justify-center h-10 w-10 rounded-full border shrink-0 transition-shadow duration-200 group-hover:shadow-md ${actionColors.bg} ${actionColors.border} ${actionColors.text} ${actionColors.glow}`}
 									>
 										<IconComponent className="h-4 w-4" />
 									</div>

@@ -1,18 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api-client";
+import type { AiInsight } from "@/types/api";
 
-export interface Insight {
-	id: string;
-	type: "anomaly" | "coaching" | "kudo";
-	title: string;
-	description: string;
-	category?: string;
-	amount?: number;
-	date?: string;
-	is_dismissed?: boolean;
-	created_at?: string;
-}
+// Shared API type — kept as a named alias so existing consumers of
+// `import type { Insight } from "@/hooks/useAIInsights"` keep compiling.
+export type Insight = AiInsight;
 
 export function useAIInsights() {
 	const { user } = useAuth();

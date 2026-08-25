@@ -1,4 +1,4 @@
-import { type LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface StatCardProps {
@@ -9,8 +9,6 @@ interface StatCardProps {
     percentageChange?: string
     trendDescription?: string
     subtitle?: string
-    icon?: LucideIcon
-    iconColor?: string
 }
 
 export function StatCard({

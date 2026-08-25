@@ -22,6 +22,7 @@ import {
 	formatResource,
 	formatTimestamp,
 	getFieldChanges,
+	safeJsonParse,
 	shouldShowField,
 } from "@/lib/log-formatter";
 import type { LogEntry } from "@/types/api";
@@ -189,7 +190,10 @@ export function LogDetailDrawer({
 											const isCreation = !log.oldValue && log.newValue;
 
 											if (isDeletion && log.oldValue) {
-												const oldObj = JSON.parse(log.oldValue);
+												const oldObj =
+													safeJsonParse<Record<string, unknown>>(
+														log.oldValue,
+													) ?? {};
 												return Object.entries(oldObj)
 													.filter(([key]) => shouldShowField(key))
 													.map(([key, value]) => (
@@ -208,7 +212,10 @@ export function LogDetailDrawer({
 											}
 
 											if (isCreation && log.newValue) {
-												const newObj = JSON.parse(log.newValue);
+												const newObj =
+													safeJsonParse<Record<string, unknown>>(
+														log.newValue,
+													) ?? {};
 												return Object.entries(newObj)
 													.filter(([key]) => shouldShowField(key))
 													.map(([key, value]) => (

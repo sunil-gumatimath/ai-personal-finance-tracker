@@ -46,6 +46,8 @@ interface TransactionDialogProps extends TransactionFormState {
 	categories: Category[];
 	accounts: Account[];
 	onSubmit: (e: React.FormEvent) => void;
+	/** Submit-time validation message surfaced by the parent handler. */
+	error?: string | null;
 }
 
 /** Add/Edit transaction dialog with the full form. */
@@ -58,6 +60,7 @@ export function TransactionDialog({
 	categories,
 	accounts,
 	onSubmit,
+	error,
 }: TransactionDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,6 +76,14 @@ export function TransactionDialog({
 					</DialogDescription>
 				</DialogHeader>
 				<form onSubmit={onSubmit} className="space-y-4">
+					{error && (
+						<p
+							role="alert"
+							className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+						>
+							{error}
+						</p>
+					)}
 					<div className="space-y-2">
 						<Label>Type</Label>
 						<Select
@@ -97,7 +108,9 @@ export function TransactionDialog({
 						<Input
 							id="amount"
 							type="number"
+							min="0"
 							step="0.01"
+							inputMode="decimal"
 							placeholder="0.00"
 							value={formData.amount}
 							onChange={(e) =>
@@ -120,7 +133,12 @@ export function TransactionDialog({
 					</div>
 
 					<div className="space-y-2">
-						<Label>Category</Label>
+						<Label>
+							Category{" "}
+							<span className="text-xs font-normal text-muted-foreground">
+								(optional)
+							</span>
+						</Label>
 						<Select
 							value={formData.category_id}
 							onValueChange={(value) =>
@@ -154,7 +172,6 @@ export function TransactionDialog({
 							onValueChange={(value) =>
 								setFormData({ ...formData, account_id: value })
 							}
-							required
 						>
 							<SelectTrigger>
 								<SelectValue placeholder="Select account" />
@@ -178,7 +195,6 @@ export function TransactionDialog({
 								onValueChange={(value) =>
 									setFormData({ ...formData, to_account_id: value })
 								}
-								required
 							>
 								<SelectTrigger>
 									<SelectValue placeholder="Select destination account" />
@@ -224,6 +240,7 @@ export function TransactionDialog({
 								type="button"
 								role="switch"
 								aria-checked={formData.is_recurring}
+								aria-label="Toggle recurring transaction"
 								onClick={() =>
 									setFormData({
 										...formData,

@@ -37,6 +37,17 @@ export const debtColors = [
 // Pure debt math (payoff time, strategies, simulations) lives in
 // @/lib/debt-calculations; this hook owns state, fetching, and actions.
 
+/** PostgreSQL DECIMAL may arrive as string; normalize money fields before math. */
+function normalizeDebtRow(debt: Debt): Debt {
+	return {
+		...debt,
+		original_amount: toNumber(debt.original_amount),
+		current_balance: toNumber(debt.current_balance),
+		interest_rate: toNumber(debt.interest_rate),
+		minimum_payment: toNumber(debt.minimum_payment),
+	};
+}
+
 export function useDebts() {
 	const { user } = useAuth();
 	const { formatCurrency } = usePreferences();
@@ -85,15 +96,7 @@ export function useDebts() {
 			const res = await api.debts.list();
 			const rows = (res.debts || []) as Debt[];
 
-			const typedRows = (rows || []).map((debt) => ({
-				...debt,
-				original_amount: toNumber(debt.original_amount),
-				current_balance: toNumber(debt.current_balance),
-				interest_rate: toNumber(debt.interest_rate),
-				minimum_payment: toNumber(debt.minimum_payment),
-			}));
-
-			setDebts(typedRows);
+			setDebts(rows.map(normalizeDebtRow));
 		} catch (error) {
 			console.error("Error fetching debts:", error);
 			toast.error("Failed to load debts");
@@ -140,13 +143,18 @@ export function useDebts() {
 		if (!user) return;
 
 		try {
+			// Explicit empty-string check: a blank field means "same as original
+			// amount", but an explicit "0" must stay 0 (`parseFloat || fallback`
+			// used to overwrite zero balances with the original amount).
+			const currentBalance =
+				formData.current_balance.trim() === ""
+					? parseFloat(formData.original_amount)
+					: parseFloat(formData.current_balance);
 			const debtData = {
 				name: formData.name,
 				type: formData.type,
 				original_amount: parseFloat(formData.original_amount),
-				current_balance:
-					parseFloat(formData.current_balance) ||
-					parseFloat(formData.original_amount),
+				current_balance: currentBalance,
 				interest_rate: parseFloat(formData.interest_rate) || 0,
 				minimum_payment: parseFloat(formData.minimum_payment) || 0,
 				due_day: formData.due_day ? parseInt(formData.due_day) : null,
@@ -194,18 +202,27 @@ export function useDebts() {
 				notes: paymentFormData.notes || null,
 			};
 
-			await api.debts.payments.create(paymentData);
+			const res = await api.debts.payments.create(paymentData);
+			// Prefer the server-computed updated debt row; fall back to a
+			// refetch when the backend doesn't return one.
+			const serverDebt = res?.debt ? normalizeDebtRow(res.debt) : null;
+			const newBalance =
+				serverDebt !== null
+					? toNumber(serverDebt.current_balance)
+					: Math.max(
+							0,
+							toNumber(selectedDebt.current_balance) - principalAmount,
+						);
 
-			const newBalance = Math.max(
-				0,
-				selectedDebt.current_balance - principalAmount,
-			);
 			if (newBalance === 0) {
 				toast.success("Congratulations! This debt is now paid off!");
-				try {
-					await api.debts.update(selectedDebt.id, { is_active: false });
-				} catch (updateError) {
-					console.error("Error auto-marking debt as inactive:", updateError);
+				if (serverDebt && serverDebt.is_active !== false) {
+					try {
+						await api.debts.update(selectedDebt.id, { is_active: false });
+						serverDebt.is_active = false;
+					} catch (updateError) {
+						console.error("Error auto-marking debt as inactive:", updateError);
+					}
 				}
 			} else {
 				toast.success(
@@ -213,11 +230,24 @@ export function useDebts() {
 				);
 			}
 
+			if (serverDebt) {
+				setDebts((prev) =>
+					prev.map((d) => (d.id === serverDebt.id ? serverDebt : d)),
+				);
+			}
+
 			setIsPaymentDialogOpen(false);
 			resetPaymentForm();
-			fetchDebts();
-			if (expandedDebt === selectedDebt.id) {
-				fetchPayments(selectedDebt.id);
+
+			if (serverDebt) {
+				if (expandedDebt === selectedDebt.id) {
+					fetchPayments(selectedDebt.id);
+				}
+			} else {
+				fetchDebts();
+				if (expandedDebt === selectedDebt.id) {
+					fetchPayments(selectedDebt.id);
+				}
 			}
 		} catch (error) {
 			console.error("Error recording payment:", error);

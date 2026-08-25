@@ -59,6 +59,12 @@ export function useSystemLogs() {
 
 	const wsRef = useRef<WebSocket | null>(null);
 	const reconnectTimeoutRef = useRef<number | null>(null);
+	const disposedRef = useRef(false);
+	const reconnectAttemptsRef = useRef(0);
+
+	// Capped exponential backoff: 1s, 2s, 4s … max 30s.
+	const RECONNECT_BASE_DELAY_MS = 1000;
+	const RECONNECT_MAX_DELAY_MS = 30000;
 
 	const updateStats = useCallback((currentLogs: LogEntry[]) => {
 		setStats(computeStats(currentLogs));
@@ -80,6 +86,8 @@ export function useSystemLogs() {
 	}, [updateStats]);
 
 	const connectWebSocket = useCallback(() => {
+		if (disposedRef.current) return;
+
 		if (wsRef.current) {
 			wsRef.current.close();
 		}
@@ -97,6 +105,8 @@ export function useSystemLogs() {
 
 		socket.onopen = () => {
 			setWsStatus("connected");
+			// Successful open — reset the backoff sequence.
+			reconnectAttemptsRef.current = 0;
 			if (reconnectTimeoutRef.current) {
 				clearTimeout(reconnectTimeoutRef.current);
 				reconnectTimeoutRef.current = null;
@@ -132,11 +142,32 @@ export function useSystemLogs() {
 			}
 		};
 
-		socket.onclose = () => {
+		socket.onclose = (event) => {
+			// Never reschedule after unmount — this is what caused the zombie
+			// reconnect loop (cleanup closed the socket, but the async onclose
+			// callback still fired and scheduled a fresh connection forever).
+			if (disposedRef.current) return;
+
+			// Respect clean closures: the remote end intentionally closed the
+			// feed (e.g. graceful shutdown), so stop instead of hammering it.
+			// Abnormal closes (crash, network drop) reconnect with backoff.
+			if (event.wasClean) {
+				setWsStatus("disconnected");
+				return;
+			}
+
 			setWsStatus("reconnecting");
+			const delay = Math.min(
+				RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttemptsRef.current,
+				RECONNECT_MAX_DELAY_MS,
+			);
+			reconnectAttemptsRef.current += 1;
+			if (reconnectTimeoutRef.current) {
+				clearTimeout(reconnectTimeoutRef.current);
+			}
 			reconnectTimeoutRef.current = window.setTimeout(() => {
 				connectWebSocket();
-			}, 3000);
+			}, delay);
 		};
 
 		socket.onerror = () => {
@@ -145,15 +176,22 @@ export function useSystemLogs() {
 	}, [updateStats]);
 
 	useEffect(() => {
+		disposedRef.current = false;
 		fetchInitialData();
 		connectWebSocket();
 
 		return () => {
+			disposedRef.current = true;
 			if (wsRef.current) {
+				// Detach handlers first so this intentional close cannot
+				// trigger a reconnect.
+				wsRef.current.onclose = null;
+				wsRef.current.onerror = null;
 				wsRef.current.close();
 			}
 			if (reconnectTimeoutRef.current) {
 				clearTimeout(reconnectTimeoutRef.current);
+				reconnectTimeoutRef.current = null;
 			}
 		};
 	}, [fetchInitialData, connectWebSocket]);

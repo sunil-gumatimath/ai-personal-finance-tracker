@@ -55,10 +55,24 @@ async function apiFetch<T>(
 	});
 
 	if (!res.ok) {
-		throw await ApiError.fromResponse(res);
+		const error = await ApiError.fromResponse(res);
+		// Global 401/403 handling: let AuthContext sign the user out and
+		// redirect, unless the failure happened on an auth page itself.
+		if (
+			error.isAuthError &&
+			!isPublicAuthRoute(window.location.pathname)
+		) {
+			window.dispatchEvent(new CustomEvent("app:session-expired"));
+		}
+		throw error;
 	}
 
 	return (await res.json()) as T;
+}
+
+/** Routes where an auth error is expected and must not force a redirect loop. */
+function isPublicAuthRoute(pathname: string): boolean {
+	return ["/login", "/signup", "/forgot-password"].includes(pathname);
 }
 
 export const api = {

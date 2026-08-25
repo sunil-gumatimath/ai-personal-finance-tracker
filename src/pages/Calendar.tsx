@@ -24,34 +24,9 @@ import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
+import { parseTransactionDate } from '@/lib/date-utils'
+import { toNumber } from '@/lib/number'
 import type { Transaction } from '@/types'
-
-// PostgreSQL DECIMAL may come back as a string; normalize before doing math
-function toNumber(val: unknown): number {
-    if (typeof val === 'number') return isNaN(val) ? 0 : val
-    if (typeof val === 'string') {
-        const parsed = parseFloat(val)
-        return isNaN(parsed) ? 0 : parsed
-    }
-    return 0
-}
-
-// PostgreSQL DATE often comes back as 'YYYY-MM-DD'. `new Date('YYYY-MM-DD')` is UTC and can
-// shift to the previous/next day in local timezones, so parse date-only values as local dates.
-function parseTransactionDate(val: unknown): Date {
-    if (val instanceof Date) return val
-    if (typeof val === 'string') {
-        const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(val)
-        if (match) {
-            const year = Number(match[1])
-            const month = Number(match[2])
-            const day = Number(match[3])
-            return new Date(year, month - 1, day)
-        }
-        return new Date(val)
-    }
-    return new Date(NaN)
-}
 
 export function Calendar() {
     const { user } = useAuth()
@@ -187,23 +162,42 @@ export function Calendar() {
                     <div className="py-2">Sat</div>
                 </div>
                 <div className="grid grid-cols-7 text-sm">
-                    {calendarGrid.map((day, idx) => (
-                        <div
-                            key={day.date.toString()}
-                            onClick={() => handleDayClick(day)}
-                            className={cn(
-                                "relative min-h-[100px] border-b border-r p-2 transition-colors hover:bg-muted/50 cursor-pointer",
-                                !isSameMonth(day.date, currentDate) && "bg-muted/20 text-muted-foreground",
-                                isSameDay(day.date, new Date()) && "bg-primary/5 font-semibold",
-                                idx % 7 === 0 && "border-l" // Left border for first column
-                            )}
-                        >
-                            <span className={cn(
-                                "flex h-6 w-6 items-center justify-center rounded-full text-xs",
-                                isSameDay(day.date, new Date()) && "bg-primary text-primary-foreground"
-                            )}>
-                                {format(day.date, 'd')}
-                            </span>
+                    {calendarGrid.map((day, idx) => {
+                        const hasTransactions = day.transactions.length > 0
+                        const isToday = isSameDay(day.date, new Date())
+                        const isSelected = selectedDate !== null && isSameDay(day.date, selectedDate)
+                        return (
+                            <div
+                                key={day.date.toString()}
+                                {...(hasTransactions
+                                    ? {
+                                          role: 'button' as const,
+                                          tabIndex: 0,
+                                          'aria-label': `View transactions for ${format(day.date, 'MMMM d, yyyy')}`,
+                                          onClick: () => handleDayClick(day),
+                                          onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+                                              if (e.key === 'Enter' || e.key === ' ') {
+                                                  e.preventDefault()
+                                                  handleDayClick(day)
+                                              }
+                                          },
+                                      }
+                                    : {})}
+                                aria-selected={isSelected}
+                                className={cn(
+                                    "relative min-h-[100px] border-b border-r p-2 transition-colors cursor-default",
+                                    hasTransactions && "hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
+                                    !isSameMonth(day.date, currentDate) && "bg-muted/20 text-muted-foreground",
+                                    isToday && "bg-primary/5 font-semibold",
+                                    idx % 7 === 0 && "border-l" // Left border for first column
+                                )}
+                            >
+                                <span className={cn(
+                                    "flex h-6 w-6 items-center justify-center rounded-full text-xs",
+                                    isToday && "bg-primary text-primary-foreground"
+                                )}>
+                                    {format(day.date, 'd')}
+                                </span>
 
                             <div className="mt-2 space-y-1">
                                 {day.summary.income > 0 && (
@@ -220,7 +214,8 @@ export function Calendar() {
                                 )}
                             </div>
                         </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
 

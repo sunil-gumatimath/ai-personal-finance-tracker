@@ -22,6 +22,9 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePreferences } from "@/hooks/usePreferences";
+import { toNumber } from "@/lib/number";
+import type { DebtSimulations } from "@/lib/debt-calculations";
 import type { Debt } from "@/types";
 
 interface StrategyDialogProps {
@@ -31,12 +34,7 @@ interface StrategyDialogProps {
   setExtraPayment: (val: number) => void;
   totalMinPayment: number;
   formatCurrency: (val: number) => string;
-  simulations: {
-    snowball: { months: number; totalInterest: number };
-    avalanche: { months: number; totalInterest: number };
-    minimums: { months: number; totalInterest: number };
-    mergedData: any[];
-  };
+  simulations: Pick<DebtSimulations, "snowball" | "avalanche" | "minimums" | "mergedData">;
   avalancheStrategy: Debt[];
   snowballStrategy: Debt[];
 }
@@ -52,6 +50,16 @@ export function StrategyDialog({
   avalancheStrategy,
   snowballStrategy,
 }: StrategyDialogProps) {
+  const { preferences } = usePreferences();
+  // Currency-aware axis ticks (compact form: $1.2K)
+  const formatAxisTick = (val: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: preferences.currency || "USD",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(val);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto">
@@ -136,14 +144,18 @@ export function StrategyDialog({
               </div>
               <div className="space-y-1">
                 <p className="text-lg font-bold">
-                  {simulations.minimums.months >= 360
-                    ? "30+ years"
-                    : `${simulations.minimums.months} months`}
+                  {simulations.minimums.neverPayoff
+                    ? "Never pays off at minimums"
+                    : simulations.minimums.months >= 360
+                      ? "30+ years"
+                      : `${simulations.minimums.months} months`}
                 </p>
                 <p className="text-xs text-muted-foreground font-medium">
                   Interest:{" "}
                   <span className="text-red-400 font-semibold">
-                    {formatCurrency(simulations.minimums.totalInterest)}
+                    {simulations.minimums.neverPayoff
+                      ? "Unbounded"
+                      : formatCurrency(simulations.minimums.totalInterest)}
                   </span>
                 </p>
               </div>
@@ -170,8 +182,15 @@ export function StrategyDialog({
                     {formatCurrency(simulations.snowball.totalInterest)}
                   </span>
                 </p>
-                {simulations.minimums.months >
-                  simulations.snowball.months && (
+                {simulations.minimums.neverPayoff && (
+                  <p className="text-[10px] text-red-400 font-bold mt-1 leading-normal">
+                    Minimums alone never repay this debt — extra payments are
+                    essential.
+                  </p>
+                )}
+                {!simulations.minimums.neverPayoff &&
+                  simulations.minimums.months >
+                    simulations.snowball.months && (
                   <p className="text-[10px] text-emerald-500 font-bold mt-1 leading-normal">
                     Saved{" "}
                     {simulations.minimums.months -
@@ -211,8 +230,15 @@ export function StrategyDialog({
                     {formatCurrency(simulations.avalanche.totalInterest)}
                   </span>
                 </p>
-                {simulations.minimums.months >
-                  simulations.avalanche.months && (
+                {simulations.minimums.neverPayoff && (
+                  <p className="text-[10px] text-red-400 font-bold mt-1 leading-normal">
+                    Minimums alone never repay this debt — extra payments are
+                    essential.
+                  </p>
+                )}
+                {!simulations.minimums.neverPayoff &&
+                  simulations.minimums.months >
+                    simulations.avalanche.months && (
                   <p className="text-[10px] text-emerald-500 font-bold mt-1 leading-normal">
                     Saved{" "}
                     {simulations.minimums.months -
@@ -324,9 +350,7 @@ export function StrategyDialog({
                     axisLine={false}
                     tickMargin={8}
                     style={{ fontSize: "10px" }}
-                    tickFormatter={(val) =>
-                      val === 0 ? "$0" : `$${(val / 1000).toFixed(0)}k`
-                    }
+                    tickFormatter={(val) => formatAxisTick(Number(val))}
                   />
                   <ChartTooltip
                     content={
@@ -415,7 +439,7 @@ export function StrategyDialog({
                       {debt.interest_rate}% APR
                     </span>
                     <span className="text-muted-foreground">
-                      {formatCurrency(debt.current_balance)}
+                      {formatCurrency(toNumber(debt.current_balance))}
                     </span>
                   </div>
                 </div>
@@ -442,7 +466,7 @@ export function StrategyDialog({
                   </div>
                   <div className="flex items-center gap-4 text-xs font-semibold">
                     <span className="text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
-                      {formatCurrency(debt.current_balance)} balance
+                      {formatCurrency(toNumber(debt.current_balance))} balance
                     </span>
                     <span className="text-amber-500">
                       {debt.interest_rate}% APR
@@ -490,7 +514,10 @@ export function StrategyDialog({
                     {snowballStrategy[0] && (
                       <strong>
                         {snowballStrategy[0].name} (
-                        {formatCurrency(snowballStrategy[0].current_balance)}{" "}
+                        {formatCurrency(
+                          toNumber(snowballStrategy[0].current_balance),
+                        )}
+                        {" "}
                         remaining)
                       </strong>
                     )}{" "}

@@ -38,12 +38,32 @@ import { usePreferences } from '@/hooks/usePreferences'
 interface FinancialHealthScoreProps {
     data: FinancialHealth | null
     loading: boolean
+    /** Set when the score calculation failed — shows a retry affordance instead of an eternal skeleton. */
+    error?: string | null
+    onRetry?: () => void
 }
 
-export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProps) {
+export function FinancialHealthScore({ data, loading, error, onRetry }: FinancialHealthScoreProps) {
     const [open, setOpen] = useState(false)
 
     const { formatCurrency } = usePreferences()
+
+    if (!loading && !data && error) {
+        return (
+            <Card className="h-full border-border/50 bg-card/50 flex flex-col items-center justify-center gap-3 p-8 text-center">
+                <Activity className="h-6 w-6 text-muted-foreground" />
+                <p className="text-sm font-semibold text-foreground">Couldn't load your health score</p>
+                <p className="text-xs text-muted-foreground max-w-[260px]">
+                    {error} Check your connection and try again.
+                </p>
+                {onRetry && (
+                    <Button size="sm" variant="outline" onClick={onRetry}>
+                        Try again
+                    </Button>
+                )}
+            </Card>
+        )
+    }
 
     if (loading || !data) {
         return (
@@ -267,8 +287,18 @@ export function FinancialHealthScore({ data, loading }: FinancialHealthScoreProp
                             {/* Score Ring Section */}
                             <div className="flex items-center justify-center">
                                 <div
-                                    className="relative h-[180px] w-full flex items-center justify-center cursor-pointer"
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Financial health score ${score} out of 100 — view breakdown`}
+                                    aria-haspopup="dialog"
                                     onClick={() => setOpen(true)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault()
+                                            setOpen(true)
+                                        }
+                                    }}
+                                    className="relative h-[180px] w-full flex items-center justify-center cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 >
                                     <svg viewBox="0 0 120 120" className="w-[160px] h-[160px] transform -rotate-90">
                                         <defs>

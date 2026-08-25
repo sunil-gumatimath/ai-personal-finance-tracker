@@ -13,15 +13,12 @@ const directNeonAuthUrl = 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1
 const rewriteAuthUrl =
   `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}/neon-auth/auth`
 
-// Use direct URL in local development if VITE_NEON_AUTH_URL is not set
-// Use rewrite URL in production for cookie domain alignment
-const authUrl = import.meta.env.VITE_NEON_AUTH_URL ||
-  (isProduction ? rewriteAuthUrl : directNeonAuthUrl)
+// Base URL precedence: explicit env var → production rewrite path → local dev direct URL.
+const envAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined
+const authUrl = envAuthUrl || (isProduction ? rewriteAuthUrl : directNeonAuthUrl)
 
 // If neither is available (extremely unlikely), log a loud error.
-if (!authUrl) console.error('❌ Neon Auth URL is missing. Signup/Login will fail.');
-
-console.log('Frontend auth URL:', authUrl, 'Is production:', isProduction)
+if (!authUrl) console.error('❌ Neon Auth URL is missing. Signup/Login will fail.')
 
 export const authClient = createAuthClient(
   authUrl,

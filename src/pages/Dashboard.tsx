@@ -13,6 +13,8 @@ import {
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
+import { parseTransactionDate } from "@/lib/date-utils";
+import { toNumber } from "@/lib/number";
 import type {
 	Transaction,
 	DashboardStats,
@@ -58,7 +60,7 @@ export function Dashboard() {
 		SpendingByCategory[]
 	>([]);
 
-	const { data: healthData, loading: healthLoading } = useFinancialHealth();
+	const { data: healthData, loading: healthLoading, error: healthError, refresh: refreshHealth } = useFinancialHealth();
 	useEffect(() => {
 		async function fetchDashboardData() {
 			if (!user) {
@@ -67,16 +69,6 @@ export function Dashboard() {
 			}
 
 			try {
-				// PostgreSQL DECIMAL may come back as a string; normalize before doing math
-				const toNumber = (val: unknown): number => {
-					if (typeof val === "number") return isNaN(val) ? 0 : val;
-					if (typeof val === "string") {
-						const parsed = parseFloat(val);
-						return isNaN(parsed) ? 0 : parsed;
-					}
-					return 0;
-				};
-
 				// Helper to get local date string (YYYY-MM-DD) to avoid timezone issues
 				const getLocalDateString = (date: Date): string => {
 					const year = date.getFullYear();
@@ -112,7 +104,7 @@ export function Dashboard() {
 				// 2. Fetch both current and last month data for comparison
 				type TwoMonthRow = {
 					type: Transaction["type"];
-					amount: unknown;
+					amount: Transaction["amount"];
 					date: string | Date;
 					category: Category | null;
 				};
@@ -269,45 +261,45 @@ export function Dashboard() {
 					}));
 
 				if (trendData) {
+					// Bucket by the transaction's LOCAL date parts (year-month key).
+					// Formatting UTC-parsed dates with toLocaleString shifted months
+					// for timezones behind UTC.
+					const monthKey = (date: string): string => {
+						const d = parseTransactionDate(date);
+						return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+					};
+
 					const monthsMap = new Map<
 						string,
 						{ income: number; expenses: number }
 					>();
 
-					// Initialize last 6 months
-					for (let i = 0; i < 6; i++) {
+					// Initialize last 6 months with their year-month keys
+					const orderedMonths: Array<{ key: string; label: string }> = [];
+					for (let i = 5; i >= 0; i--) {
 						const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-						const monthKey = d.toLocaleString("default", { month: "short" });
-						monthsMap.set(monthKey, { income: 0, expenses: 0 });
+						const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+						orderedMonths.push({
+							key,
+							label: d.toLocaleString("default", { month: "short" }),
+						});
+						monthsMap.set(key, { income: 0, expenses: 0 });
 					}
 
 					trendData.forEach((t) => {
-						const d = new Date(t.date);
-						const monthKey = d.toLocaleString("default", { month: "short" });
-						if (monthsMap.has(monthKey)) {
-							const current = monthsMap.get(monthKey)!;
+						const key = monthKey(t.date);
+						if (monthsMap.has(key)) {
+							const current = monthsMap.get(key)!;
 							if (t.type === "income") current.income += toNumber(t.amount);
 							if (t.type === "expense") current.expenses += toNumber(t.amount);
 						}
 					});
 
-					// Convert map to array and reverse to show chronological order if needed
-					// (But we inserted keys in reverse order, so we might want to fix the order)
-					// Better approach: Generate array of keys in chronological order first
-					const orderedMonths: string[] = [];
-					for (let i = 5; i >= 0; i--) {
-						const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-						const orderedMonths_push = d.toLocaleString("default", {
-							month: "short",
-						});
-						orderedMonths.push(orderedMonths_push);
-					}
-
 					const monthlyTrendData: MonthlyTrend[] = orderedMonths.map(
-						(month) => ({
-							month,
-							income: monthsMap.get(month)?.income || 0,
-							expenses: monthsMap.get(month)?.expenses || 0,
+						({ key, label }) => ({
+							month: label,
+							income: monthsMap.get(key)?.income || 0,
+							expenses: monthsMap.get(key)?.expenses || 0,
 						}),
 					);
 
@@ -319,13 +311,7 @@ export function Dashboard() {
 				const rawAccounts = accountsRes.accounts || [];
 				const totalBalance = rawAccounts
 					.filter((a) => a.is_active)
-					.reduce((sum: number, a) => {
-						const balance =
-							typeof a.balance === "string"
-								? parseFloat(a.balance as unknown as string)
-								: a.balance;
-						return sum + (isNaN(balance) ? 0 : balance);
-					}, 0);
+					.reduce((sum: number, a) => sum + toNumber(a.balance), 0);
 				setStats((prev) => ({ ...prev, totalBalance }));
 			} catch (error) {
 				console.error("Error fetching dashboard data:", error);
@@ -338,7 +324,11 @@ export function Dashboard() {
 		fetchDashboardData();
 	}, [user]);
 
-	const { insights } = useAIInsights();
+	const {
+		insights,
+		loading: insightsLoading,
+		dismissInsight,
+	} = useAIInsights();
 	const anomalies: Insight[] = insights.filter((i) => i.type === "anomaly");
 
 	if (loading) {
@@ -373,7 +363,11 @@ export function Dashboard() {
 
 			{/* AI Coaching Section */}
 			<div className="animate-fade-in-up animate-delay-50">
-				<AICoach />
+				<AICoach
+					insights={insights}
+					isLoading={insightsLoading}
+					dismissInsight={dismissInsight}
+				/>
 			</div>
 
 			{/* Weekly AI Digest */}
@@ -444,7 +438,12 @@ export function Dashboard() {
 
 			{/* Health Score & Spending Flow Row */}
 			<div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2 animate-fade-in-up animate-delay-300">
-				<FinancialHealthScore data={healthData} loading={healthLoading} />
+				<FinancialHealthScore
+					data={healthData}
+					loading={healthLoading}
+					error={healthError}
+					onRetry={refreshHealth}
+				/>
 				<BudgetOverview
 					spendingByCategory={spendingByCategory}
 					previousMonthData={previousMonthSpending}

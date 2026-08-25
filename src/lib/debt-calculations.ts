@@ -1,17 +1,20 @@
 import { format } from "date-fns";
 import type { Debt } from "@/types";
+import { toNumber } from "@/lib/number";
 
-/** Helper to safely convert to number */
-export function toNumber(value: unknown): number {
-	if (typeof value === "number") return value;
-	if (typeof value === "string") return parseFloat(value) || 0;
-	return 0;
-}
+// Re-exported so existing consumers of debt-calculations keep working.
+export { toNumber };
 
 interface SimulationResult {
 	months: number;
 	totalInterest: number;
 	monthlyData: { month: number; remainingBalance: number }[];
+	/**
+	 * True when a strategy mathematically cannot repay the balances
+	 * (e.g. minimums-only where a payment never covers the monthly interest).
+	 * `months` is Infinity in that case; UIs should show a "never pays off" hint.
+	 */
+	neverPayoff?: boolean;
 }
 
 const runSimulation = (
@@ -19,11 +22,13 @@ const runSimulation = (
 	extraPayment: number,
 	strategy: "snowball" | "avalanche" | "minimums",
 ): SimulationResult => {
+	// Normalize DECIMAL-as-string fields once at the boundary so all math
+	// below operates on plain numbers.
 	const simulatedDebts = activeDebtsList.map((d) => ({
 		id: d.id,
-		current_balance: d.current_balance,
-		interest_rate: d.interest_rate,
-		minimum_payment: d.minimum_payment,
+		current_balance: toNumber(d.current_balance),
+		interest_rate: toNumber(d.interest_rate),
+		minimum_payment: toNumber(d.minimum_payment),
 	}));
 
 	let currentMonth = 0;
@@ -39,6 +44,25 @@ const runSimulation = (
 	];
 
 	const maxMonths = 360; // 30 years limit
+
+	// Minimums-only mode: if any debt's payment never covers its monthly
+	// interest, that balance grows forever — bail out with a sentinel instead
+	// of silently running to the 360-month cap.
+	if (strategy === "minimums") {
+		const stuck = simulatedDebts.some(
+			(d) =>
+				d.current_balance > 0 &&
+				d.minimum_payment <= d.current_balance * (d.interest_rate / 100 / 12),
+		);
+		if (stuck) {
+			return {
+				months: Infinity,
+				totalInterest: Infinity,
+				monthlyData,
+				neverPayoff: true,
+			};
+		}
+	}
 
 	if (strategy === "snowball") {
 		simulatedDebts.sort((a, b) => a.current_balance - b.current_balance);
@@ -123,41 +147,49 @@ const runSimulation = (
 	};
 };
 
-/** Progress toward payoff (0-100). */
+/** Progress toward payoff, clamped to 0-100 (overpaid/negative equity → bounds). */
 export function getProgress(debt: Debt): number {
-	if (debt.original_amount === 0) return 100;
-	const paid = debt.original_amount - debt.current_balance;
-	return Math.min((paid / debt.original_amount) * 100, 100);
+	const original = toNumber(debt.original_amount);
+	if (original === 0) return 100;
+	const paid = original - toNumber(debt.current_balance);
+	return Math.max(0, Math.min((paid / original) * 100, 100));
 }
 
 /** Months until payoff with minimum payments only, or null if never. */
 export function calculatePayoffTime(debt: Debt): number | null {
-	if (debt.current_balance === 0 || debt.minimum_payment === 0) return null;
+	const balance = toNumber(debt.current_balance);
+	const minimum = toNumber(debt.minimum_payment);
+	if (balance === 0 || minimum === 0) return null;
 
-	const monthlyRate = debt.interest_rate / 100 / 12;
+	const monthlyRate = toNumber(debt.interest_rate) / 100 / 12;
 	if (monthlyRate === 0) {
-		return Math.ceil(debt.current_balance / debt.minimum_payment);
+		return Math.ceil(balance / minimum);
 	}
 
-	if (debt.minimum_payment <= debt.current_balance * monthlyRate) {
+	if (minimum <= balance * monthlyRate) {
 		return null;
 	}
 
 	const months =
-		Math.log(
-			debt.minimum_payment /
-				(debt.minimum_payment - debt.current_balance * monthlyRate),
-		) / Math.log(1 + monthlyRate);
+		Math.log(minimum / (minimum - balance * monthlyRate)) /
+		Math.log(1 + monthlyRate);
 	return isNaN(months) || !isFinite(months) ? null : Math.ceil(months);
 }
 
-/** Total interest paid over the minimum-payment lifetime. */
+/**
+ * Total interest paid over the minimum-payment lifetime.
+ *
+ * NOTE: payoffMonths is rounded UP with ceil (a partial final month is still a
+ * payment), so this slightly OVERSTATES interest when the final payment is
+ * smaller than the minimum. That's intentional — it errs on the side of
+ * caution for the "interest warning" UI.
+ */
 export function calculateTotalInterest(debt: Debt): number {
 	const payoffMonths = calculatePayoffTime(debt);
 	if (!payoffMonths || payoffMonths <= 0) return 0;
 
-	const totalPaid = debt.minimum_payment * payoffMonths;
-	return Math.max(0, totalPaid - debt.current_balance);
+	const totalPaid = toNumber(debt.minimum_payment) * payoffMonths;
+	return Math.max(0, totalPaid - toNumber(debt.current_balance));
 }
 
 export interface DebtStrategies {
@@ -174,29 +206,47 @@ export interface DebtStrategies {
 
 /** Derived debt collections and aggregates (pure, memoize at the call site). */
 export function buildStrategies(debts: Debt[]): DebtStrategies {
-	const activeDebts = debts.filter((d) => d.is_active && d.current_balance > 0);
-	const paidOffDebts = debts.filter(
-		(d) => !d.is_active || d.current_balance === 0,
+	const activeDebts = debts.filter(
+		(d) => d.is_active && toNumber(d.current_balance) > 0,
 	);
-	const totalDebt = activeDebts.reduce((sum, d) => sum + d.current_balance, 0);
-	const totalOriginal = debts.reduce((sum, d) => sum + d.original_amount, 0);
-	const totalMinPayment = activeDebts.reduce(
-		(sum, d) => sum + d.minimum_payment,
+	const paidOffDebts = debts.filter(
+		(d) => !d.is_active || toNumber(d.current_balance) === 0,
+	);
+	const totalDebt = activeDebts.reduce(
+		(sum, d) => sum + toNumber(d.current_balance),
 		0,
 	);
+	const totalOriginal = debts.reduce(
+		(sum, d) => sum + toNumber(d.original_amount),
+		0,
+	);
+	const totalMinPayment = activeDebts.reduce(
+		(sum, d) => sum + toNumber(d.minimum_payment),
+		0,
+	);
+	// Balance-weighted average APR: Σ(rate × balance) / Σ(balance). A plain
+	// mean would overstate the "typical" rate on a small high-APR card.
+	// Falls back to the plain mean when Σ balance is 0 (e.g. all zeros).
 	const avgInterestRate =
-		activeDebts.length > 0
-			? activeDebts.reduce((sum, d) => sum + d.interest_rate, 0) /
-				activeDebts.length
-			: 0;
+		totalDebt > 0
+			? activeDebts.reduce(
+					(sum, d) =>
+						sum + toNumber(d.interest_rate) * toNumber(d.current_balance),
+					0,
+				) / totalDebt
+			: activeDebts.length > 0
+				? activeDebts.reduce((sum, d) => sum + toNumber(d.interest_rate), 0) /
+					activeDebts.length
+				: 0;
 	const totalPaid = Math.max(0, totalOriginal - totalDebt);
 
 	return {
 		snowballStrategy: [...activeDebts].sort(
-			(a, b) => a.current_balance - b.current_balance,
+			(a, b) =>
+				toNumber(a.current_balance) - toNumber(b.current_balance),
 		),
 		avalancheStrategy: [...activeDebts].sort(
-			(a, b) => b.interest_rate - a.interest_rate,
+			(a, b) => toNumber(b.interest_rate) - toNumber(a.interest_rate),
 		),
 		activeDebts,
 		paidOffDebts,
@@ -227,7 +277,7 @@ export function buildSimulations(
 	extraPayment: number,
 ): DebtSimulations {
 	const activeDebtsList = debts.filter(
-		(d) => d.is_active && d.current_balance > 0,
+		(d) => d.is_active && toNumber(d.current_balance) > 0,
 	);
 	if (activeDebtsList.length === 0) {
 		return {

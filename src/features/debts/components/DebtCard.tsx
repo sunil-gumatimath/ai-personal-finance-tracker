@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { useState } from "react";
 import {
   CreditCard,
   Pencil,
@@ -25,6 +26,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { parseTransactionDate } from "@/lib/date-utils";
+import { toNumber } from "@/lib/number";
 import { cn } from "@/lib/utils";
 import type { Debt, DebtPayment } from "@/types";
 
@@ -85,6 +98,7 @@ export function DebtCard({
   calculateTotalInterest,
   formatCurrency,
 }: DebtCardProps) {
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const getDebtIcon = (type: Debt["type"]) => {
     const found = debtTypes.find((t) => t.value === type);
     return found?.icon || CreditCard;
@@ -147,7 +161,7 @@ export function DebtCard({
                     <span>{debt.lender}</span>
                   </>
                 )}
-                {debt.interest_rate > 0 && (
+                {toNumber(debt.interest_rate) > 0 && (
                   <>
                     <span>•</span>
                     <span className="text-amber-500 font-semibold">
@@ -205,7 +219,7 @@ export function DebtCard({
                 )}
                 <DropdownMenuItem
                   className="text-destructive"
-                  onClick={() => handleDelete(debt.id)}
+                  onClick={() => setConfirmDeleteOpen(true)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -214,6 +228,33 @@ export function DebtCard({
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Delete confirmation */}
+        <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <AlertDialogContent className="sm:max-w-[425px]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-destructive">
+                Delete Debt
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Delete <strong>"{debt.name}"</strong> and its payment history? This
+                action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-2">
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  handleDelete(debt.id);
+                  setConfirmDeleteOpen(false);
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Progress bar */}
         <div className="space-y-2">
@@ -236,10 +277,10 @@ export function DebtCard({
           />
           <div className="flex justify-between text-xs font-medium">
             <span className="text-foreground font-semibold">
-              {formatCurrency(debt.current_balance)} remaining
+              {formatCurrency(toNumber(debt.current_balance))} remaining
             </span>
             <span className="text-muted-foreground">
-              of {formatCurrency(debt.original_amount)}
+              of {formatCurrency(toNumber(debt.original_amount))}
             </span>
           </div>
         </div>
@@ -252,7 +293,7 @@ export function DebtCard({
                 Min Payment
               </p>
               <p className="text-xs font-bold text-foreground mt-0.5">
-                {formatCurrency(debt.minimum_payment)}
+                {formatCurrency(toNumber(debt.minimum_payment))}
               </p>
             </div>
             <div>
@@ -328,11 +369,11 @@ export function DebtCard({
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-sm text-foreground">
-                            {formatCurrency(payment.amount)}
+                            {formatCurrency(toNumber(payment.amount))}
                           </span>
                           <span className="text-[10px] text-muted-foreground font-medium">
                             {format(
-                              new Date(payment.payment_date),
+                              parseTransactionDate(payment.payment_date),
                               "MMM d, yyyy",
                             )}
                           </span>
@@ -346,10 +387,10 @@ export function DebtCard({
                       <div className="flex items-center gap-1.5 text-[10px] font-bold">
                         <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
                           Principal:{" "}
-                          {formatCurrency(payment.principal_amount)}
+                          {formatCurrency(toNumber(payment.principal_amount))}
                         </span>
                         <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
-                          Interest: {formatCurrency(payment.interest_amount)}
+                          Interest: {formatCurrency(toNumber(payment.interest_amount))}
                         </span>
                       </div>
                     </div>

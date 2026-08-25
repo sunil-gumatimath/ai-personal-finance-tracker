@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import {
 	ArrowDownLeft,
@@ -10,6 +11,16 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -24,6 +35,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { parseTransactionDate } from "@/lib/date-utils";
+import { toNumber } from "@/lib/number";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/types";
 
@@ -64,11 +77,12 @@ function TypeBadgeClasses({ type }: { type: Transaction["type"] }) {
 function RowActions({
 	transaction,
 	onEdit,
-	onDelete,
+	onRequestDelete,
 }: {
 	transaction: Transaction;
 	onEdit: (t: Transaction) => void;
-	onDelete: (id: string) => void;
+	/** Requests confirmation — the actual delete happens after the dialog. */
+	onRequestDelete: (t: Transaction) => void;
 }) {
 	return (
 		<DropdownMenu>
@@ -84,7 +98,7 @@ function RowActions({
 				</DropdownMenuItem>
 				<DropdownMenuItem
 					className="text-destructive"
-					onClick={() => onDelete(transaction.id)}
+					onClick={() => onRequestDelete(transaction)}
 				>
 					<Trash2 className="mr-2 h-4 w-4" />
 					Delete
@@ -98,12 +112,12 @@ function MobileCards({
 	transactions,
 	formatCurrency,
 	onEdit,
-	onDelete,
+	onRequestDelete,
 }: {
 	transactions: Transaction[];
 	formatCurrency: (amount: number) => string;
 	onEdit: (t: Transaction) => void;
-	onDelete: (id: string) => void;
+	onRequestDelete: (t: Transaction) => void;
 }) {
 	return (
 		<div className="block md:hidden space-y-3">
@@ -126,7 +140,9 @@ function MobileCards({
 								{transaction.description || "No description"}
 							</p>
 							<div className="flex items-center gap-2 text-xs text-muted-foreground">
-								<span>{format(new Date(transaction.date), "MMM d")}</span>
+								<span>
+									{format(parseTransactionDate(transaction.date), "MMM d")}
+								</span>
 								{transaction.category && (
 									<>
 										<span>•</span>
@@ -148,12 +164,12 @@ function MobileCards({
 							)}
 						>
 							{transaction.type === "income" ? "+" : "-"}
-							{formatCurrency(Math.abs(transaction.amount))}
+							{formatCurrency(Math.abs(toNumber(transaction.amount)))}
 						</span>
 						<RowActions
 							transaction={transaction}
 							onEdit={onEdit}
-							onDelete={onDelete}
+							onRequestDelete={onRequestDelete}
 						/>
 					</div>
 				</div>
@@ -166,12 +182,12 @@ function DesktopTable({
 	transactions,
 	formatCurrency,
 	onEdit,
-	onDelete,
+	onRequestDelete,
 }: {
 	transactions: Transaction[];
 	formatCurrency: (amount: number) => string;
 	onEdit: (t: Transaction) => void;
-	onDelete: (id: string) => void;
+	onRequestDelete: (t: Transaction) => void;
 }) {
 	return (
 		<div className="hidden md:block">
@@ -220,7 +236,7 @@ function DesktopTable({
 							</TableCell>
 							<TableCell>{transaction.account?.name || "—"}</TableCell>
 							<TableCell>
-								{format(new Date(transaction.date), "MMM d, yyyy")}
+								{format(parseTransactionDate(transaction.date), "MMM d, yyyy")}
 							</TableCell>
 							<TableCell
 								className={cn(
@@ -231,13 +247,13 @@ function DesktopTable({
 								)}
 							>
 								{transaction.type === "income" ? "+" : "-"}
-								{formatCurrency(Math.abs(transaction.amount))}
+								{formatCurrency(Math.abs(toNumber(transaction.amount)))}
 							</TableCell>
 							<TableCell>
 								<RowActions
 									transaction={transaction}
 									onEdit={onEdit}
-									onDelete={onDelete}
+									onRequestDelete={onRequestDelete}
 								/>
 							</TableCell>
 						</TableRow>
@@ -257,6 +273,8 @@ export function TransactionTable({
 	onDelete,
 	onAdd,
 }: TransactionTableProps) {
+	const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+
 	if (transactions.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center py-12 text-center">
@@ -286,15 +304,51 @@ export function TransactionTable({
 				transactions={transactions}
 				formatCurrency={formatCurrency}
 				onEdit={onEdit}
-				onDelete={onDelete}
+				onRequestDelete={setPendingDelete}
 			/>
 			{/* Desktop Table Layout */}
 			<DesktopTable
 				transactions={transactions}
 				formatCurrency={formatCurrency}
 				onEdit={onEdit}
-				onDelete={onDelete}
+				onRequestDelete={setPendingDelete}
 			/>
+
+			{/* Delete confirmation */}
+			<AlertDialog
+				open={pendingDelete !== null}
+				onOpenChange={(open) => {
+					if (!open) setPendingDelete(null);
+				}}
+			>
+				<AlertDialogContent className="sm:max-w-[425px]">
+					<AlertDialogHeader>
+						<AlertDialogTitle className="text-destructive">
+							Delete Transaction
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							Delete{" "}
+							<strong>
+								"
+								{pendingDelete?.description || "this transaction"}"
+							</strong>
+							? This action cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="gap-2 sm:gap-2">
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							onClick={() => {
+								if (pendingDelete) onDelete(pendingDelete.id);
+								setPendingDelete(null);
+							}}
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</>
 	);
 }

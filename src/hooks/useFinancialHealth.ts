@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
+import { toNumber } from '@/lib/number'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 import type { Transaction, Budget, Account } from '@/types'
 
@@ -29,6 +30,7 @@ export function useFinancialHealth() {
     const { formatCurrency } = usePreferences()
     const [data, setData] = useState<FinancialHealth | null>(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     const calculateHealth = useCallback(async () => {
         if (!user) {
@@ -37,6 +39,7 @@ export function useFinancialHealth() {
         }
 
         try {
+            setError(null)
             setLoading(true)
             const now = new Date()
             const startOfCurrMonth = format(startOfMonth(now), 'yyyy-MM-dd')
@@ -57,16 +60,6 @@ export function useFinancialHealth() {
             const typedTransactions = (transactionsRes.transactions || []) as Transaction[]
             const typedBudgets = (budgetsRes.budgets || []) as (Budget & { category: { name: string } })[]
             const typedAccounts = (accountsRes.accounts || []) as Account[]
-
-            // Helper to safely parse number from PostgreSQL DECIMAL (which may come as string)
-            const toNumber = (val: unknown): number => {
-                if (typeof val === 'number') return isNaN(val) ? 0 : val
-                if (typeof val === 'string') {
-                    const parsed = parseFloat(val)
-                    return isNaN(parsed) ? 0 : parsed
-                }
-                return 0
-            }
 
             // 1. Savings Rate Calculation
             const currentMonthTransactions = typedTransactions.filter(t => {
@@ -97,21 +90,35 @@ export function useFinancialHealth() {
             const budgetAdherence = typedBudgets.length > 0 ? categoriesOnTrack / typedBudgets.length : 1
 
             // 3. Emergency Fund Progress
-            const savingsAccounts = typedAccounts.filter(a => a.type === 'savings' || a.name.toLowerCase().includes('emergency'))
+            const savingsAccounts = typedAccounts.filter(a => a.type === 'savings' || (a.name ?? '').toLowerCase().includes('emergency'))
             // Handle PostgreSQL DECIMAL type which may come as string
-            const currentEmergencyFund = savingsAccounts.reduce((sum, a) => {
-                const balance = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance
-                return sum + (isNaN(balance) ? 0 : balance)
-            }, 0)
+            const currentEmergencyFund = savingsAccounts.reduce((sum, a) => sum + toNumber(a.balance), 0)
 
-            // Fetch last 3 months expenses to average
-            const pastExpenses = typedTransactions
+            // Fetch last 3 months expenses to average; keep per-transaction amounts
+            // so we can fall back to the median when there is no history at all.
+            const pastExpenseAmounts: number[] = []
+            let pastExpenses = 0
+            typedTransactions
                 .filter(t => {
                     const dateStr = String(t.date).split('T')[0]
                     return t.type === 'expense' && dateStr >= threeMonthsAgo && dateStr < startOfCurrMonth
                 })
-                .reduce((sum, t) => sum + toNumber(t.amount), 0)
-            const avgMonthlyExpenses = pastExpenses > 0 ? pastExpenses / 3 : (expenses > 0 ? expenses : 2000)
+                .forEach(t => {
+                    const amount = toNumber(t.amount)
+                    pastExpenses += amount
+                    pastExpenseAmounts.push(amount)
+                })
+            // Median of observed expenses (robust to one-off spikes); falls back
+            // to this month, and only then to a static $2,000 assumption.
+            const sortedPast = [...pastExpenseAmounts].sort((a, b) => a - b)
+            const medianExpense = sortedPast.length > 0
+                ? (sortedPast[Math.floor((sortedPast.length - 1) / 2)] ?? 0)
+                : 0
+            const avgMonthlyExpenses = pastExpenses > 0
+                ? pastExpenses / 3
+                : medianExpense > 0
+                    ? medianExpense
+                    : (expenses > 0 ? expenses : 2000) // last-resort static fallback for brand-new users
             const targetEmergencyFund = avgMonthlyExpenses * 6
             const emergencyFundProgress = Math.min(1, currentEmergencyFund / targetEmergencyFund)
 
@@ -174,6 +181,7 @@ export function useFinancialHealth() {
 
         } catch (error) {
             console.error('Error calculating financial health:', error)
+            setError(error instanceof Error ? error.message : 'Failed to calculate your financial health score.')
         } finally {
             setLoading(false)
         }
@@ -183,5 +191,5 @@ export function useFinancialHealth() {
         calculateHealth()
     }, [calculateHealth])
 
-    return { data, loading, refresh: calculateHealth }
+    return { data, loading, error, refresh: calculateHealth }
 }

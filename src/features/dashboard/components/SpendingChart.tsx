@@ -54,10 +54,22 @@ export function SpendingChart({ data }: SpendingChartProps) {
     const savingsRate = totalIncome > 0 ? ((netFlow / totalIncome) * 100) : 0
 
     // Custom Tooltip component to show detailed metrics per month
-    const CustomTooltip = ({ active, payload, label }: any) => {
+    interface TooltipEntry {
+        dataKey?: string | number
+        value?: number | string
+    }
+    const CustomTooltip = ({
+        active,
+        payload,
+        label,
+    }: {
+        active?: boolean
+        payload?: TooltipEntry[]
+        label?: string | number
+    }) => {
         if (active && payload && payload.length) {
-            const income = payload.find((p: any) => p.dataKey === 'income')?.value || 0
-            const expenses = payload.find((p: any) => p.dataKey === 'expenses')?.value || 0
+            const income = Number(payload.find((p) => p.dataKey === 'income')?.value) || 0
+            const expenses = Number(payload.find((p) => p.dataKey === 'expenses')?.value) || 0
             const net = income - expenses
             const monthSavingsRate = income > 0 ? (net / income) * 100 : 0
 

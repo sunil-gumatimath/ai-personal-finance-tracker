@@ -30,6 +30,16 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog'
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -89,6 +99,7 @@ export function Categories() {
     const [categories, setCategories] = useState<Category[]>([])
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+    const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
     const [formData, setFormData] = useState({
         name: '',
         type: 'expense' as 'income' | 'expense',
@@ -300,7 +311,7 @@ export function Categories() {
                                                 </div>
                                                 <span className="font-bold text-sm text-foreground truncate tracking-tight">{category.name}</span>
                                             </div>
-                                            <div className="flex gap-0.5 opacity-60 group-hover/tile:opacity-100 transition-opacity duration-200 shrink-0">
+                                            <div className="flex gap-0.5 opacity-60 transition-opacity duration-200 shrink-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
@@ -322,7 +333,8 @@ export function Categories() {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-background/80 cursor-pointer"
-                                                    onClick={() => handleDelete(category.id)}
+                                                    aria-label={`Delete ${category.name}`}
+                                                    onClick={() => setCategoryToDelete(category)}
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                 </Button>
@@ -377,7 +389,7 @@ export function Categories() {
                                                 </div>
                                                 <span className="font-bold text-sm text-foreground truncate tracking-tight">{category.name}</span>
                                             </div>
-                                            <div className="flex gap-0.5 opacity-60 group-hover/tile:opacity-100 transition-opacity duration-200 shrink-0">
+                                            <div className="flex gap-0.5 opacity-60 transition-opacity duration-200 shrink-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
@@ -399,7 +411,8 @@ export function Categories() {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-background/80 cursor-pointer"
-                                                    onClick={() => handleDelete(category.id)}
+                                                    aria-label={`Delete ${category.name}`}
+                                                    onClick={() => setCategoryToDelete(category)}
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                 </Button>
@@ -549,6 +562,40 @@ export function Categories() {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Delete confirmation (shared by income & expense tiles) */}
+            <AlertDialog
+                open={categoryToDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) setCategoryToDelete(null)
+                }}
+            >
+                <AlertDialogContent className="sm:max-w-[425px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-destructive">
+                            Delete Category
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Delete the category{" "}
+                            <strong>"{categoryToDelete?.name}"</strong>? If it is in use
+                            by transactions, the delete will fail. This action cannot be
+                            undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:gap-2">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                                if (categoryToDelete) handleDelete(categoryToDelete.id)
+                                setCategoryToDelete(null)
+                            }}
+                        >
+                            Delete Category
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

@@ -119,8 +119,16 @@ const CustomTooltip = ({ active, payload, formatCurrency }: CustomTooltipProps) 
 
 
 // Custom active shape component for the Donut Chart
-const renderActiveShape = (props: any) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+const renderActiveShape = (props: React.ComponentProps<typeof Sector>) => {
+    const {
+        cx,
+        cy,
+        innerRadius = 0,
+        outerRadius = 0,
+        startAngle = 0,
+        endAngle = 0,
+        fill,
+    } = props;
     return (
         <g>
             {/* Glowing shadow background sector */}

@@ -55,7 +55,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
-import { useAuth } from "@/contexts/AuthContext";
+import { toNumber } from "@/lib/number";import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/types";
@@ -278,7 +278,7 @@ export function Accounts() {
       case "name":
         return a.name.localeCompare(b.name);
       case "balance":
-        return b.balance - a.balance;
+        return toNumber(b.balance) - toNumber(a.balance);
       case "type":
         return a.type.localeCompare(b.type);
       case "created":
@@ -294,14 +294,14 @@ export function Accounts() {
   const inactiveAccounts = sortedAccounts.filter((a) => !a.is_active);
   const totalBalance = accounts
     .filter((a) => a.is_active)
-    .reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    .reduce((sum, a) => sum + toNumber(a.balance), 0);
   const totalAssets = accounts
-    .filter((a) => a.is_active && Number(a.balance || 0) > 0)
-    .reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    .filter((a) => a.is_active && toNumber(a.balance) > 0)
+    .reduce((sum, a) => sum + toNumber(a.balance), 0);
   const totalLiabilities = Math.abs(
     accounts
-      .filter((a) => a.is_active && Number(a.balance || 0) < 0)
-      .reduce((sum, a) => sum + Number(a.balance || 0), 0),
+      .filter((a) => a.is_active && toNumber(a.balance) < 0)
+      .reduce((sum, a) => sum + toNumber(a.balance), 0),
   );
 
   if (loading) {
@@ -578,13 +578,13 @@ export function Accounts() {
                       <h3
                         className={cn(
                           "text-3xl font-black tabular-nums tracking-tighter transition-all group-hover:scale-105 origin-left",
-                          account.balance >= 0
+                          toNumber(account.balance) >= 0
                             ? "text-foreground"
                             : "text-rose-500",
                         )}
                       >
                         {showBalances
-                          ? formatCurrency(account.balance)
+                          ? formatCurrency(toNumber(account.balance))
                           : "••••••"}
                       </h3>
                     </div>
@@ -673,7 +673,7 @@ export function Accounts() {
                       </p>
                       <h3 className="text-xl font-black text-muted-foreground/80 tracking-tighter">
                         {showBalances
-                          ? formatCurrency(account.balance)
+                          ? formatCurrency(toNumber(account.balance))
                           : "••••••"}
                       </h3>
                     </div>
