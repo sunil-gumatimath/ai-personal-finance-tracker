@@ -50,7 +50,7 @@
   "crons": [
     {
       "path": "/api/cron?action=recurring",
-      "schedule": "0 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
