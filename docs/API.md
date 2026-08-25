@@ -125,13 +125,13 @@ possessing another user's UUID grants no access.
 | --- | --- | --- |
 | POST | `/api/transactions?action=process-recurring` | Materialize due recurring occurrences for the signed-in user (returns `{ created, completed }`) |
 
-Recurring templates carry `recurring_frequency`, an optional `recurring_end_date`, and a server-owned `next_due_date`. Each run copies the template into a regular transaction dated `next_due_date` and advances it; series whose end date passed are deactivated. The hourly Vercel Cron job (`/api/cron?action=recurring`, guarded by `CRON_SECRET`) does this for all users; the in-app button does it for one user.
+Recurring templates carry `recurring_frequency`, an optional `recurring_end_date`, and a server-owned `next_due_date`. Each run copies the template into a regular transaction dated `next_due_date` and advances it; series whose end date passed are deactivated. The Vercel Cron job (daily at 03:00 UTC; `/api/cron?action=recurring`, guarded by `CRON_SECRET`) does this for all users; the in-app button does it for one user.
 
 ## Cron
 
 | Method | Path | Description |
 | --- | --- | --- |
-| POST | `/api/cron?action=recurring` | Hourly maintenance: process due recurring transactions for all users. Requires `Authorization: Bearer <CRON_SECRET>` (Vercel Cron sends this automatically) |
+| POST | `/api/cron?action=recurring` | Daily maintenance (03:00 UTC): process due recurring transactions for all users. Requires `Authorization: Bearer <CRON_SECRET>` (Vercel Cron sends this automatically) |
 
 ## System
 

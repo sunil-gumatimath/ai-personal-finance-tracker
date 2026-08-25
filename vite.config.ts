@@ -44,7 +44,9 @@ export default defineConfig({
         ws: true,
       },
       '/neon-auth': {
-        target: 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth',
+        // Env override keeps the real endpoint out of source control;
+        // the literal is only a fallback (must match src/lib/auth.ts).
+        target: process.env.VITE_NEON_AUTH_URL ?? 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/neon-auth\/auth/, ''),

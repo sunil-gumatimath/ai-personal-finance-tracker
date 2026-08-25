@@ -46,7 +46,7 @@ Use **Transactions** to record money moving in and out.
   - Choose **Income**, **Expense**, or **Transfer**.
   - Enter amount, date, description, account, and category when applicable.
   - For transfers, choose both the source and destination account.
-- **Recurring transactions**: Mark repeating items such as rent, subscriptions, or salary as recurring, choose the frequency, and optionally set an **end date**. The next occurrence is generated automatically (hourly cron in production, or the **Process Recurring** button on this page) and appears as a normal transaction you can edit or delete.
+- **Recurring transactions**: Mark repeating items such as rent, subscriptions, or salary as recurring, choose the frequency, and optionally set an **end date**. The next occurrence is generated automatically (daily 03:00 UTC cron in production, or the **Process Recurring** button on this page) and appears as a normal transaction you can edit or delete.
 - **Add with AI**: Type a sentence like *"paid $45 for groceries yesterday"* or *"salary of $2,000 on the 1st"* into the **Add with AI** box — the assistant fills the form for you to review before saving.
 - **Search and filter**: Search by description or category and filter by transaction type.
 - **Edit or delete**: Use the row actions to correct or remove entries.

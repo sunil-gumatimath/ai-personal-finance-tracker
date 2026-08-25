@@ -108,5 +108,3 @@ src/tests/
 .history/
 *.orig
 *.rej
-.vercel
-.env*

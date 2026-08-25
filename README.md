@@ -100,12 +100,15 @@ A premium, AI-powered personal finance management platform for tracking transact
    NEON_AUTH_URL=your_neon_auth_url
    VITE_NEON_AUTH_URL=your_neon_auth_url
 
-   # Optional local development flags
+   # Optional local development flag: allow cookies over plain HTTP
+   # locally (forces Secure=false). Never use in production.
    ALLOW_INSECURE_COOKIES=true
 
    # Local development without Neon
    USE_MOCK_DB=true
    ```
+
+   See [`.env.example`](./.env.example) for every supported variable, including `ALLOWED_ORIGINS` (extra CORS/auth origins), `VITE_APP_URL` (public app URL for auth redirects/emails), `KILOCODE_FREE_MODELS`, `PORT`, and `CRON_SECRET`.
 
 4. **Database setup for Neon:**
 
@@ -130,7 +133,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 
 ### Recurring automation cron (optional, for production)
 
-`vercel.json` already declares an hourly cron that hits `/api/cron?action=recurring` to materialize due recurring transactions for all users. To enable it, add a `CRON_SECRET` env var in your Vercel project — Vercel sends it as `Authorization: Bearer <CRON_SECRET>` automatically, and the endpoint refuses to run without it. Without the cron, users can still use the **Process Recurring** button on the Transactions page, which runs the same logic for the signed-in user.
+`vercel.json` already declares a daily cron (`0 3 * * *`, i.e. **03:00 UTC**) that hits `/api/cron?action=recurring` to materialize due recurring transactions for all users. To enable it, add a `CRON_SECRET` env var in your Vercel project — Vercel sends it as `Authorization: Bearer <CRON_SECRET>` automatically, and the endpoint refuses to run without it. Without the cron, users can still use the **Process Recurring** button on the Transactions page, which runs the same logic for the signed-in user.
 
 ## Development Commands
 
@@ -145,17 +148,21 @@ A premium, AI-powered personal finance management platform for tracking transact
 | `bun run test` | Run Bun unit tests |
 | `bun run build` | Typecheck and build for production |
 | `bun run preview` | Preview the production Vite build |
+| `bun scripts/migrate.ts` | Apply all pending migrations from `database/migrations/` in filename order (skips versions already recorded in the `schema_migrations` ledger; reads `NEON_DATABASE_URL` from `.env`) |
+| `bun scripts/migrate.ts <file.sql>` | Apply a single migration file (recorded in the ledger like any other run) |
+| `bun scripts/migrate.ts <file.sql> --force` | Re-apply a file even if its version is already recorded (migrations are idempotent) |
 
 ## CI / Continuous Integration
 
 A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request to `main`/`master`:
 
-1. `bun install --frozen-lockfile`
-2. `bun run lint`
-3. `bun run typecheck` (frontend)
-4. `bun run typecheck:api` (API)
-5. `bun run test`
-6. `bun run build`
+1. Gitleaks secret scan (full git history)
+2. `bun install --frozen-lockfile`
+3. `bun run lint`
+4. `bun run typecheck` (frontend)
+5. `bun run typecheck:api` (API)
+6. `bun test --coverage`
+7. `bun run build`
 
 In-progress runs for the same branch are cancelled automatically so the latest commit is always what gets checked.
 
@@ -193,6 +200,7 @@ AI features require a valid provider key. Add it in **Settings > Preferences > A
    - `AUTH_SECRET`
    - `API_KEY_ENCRYPTION_SECRET`
    - `NEON_AUTH_URL` if needed by your Neon Auth project
+   - `CRON_SECRET` to authenticate the daily recurring-transactions cron
    - Optional provider-level AI keys only if you later add global server-side key support. The current UI is designed around per-user keys in Settings.
 4. Deploy.
 
@@ -243,7 +251,6 @@ Notes:
 │   ├── _repositories/         # Data access layer and query builder
 │   ├── _routes/               # HTTP route modules and route registry (index.ts)
 │   ├── _services/             # Business logic, ownership checks, auth, audit log, AI providers
-│   ├── tests/                 # API test support
 │   ├── _utils/                # Crypto, response, query-processor, DNS bypass, default categories, types
 │   ├── handler.ts             # Vercel serverless function entrypoint (the only deployed function)
 │   ├── _server.ts             # Local Bun HTTP server shim (also serves /api/ws-logs)
@@ -252,10 +259,10 @@ Notes:
 │   ├── migrations/            # Versioned migrations (canonical source of truth)
 │   ├── scripts/               # Database helper scripts
 │   └── seeds/                 # Seed data (default categories)
-├── docs/                      # Project documentation (reserved)
-├── .github/workflows/ci.yml   # CI: lint + typecheck (frontend + API) + test + build on push/PR to main
+├── docs/                      # Project documentation (API reference)
+├── .github/workflows/ci.yml   # CI: gitleaks + lint + typecheck (frontend + API) + test (coverage) + build on push/PR to main
 ├── public/                    # Static assets: favicon, PWA icons
-└── scripts/                   # Dev helpers: fullstack runner (dev.ts)
+└── scripts/                   # Dev helpers: fullstack runner (dev.ts), migration runner (migrate.ts)
 ```
 
 > **Layout note:** `api/_routes/*` are the controllers; there is no separate `api/controllers/`
