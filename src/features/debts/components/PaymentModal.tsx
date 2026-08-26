@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
     Dialog,
@@ -10,6 +11,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { usePreferences } from '@/hooks/usePreferences'
+import { toNumber } from '@/lib/number'
 import type { Debt } from '@/types'
 
 interface PaymentModalProps {
@@ -32,6 +35,8 @@ interface PaymentModalProps {
     }>>
     onSubmit: (e: React.FormEvent) => void
     onCancel: () => void
+    /** True while the payment request is in flight. */
+    isSaving?: boolean
 }
 
 export function PaymentModal({
@@ -42,7 +47,17 @@ export function PaymentModal({
     setFormData,
     onSubmit,
     onCancel,
+    isSaving = false,
 }: PaymentModalProps) {
+    const { formatCurrency } = usePreferences()
+    const remaining = selectedDebt ? toNumber(selectedDebt.current_balance) : 0
+    const enteredAmount = parseFloat(formData.amount)
+    const overpays =
+        Number.isFinite(enteredAmount) &&
+        enteredAmount > 0 &&
+        selectedDebt !== null &&
+        enteredAmount > remaining
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
@@ -50,6 +65,12 @@ export function PaymentModal({
                     <DialogTitle>Record Payment</DialogTitle>
                     <DialogDescription>
                         Log a payment for <strong>{selectedDebt?.name}</strong>.
+                        {selectedDebt && (
+                            <>
+                                {' '}Balance: {formatCurrency(remaining)} · Min:{' '}
+                                {formatCurrency(toNumber(selectedDebt.minimum_payment))}
+                            </>
+                        )}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="space-y-4">
@@ -59,12 +80,18 @@ export function PaymentModal({
                             <Input
                                 id="payment-amount"
                                 type="number"
+                                min="0"
                                 step="0.01"
                                 placeholder="0.00"
                                 value={formData.amount}
                                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                 required
                             />
+                            {overpays && (
+                                <p className="text-xs font-medium text-amber-500">
+                                    This amount is larger than the remaining balance.
+                                </p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -73,11 +100,15 @@ export function PaymentModal({
                                 <Input
                                     id="payment-principal"
                                     type="number"
+                                    min="0"
                                     step="0.01"
                                     placeholder="Optional"
                                     value={formData.principal_amount}
                                     onChange={(e) => setFormData({ ...formData, principal_amount: e.target.value })}
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    Leave blank to auto-split against the amount.
+                                </p>
                             </div>
 
                             <div className="space-y-1">
@@ -85,6 +116,7 @@ export function PaymentModal({
                                 <Input
                                     id="payment-interest"
                                     type="number"
+                                    min="0"
                                     step="0.01"
                                     placeholder="Optional"
                                     value={formData.interest_amount}
@@ -120,7 +152,10 @@ export function PaymentModal({
                         <Button type="button" variant="outline" onClick={onCancel}>
                             Cancel
                         </Button>
-                        <Button type="submit">
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving && (
+                                <Loader2 className="mr-2 h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+                            )}
                             Record Payment
                         </Button>
                     </DialogFooter>

@@ -11,8 +11,16 @@ import {
     addMonths,
     subMonths,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import {
+    ChevronLeft,
+    ChevronRight,
+    ArrowUpRight,
+    ArrowDownLeft,
+    ArrowLeftRight,
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
     Dialog,
     DialogContent,
@@ -20,20 +28,25 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog'
+import { ErrorState } from '@/components/system/ErrorState'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
 import { parseTransactionDate } from '@/lib/date-utils'
-import { toNumber } from '@/lib/number'
+import { formatCompactCurrency, toNumber } from '@/lib/number'
 import type { Transaction } from '@/types'
+
+/** Mirrors Reports — the API caps results; beyond this we'd silently truncate. */
+const CALENDAR_TX_LIMIT = 1000
 
 export function Calendar() {
     const { user } = useAuth()
-    const { formatCurrency } = usePreferences()
+    const { formatCurrency, preferences } = usePreferences()
     const [currentDate, setCurrentDate] = useState(new Date())
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(false)
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
 
@@ -42,6 +55,8 @@ export function Calendar() {
             setLoading(false)
             return
         }
+
+        setError(false)
 
         const start = startOfWeek(startOfMonth(currentDate))
         const end = endOfWeek(endOfMonth(currentDate))
@@ -55,13 +70,19 @@ export function Calendar() {
         }
 
         try {
-            const res = await api.transactions.list({ since: formatDateStr(start) })
+            const res = await api.transactions.list({
+                since: formatDateStr(start),
+                limit: CALENDAR_TX_LIMIT,
+            })
             const rows = (res.transactions || []) as Transaction[]
             const endStr = formatDateStr(end)
             const filtered = rows.filter(t => String(t.date).split('T')[0] <= endStr)
             setTransactions(filtered)
-        } catch (error) {
-            console.error('Error fetching transactions:', error)
+        } catch (err) {
+            console.error('Error fetching transactions:', err)
+            // A silent failure used to render an empty-looking month.
+            toast.error('Failed to load calendar transactions')
+            setError(true)
         } finally {
             setLoading(false)
         }
@@ -120,8 +141,27 @@ export function Calendar() {
 
     if (loading) {
         return (
-            <div className="flex h-full items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <div className="space-y-6">
+                {/* Header skeleton */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-2">
+                        <Skeleton className="h-9 w-48" />
+                        <Skeleton className="h-5 w-72 max-w-full" />
+                    </div>
+                    <Skeleton className="h-10 w-64 max-w-full" />
+                </div>
+                {/* Weekday header + 7×6 grid skeleton */}
+                <div className="rounded-xl border border-border/50 bg-card/50 overflow-hidden">
+                    <Skeleton className="h-10 w-full rounded-none" />
+                    <div className="grid grid-cols-7">
+                        {[...Array(42)].map((_, i) => (
+                            <Skeleton
+                                key={i}
+                                className="h-[100px] w-full rounded-none border-b border-r border-border/30"
+                            />
+                        ))}
+                    </div>
+                </div>
             </div>
         )
     }
@@ -136,20 +176,41 @@ export function Calendar() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={prevMonth}>
-                        <ChevronLeft className="h-4 w-4" />
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Previous month"
+                        onClick={prevMonth}
+                        className="h-11 w-11"
+                    >
+                        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                     </Button>
-                    <div className="min-w-[140px] text-center font-medium">
+                    {/* Announced when month navigation changes it */}
+                    <div className="min-w-[140px] text-center font-medium" aria-live="polite">
                         {format(currentDate, 'MMMM yyyy')}
                     </div>
-                    <Button variant="outline" size="icon" onClick={nextMonth}>
-                        <ChevronRight className="h-4 w-4" />
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Next month"
+                        onClick={nextMonth}
+                        className="h-11 w-11"
+                    >
+                        <ChevronRight className="h-4 w-4" aria-hidden="true" />
                     </Button>
-                    <Button variant="secondary" onClick={resetToToday} className="ml-2">
+                    <Button variant="secondary" onClick={resetToToday} className="ml-2 active:scale-[0.98] transition-transform duration-150 ease-out">
                         Today
                     </Button>
                 </div>
             </div>
+
+            {error && (
+                <ErrorState
+                    title="Couldn't load this month"
+                    message="Some transactions may be missing from the calendar. Check your connection and try again."
+                    onRetry={fetchTransactions}
+                />
+            )}
 
             <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-border hover:bg-card/80">
                 <div className="grid grid-cols-7 border-b bg-muted/50 text-center text-xs font-semibold leading-6 text-muted-foreground lg:text-sm">
@@ -165,7 +226,6 @@ export function Calendar() {
                     {calendarGrid.map((day, idx) => {
                         const hasTransactions = day.transactions.length > 0
                         const isToday = isSameDay(day.date, new Date())
-                        const isSelected = selectedDate !== null && isSameDay(day.date, selectedDate)
                         return (
                             <div
                                 key={day.date.toString()}
@@ -183,12 +243,11 @@ export function Calendar() {
                                           },
                                       }
                                     : {})}
-                                aria-selected={isSelected}
                                 className={cn(
                                     "relative min-h-[100px] border-b border-r p-2 transition-colors cursor-default",
                                     hasTransactions && "hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
                                     !isSameMonth(day.date, currentDate) && "bg-muted/20 text-muted-foreground",
-                                    isToday && "bg-primary/5 font-semibold",
+                                    isToday && "ring-1 ring-primary ring-inset bg-primary/5 font-semibold",
                                     idx % 7 === 0 && "border-l" // Left border for first column
                                 )}
                             >
@@ -201,15 +260,26 @@ export function Calendar() {
 
                             <div className="mt-2 space-y-1">
                                 {day.summary.income > 0 && (
-                                    <div className="flex items-center gap-1 rounded bg-green-500/10 px-1 py-0.5 text-[10px] text-green-600 dark:text-green-400">
-                                        <ArrowDownLeft className="h-3 w-3" />
-                                        {formatCurrency(day.summary.income)}
+                                    <div className="flex items-center gap-1 rounded bg-[var(--income)]/10 px-1 py-0.5 text-[10px] text-[var(--income)]">
+                                        <ArrowDownLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {/* Compact below sm so wide amounts stop clipping */}
+                                        <span className="sm:hidden tabular-nums">
+                                            {formatCompactCurrency(day.summary.income, preferences.currency)}
+                                        </span>
+                                        <span className="hidden sm:inline tabular-nums">
+                                            {formatCurrency(day.summary.income)}
+                                        </span>
                                     </div>
                                 )}
                                 {day.summary.expense > 0 && (
-                                    <div className="flex items-center gap-1 rounded bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600 dark:text-red-400">
-                                        <ArrowUpRight className="h-3 w-3" />
-                                        {formatCurrency(day.summary.expense)}
+                                    <div className="flex items-center gap-1 rounded bg-[var(--expense)]/10 px-1 py-0.5 text-[10px] text-[var(--expense)]">
+                                        <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        <span className="sm:hidden tabular-nums">
+                                            {formatCompactCurrency(day.summary.expense, preferences.currency)}
+                                        </span>
+                                        <span className="hidden sm:inline tabular-nums">
+                                            {formatCurrency(day.summary.expense)}
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -231,24 +301,41 @@ export function Calendar() {
                     </DialogHeader>
                     <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                         {selectedDayData?.transactions.map((t) => (
-                            <div key={t.id} className="flex items-center justify-between rounded-lg border p-3">
-                                <div className="flex items-center gap-3">
+                            <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                                <div className="flex items-center gap-3 min-w-0">
                                     <div className={cn(
-                                        "flex h-8 w-8 items-center justify-center rounded-full",
-                                        t.type === 'income' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                                        t.type === 'income'
+                                            ? "bg-[var(--income)]/10 text-[var(--income)]"
+                                            : t.type === 'expense'
+                                                ? "bg-[var(--expense)]/10 text-[var(--expense)]"
+                                                : "bg-muted text-muted-foreground"
                                     )}>
-                                        {t.type === 'income' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                                        {t.type === 'income' ? (
+                                            <ArrowDownLeft className="h-4 w-4" aria-hidden="true" />
+                                        ) : t.type === 'expense' ? (
+                                            <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                                        ) : (
+                                            <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
+                                        )}
                                     </div>
-                                    <div>
-                                        <div className="font-medium">{t.description || 'No description'}</div>
-                                        <div className="text-xs text-muted-foreground">{t.category?.name || 'Uncategorized'} • {t.account?.name}</div>
+                                    <div className="min-w-0">
+                                        <div className="font-medium truncate">{t.description || 'No description'}</div>
+                                        <div className="text-xs text-muted-foreground truncate">
+                                            {t.category?.name || 'Uncategorized'} • {t.account?.name}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className={cn(
-                                    "font-semibold",
-                                    t.type === 'income' ? "text-green-500" : "text-red-500"
+                                    "shrink-0 font-semibold tabular-nums",
+                                    t.type === 'income'
+                                        ? "text-[var(--income)]"
+                                        : t.type === 'expense'
+                                            ? "text-[var(--expense)]"
+                                            : "text-muted-foreground"
                                 )}>
-                                    {t.type === 'income' ? '+' : '-'}{formatCurrency(toNumber(t.amount))}
+                                    {t.type === 'income' ? '+' : t.type === 'expense' ? '−' : '⇄'}
+                                    {formatCurrency(toNumber(t.amount))}
                                 </div>
                             </div>
                         ))}

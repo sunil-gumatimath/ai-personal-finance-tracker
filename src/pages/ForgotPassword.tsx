@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,19 +12,26 @@ import { Logo } from '@/components/system/Logo'
 export function ForgotPassword() {
     const { resetPassword } = useAuth()
     const [email, setEmail] = useState('')
-    const [loading, setLoading] = useState(false)
+    const [isSending, setIsSending] = useState(false)
+    const [formError, setFormError] = useState<string | null>(null)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        setLoading(true)
+        if (isSending) return
+        setIsSending(true)
+        setFormError(null)
         try {
             const { error } = await resetPassword(email)
             if (error) throw error
             toast.success('If that email exists, a reset link has been sent.')
         } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : 'Failed to request reset')
+            console.error('Reset request error:', error)
+            // Single error channel: inline alert (no duplicate toast).
+            setFormError(
+                error instanceof Error ? error.message : 'Failed to request reset',
+            )
         } finally {
-            setLoading(false)
+            setIsSending(false)
         }
     }
 
@@ -53,10 +61,31 @@ export function ForgotPassword() {
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     autoComplete="email"
+                                    autoFocus
                                 />
                             </div>
-                            <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? 'Sending...' : 'Send reset link'}
+                            {formError && (
+                                <p
+                                    role="alert"
+                                    id="forgot-password-error"
+                                    className="text-sm text-destructive"
+                                >
+                                    {formError}
+                                </p>
+                            )}
+                            <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={isSending}
+                            >
+                                {isSending ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 motion-safe:animate-spin" />
+                                        Sending...
+                                    </>
+                                ) : (
+                                    'Send reset link'
+                                )}
                             </Button>
                         </form>
                         <div className="mt-6 text-center text-sm">

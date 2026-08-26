@@ -1,6 +1,7 @@
-import { Leaf, Monitor, Moon, Sun, type LucideIcon } from "lucide-react"
+import { Leaf, Monitor, Moon, Palette, Sun, type LucideIcon } from "lucide-react"
 
-export type ThemeName = "light" | "dark" | "system" | "emerald"
+export type ThemeName = "light" | "dark" | "system"
+export type AccentName = "default" | "emerald"
 
 export interface ThemeOption {
     value: ThemeName
@@ -12,9 +13,19 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
     { value: "light", label: "Light", icon: Sun },
     { value: "dark", label: "Dark", icon: Moon },
     { value: "system", label: "System", icon: Monitor },
-    { value: "emerald", label: "Emerald", icon: Leaf },
 ]
 
 export const COLOR_THEMES = THEME_OPTIONS
     .filter(({ value }) => value !== "system")
     .map(({ value }) => value)
+
+export interface AccentOption {
+    value: AccentName
+    label: string
+    icon: LucideIcon
+}
+
+export const ACCENT_OPTIONS: readonly AccentOption[] = [
+    { value: "default", label: "Default", icon: Palette },
+    { value: "emerald", label: "Emerald", icon: Leaf },
+]

@@ -1,21 +1,38 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 interface StatCardProps {
     title: string
     value: string
-    change?: string
     changeType?: 'positive' | 'negative' | 'neutral'
+    /**
+     * Tints the main value with income/expense semantic colors — used when the
+     * figure itself is money-positive/negative (e.g. a negative monthly net),
+     * independent of any trend direction.
+     */
+    valueSemantic?: 'positive' | 'negative'
     percentageChange?: string
     trendDescription?: string
     subtitle?: string
 }
 
+// Money semantics follow the shared --income/--expense tokens (see Reports.tsx).
+const SEMANTIC_TEXT = {
+    positive: 'text-[var(--income)]',
+    negative: 'text-[var(--expense)]',
+} as const
+
+const SEMANTIC_BADGE = {
+    positive: 'bg-[var(--income)]/10 text-[var(--income)] border-[var(--income)]/20',
+    negative: 'bg-[var(--expense)]/10 text-[var(--expense)] border-[var(--expense)]/20',
+} as const
+
 export function StatCard({
     title,
     value,
-    change,
     changeType = 'neutral',
+    valueSemantic,
     percentageChange,
     trendDescription,
     subtitle,
@@ -26,54 +43,57 @@ export function StatCard({
             ? TrendingDown
             : Minus
 
-    const displayPercentage = percentageChange || (change && change.includes('%') ? change.split('%')[0] + '%' : null)
-    const displayTrendDesc = trendDescription || (change && !change.includes('%') ? change : null)
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
-            {/* Header with title and percentage badge */}
-            <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-muted-foreground">
-                    {title}
-                </span>
-                {displayPercentage && (
-                    <div className={cn(
-                        "flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border",
-                        changeType === 'positive' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-                        changeType === 'negative' && "bg-rose-500/10 text-rose-400 border-rose-500/20",
-                        changeType === 'neutral' && "bg-muted/50 text-muted-foreground border-border/30"
+        <Card className="relative gap-0 overflow-hidden rounded-2xl border-border bg-card py-0">
+            <CardContent className="p-5">
+                {/* Header with title and percentage badge */}
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-muted-foreground">
+                        {title}
+                    </span>
+                    {percentageChange && (
+                        <div className={cn(
+                            "flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border",
+                            changeType === 'positive' && SEMANTIC_BADGE.positive,
+                            changeType === 'negative' && SEMANTIC_BADGE.negative,
+                            changeType === 'neutral' && "bg-muted/50 text-muted-foreground border-border/30"
+                        )}>
+                            <TrendIcon className="h-3 w-3" />
+                            <span>{percentageChange}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Main Value */}
+                <div className="mb-3">
+                    <span className={cn(
+                        "text-2xl sm:text-3xl font-bold tracking-tight text-foreground",
+                        valueSemantic && SEMANTIC_TEXT[valueSemantic]
                     )}>
-                        <TrendIcon className="h-3 w-3" />
-                        <span>{displayPercentage}</span>
+                        {value}
+                    </span>
+                </div>
+
+                {/* Trend Description */}
+                {trendDescription && (
+                    <div className={cn(
+                        "flex items-center gap-1.5 text-sm font-semibold mb-1",
+                        changeType === 'positive' && SEMANTIC_TEXT.positive,
+                        changeType === 'negative' && SEMANTIC_TEXT.negative,
+                        changeType === 'neutral' && "text-muted-foreground"
+                    )}>
+                        <span>{trendDescription}</span>
+                        <TrendIcon className="h-3.5 w-3.5" />
                     </div>
                 )}
-            </div>
 
-            {/* Main Value */}
-            <div className="mb-3">
-                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                    {value}
-                </span>
-            </div>
-
-            {/* Trend Description */}
-            {displayTrendDesc && (
-                <div className={cn(
-                    "flex items-center gap-1.5 text-sm font-semibold mb-1",
-                    changeType === 'positive' && "text-emerald-400",
-                    changeType === 'negative' && "text-rose-400",
-                    changeType === 'neutral' && "text-muted-foreground"
-                )}>
-                    <span>{displayTrendDesc}</span>
-                    <TrendIcon className="h-3.5 w-3.5" />
-                </div>
-            )}
-
-            {/* Subtitle */}
-            {subtitle && (
-                <p className="text-xs text-muted-foreground/60">
-                    {subtitle}
-                </p>
-            )}
-        </div>
+                {/* Subtitle */}
+                {subtitle && (
+                    <p className="text-xs text-muted-foreground/70">
+                        {subtitle}
+                    </p>
+                )}
+            </CardContent>
+        </Card>
     )
 }

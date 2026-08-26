@@ -19,6 +19,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/system/ErrorState";
 import {
 	TransactionDialog,
 	type TransactionFormData,
@@ -29,6 +31,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { api } from "@/lib/api-client";
 import { ApiError } from "@/lib/errors";
 import { downloadTransactionsCsv } from "@/lib/transaction-csv";
+import { toNumber } from "@/lib/number";
 import type {
 	Account,
 	Category,
@@ -53,19 +56,66 @@ export function Transactions() {
 	const { user } = useAuth();
 	const { formatCurrency } = usePreferences();
 	const [loading, setLoading] = useState(true);
+	const [fetchError, setFetchError] = useState(false);
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [categories, setCategories] = useState<Category[]>([]);
 	const [accounts, setAccounts] = useState<Account[]>([]);
-	const [searchQuery, setSearchQuery] = useState("");
-	const [filterType, setFilterType] = useState("all");
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [editingTransaction, setEditingTransaction] =
 		useState<Transaction | null>(null);
 	const [formData, setFormData] = useState<TransactionFormData>(EMPTY_FORM);
 	const [formError, setFormError] = useState<string | null>(null);
+	const [isSaving, setIsSaving] = useState(false);
 	const [aiPrompt, setAiPrompt] = useState("");
 	const [aiLoading, setAiLoading] = useState(false);
 	const [processingRecurring, setProcessingRecurring] = useState(false);
+
+	// Search and type filter live in the URL so views are shareable/refreshable.
+	const [searchParams, setSearchParams] = useSearchParams();
+	const searchQuery = searchParams.get("q") ?? "";
+	const filterType = searchParams.get("type") ?? "all";
+
+	const setSearchQueryParam = useCallback(
+		(value: string) => {
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev);
+					if (value) next.set("q", value);
+					else next.delete("q");
+					return next;
+				},
+				{ replace: true },
+			);
+		},
+		[setSearchParams],
+	);
+
+	const setFilterTypeParam = useCallback(
+		(value: string) => {
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev);
+					if (value !== "all") next.set("type", value);
+					else next.delete("type");
+					return next;
+				},
+				{ replace: true },
+			);
+		},
+		[setSearchParams],
+	);
+
+	const clearFilters = useCallback(() => {
+		setSearchParams(
+			(prev) => {
+				const next = new URLSearchParams(prev);
+				next.delete("q");
+				next.delete("type");
+				return next;
+			},
+			{ replace: true },
+		);
+	}, [setSearchParams]);
 
 	// TODO(product): the transactions page loads the full history without a
 	// limit; decide on pagination/virtualization for large datasets.
@@ -98,9 +148,10 @@ export function Transactions() {
 					: []
 				).filter((a: Account) => a.is_active),
 			);
+			setFetchError(false);
 		} catch (error) {
 			console.error("Error fetching data:", error);
-			toast.error("Failed to load transactions");
+			setFetchError(true);
 		} finally {
 			setLoading(false);
 		}
@@ -110,13 +161,24 @@ export function Transactions() {
 		fetchData();
 	}, [fetchData]);
 
+	const handleRetry = useCallback(() => {
+		setFetchError(false);
+		setLoading(true);
+		void fetchData();
+	}, [fetchData]);
+
 	const filteredTransactions = useMemo(() => {
+		const query = searchQuery.trim().toLowerCase();
 		return transactions.filter((t) => {
+			// Match descriptions, category AND account names, plus raw amounts
+			// ("12.5" or "12.50" both find $12.50).
 			const matchesSearch =
-				(t.description?.toLowerCase().includes(searchQuery.toLowerCase()) ??
-					false) ||
-				(t.category?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ??
-					false);
+				query === "" ||
+				(t.description?.toLowerCase().includes(query) ?? false) ||
+				(t.category?.name?.toLowerCase().includes(query) ?? false) ||
+				(t.account?.name?.toLowerCase().includes(query) ?? false) ||
+				String(toNumber(t.amount)).includes(query) ||
+				toNumber(t.amount).toFixed(2).includes(query);
 			const matchesType = filterType === "all" || t.type === filterType;
 			return matchesSearch && matchesType;
 		});
@@ -124,22 +186,22 @@ export function Transactions() {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!user) return;
+		if (!user || isSaving) return;
 
-		// Explicit submit-time guards — native `required` can't cover the Radix
-		// Selects, and NaN/zero amounts must never reach the API.
+		// Field-level validation lives in TransactionDialog; these are defensive
+		// guards so NaN/zero amounts and missing accounts never reach the API.
 		const amount = Number.parseFloat(formData.amount);
-		if (!formData.account_id) {
-			setFormError("Please select an account.");
-			toast.error("Please select an account");
+		if (
+			!formData.account_id ||
+			!Number.isFinite(amount) ||
+			amount <= 0 ||
+			(formData.type === "transfer" && !formData.to_account_id)
+		) {
 			return;
 		}
-		if (!Number.isFinite(amount) || amount <= 0) {
-			setFormError("Amount must be a number greater than 0.");
-			toast.error("Amount must be greater than 0");
-			return;
-		}
+
 		setFormError(null);
+		setIsSaving(true);
 
 		try {
 			const transactionData: TransactionCreatePayload = {
@@ -169,12 +231,19 @@ export function Transactions() {
 				toast.success("Transaction added successfully");
 			}
 
-			setIsDialogOpen(false);
 			resetForm();
+			setIsDialogOpen(false); // keep the dialog open until the save resolves
 			fetchData();
 		} catch (error) {
 			console.error("Error saving transaction:", error);
-			toast.error("Failed to save transaction");
+			// Surface API failures via the inline banner only — no duplicate toast.
+			setFormError(
+				error instanceof ApiError && error.message
+					? error.message
+					: "Failed to save transaction",
+			);
+		} finally {
+			setIsSaving(false);
 		}
 	};
 
@@ -218,13 +287,19 @@ export function Transactions() {
 		setIsDialogOpen(true);
 	}, [resetForm]);
 
-	const [searchParams, setSearchParams] = useSearchParams();
-
 	// Deep link support: /transactions?action=new opens the create dialog once,
-	// then strips the param so back/refresh don't re-trigger it.
+	// then strips the param (keeping q/type filters!) so back/refresh don't
+	// re-trigger it.
 	useEffect(() => {
 		if (searchParams.get("action") === "new" && !loading) {
-			setSearchParams({}, { replace: true });
+			setSearchParams(
+				(prev) => {
+					const next = new URLSearchParams(prev);
+					next.delete("action");
+					return next;
+				},
+				{ replace: true },
+			);
 			openAddDialog();
 		}
 	}, [searchParams, setSearchParams, loading, openAddDialog]);
@@ -291,12 +366,22 @@ export function Transactions() {
 	};
 
 	if (loading) {
+		return <TransactionsSkeleton />;
+	}
+
+	if (fetchError) {
 		return (
-			<div className="flex h-full items-center justify-center">
-				<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+			<div className="py-8">
+				<ErrorState
+					title="Couldn't load transactions"
+					message="We couldn't load your transactions, categories, or accounts. Check your connection and try again."
+					onRetry={handleRetry}
+				/>
 			</div>
 		);
 	}
+
+	const hasActiveFilters = Boolean(searchQuery || filterType !== "all");
 
 	return (
 		<div className="space-y-6">
@@ -319,7 +404,9 @@ export function Transactions() {
 						className="flex-1 sm:flex-none"
 					>
 						<RefreshCw
-							className={`mr-2 h-4 w-4 ${processingRecurring ? "animate-spin" : ""}`}
+							className={`mr-2 h-4 w-4 ${
+								processingRecurring ? "motion-safe:animate-spin" : ""
+							}`}
 						/>
 						<span className="hidden sm:inline">Process Recurring</span>
 						<span className="sm:hidden">Recurring</span>
@@ -342,7 +429,7 @@ export function Transactions() {
 			</div>
 
 			{/* AI Quick Add */}
-			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-all duration-300 hover:border-border hover:bg-card/80">
+			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
 				<div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
 				<div className="relative flex flex-col gap-3">
 					<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -368,7 +455,9 @@ export function Transactions() {
 							variant="secondary"
 						>
 							<Sparkles
-								className={`mr-2 h-4 w-4 ${aiLoading ? "animate-pulse" : ""}`}
+								className={`mr-2 h-4 w-4 ${
+									aiLoading ? "motion-safe:animate-pulse" : ""
+								}`}
 							/>
 							{aiLoading ? "Parsing…" : "Parse"}
 						</Button>
@@ -377,7 +466,7 @@ export function Transactions() {
 			</div>
 
 			{/* Filters */}
-			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-all duration-300 hover:border-border hover:bg-card/80">
+			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
 				<div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
 				<div className="relative flex flex-col gap-4 sm:flex-row">
 					<div className="relative flex-1">
@@ -385,13 +474,14 @@ export function Transactions() {
 						<Input
 							placeholder="Search transactions..."
 							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
+							onChange={(e) => setSearchQueryParam(e.target.value)}
 							className="pl-10"
+							aria-label="Search transactions by description, category, account, or amount"
 						/>
 					</div>
 					<div className="flex gap-2">
-						<Select value={filterType} onValueChange={setFilterType}>
-							<SelectTrigger className="w-[140px]">
+						<Select value={filterType} onValueChange={setFilterTypeParam}>
+							<SelectTrigger className="w-[140px]" aria-label="Filter by type">
 								<Filter className="mr-2 h-4 w-4" />
 								<SelectValue placeholder="Filter" />
 							</SelectTrigger>
@@ -407,16 +497,23 @@ export function Transactions() {
 			</div>
 
 			{/* Transactions Table */}
-			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-border hover:bg-card/80">
+			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
 				<div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-				<div className="relative p-6 pb-2">
+				<div className="relative flex items-center justify-between px-6 pb-2 pt-6">
 					<h3 className="text-base font-semibold">All Transactions</h3>
+					<p
+						className="text-sm tabular-nums text-muted-foreground"
+						aria-live="polite"
+					>
+						Showing {filteredTransactions.length} of {transactions.length}
+					</p>
 				</div>
 				<div className="relative px-6 pb-6">
 					<TransactionTable
 						transactions={filteredTransactions}
 						formatCurrency={formatCurrency}
-						hasActiveFilters={!!(searchQuery || filterType !== "all")}
+						hasActiveFilters={hasActiveFilters}
+						onClearFilters={clearFilters}
 						onEdit={handleEdit}
 						onDelete={handleDelete}
 						onAdd={openAddDialog}
@@ -435,7 +532,44 @@ export function Transactions() {
 				accounts={accounts}
 				onSubmit={handleSubmit}
 				error={formError}
+				isSaving={isSaving}
 			/>
+		</div>
+	);
+}
+
+/** Loading skeleton shaped like the loaded page layout. */
+function TransactionsSkeleton() {
+	return (
+		<div className="space-y-6 animate-in fade-in duration-200">
+			{/* Header */}
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="space-y-2">
+					<Skeleton className="h-8 w-48" />
+					<Skeleton className="h-4 w-72" />
+				</div>
+				<div className="flex items-center gap-2">
+					<Skeleton className="h-9 flex-1 rounded-md sm:w-36 sm:flex-none" />
+					<Skeleton className="h-9 flex-1 rounded-md sm:w-28 sm:flex-none" />
+					<Skeleton className="h-9 flex-1 rounded-md sm:w-40 sm:flex-none" />
+				</div>
+			</div>
+
+			{/* AI Quick Add */}
+			<Skeleton className="h-[118px] rounded-xl" />
+
+			{/* Filters */}
+			<Skeleton className="h-[106px] rounded-xl" />
+
+			{/* Table card */}
+			<div className="space-y-4 rounded-xl border border-border/50 bg-card/50 p-6">
+				<Skeleton className="h-5 w-44" />
+				<div className="space-y-3">
+					{Array.from({ length: 8 }, (_, i) => (
+						<Skeleton key={i} className="h-10 w-full" />
+					))}
+				</div>
+			</div>
 		</div>
 	);
 }

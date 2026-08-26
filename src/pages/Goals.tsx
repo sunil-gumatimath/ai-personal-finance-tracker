@@ -10,6 +10,7 @@ import {
     Calendar,
     Sparkles,
     Trophy,
+    Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,6 +48,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { ErrorState } from '@/components/system/ErrorState'
 import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -76,6 +78,7 @@ export function Goals() {
     const { user } = useAuth()
     const { formatCurrency } = usePreferences()
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(false)
     const [goals, setGoals] = useState<Goal[]>([])
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
@@ -83,10 +86,13 @@ export function Goals() {
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
     const [contributeAmount, setContributeAmount] = useState('')
     const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const [formData, setFormData] = useState({
         name: '',
         target_amount: '',
-        current_amount: '0',
+        // Blank (not "0") so the min="0.01" input never blocks a legit zero balance.
+        current_amount: '',
         deadline: '',
         color: '#22c55e',
         icon: 'target',
@@ -98,12 +104,14 @@ export function Goals() {
             return
         }
 
+        setError(false)
         try {
             const res = await api.goals.list()
             setGoals((res.goals || []) as Goal[])
         } catch (error) {
             console.error('Error fetching goals:', error)
-            toast.error('Failed to load goals')
+            // Failure must never masquerade as "no goals yet" — surface a retry state.
+            setError(true)
         } finally {
             setLoading(false)
         }
@@ -115,7 +123,8 @@ export function Goals() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!user) return
+        if (!user || isSaving) return
+        setIsSaving(true)
 
         try {
             const goalData = {
@@ -141,12 +150,14 @@ export function Goals() {
         } catch (error) {
             console.error('Error saving goal:', error)
             toast.error('Failed to save goal')
+        } finally {
+            setIsSaving(false)
         }
     }
 
     const handleContribute = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!selectedGoal) return
+        if (!selectedGoal || isSaving) return
 
         // Reject invalid input instead of computing NaN balances.
         const contributionAmount = parseFloat(contributeAmount)
@@ -155,13 +166,30 @@ export function Goals() {
             return
         }
 
-        try {
-            const remaining =
-                toNumber(selectedGoal.target_amount) -
-                toNumber(selectedGoal.current_amount)
+        const remaining =
+            toNumber(selectedGoal.target_amount) -
+            toNumber(selectedGoal.current_amount)
 
+        // Nothing left to contribute — don't let a stale dialog push the goal
+        // past its target.
+        if (remaining <= 0) {
+            toast.info('This goal is already fully funded')
+            setIsContributeDialogOpen(false)
+            setContributeAmount('')
+            setSelectedGoal(null)
+            return
+        }
+
+        setIsSaving(true)
+
+        try {
             // Cap contribution at the remaining amount to prevent exceeding target
-            const actualContribution = Math.min(contributionAmount, remaining)
+            const actualContribution = Math.max(
+                0,
+                Math.min(contributionAmount, remaining),
+            )
+            if (actualContribution <= 0) return
+
             const newAmount = toNumber(selectedGoal.current_amount) + actualContribution
 
             await api.goals.update(selectedGoal.id, { current_amount: newAmount })
@@ -189,6 +217,8 @@ export function Goals() {
         } catch (error) {
             console.error('Error contributing to goal:', error)
             toast.error('Failed to add contribution')
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -208,7 +238,7 @@ export function Goals() {
         setFormData({
             name: goal.name,
             target_amount: goal.target_amount.toString(),
-            current_amount: goal.current_amount.toString(),
+            current_amount: goal.current_amount ? goal.current_amount.toString() : '',
             deadline: goal.deadline || '',
             color: goal.color,
             icon: goal.icon,
@@ -221,7 +251,7 @@ export function Goals() {
         setFormData({
             name: '',
             target_amount: '',
-            current_amount: '0',
+            current_amount: '',
             deadline: '',
             color: '#22c55e',
             icon: 'target',
@@ -258,6 +288,36 @@ export function Goals() {
         return (
             <div className="flex h-full items-center justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="space-y-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Financial Goals</h1>
+                        <p className="text-sm sm:text-base text-muted-foreground">
+                            Track your savings goals and celebrate achievements
+                        </p>
+                    </div>
+                    <Button
+                        onClick={() => {
+                            resetForm()
+                            setIsDialogOpen(true)
+                        }}
+                        className="w-full sm:w-auto"
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Goal
+                    </Button>
+                </div>
+                <ErrorState
+                    title="Couldn't load your goals"
+                    message="We couldn't reach your savings goals. Check your connection and try again."
+                    onRetry={fetchGoals}
+                />
             </div>
         )
     }
@@ -355,7 +415,6 @@ export function Goals() {
                         <span className="text-sm font-medium text-muted-foreground">Overall Progress</span>
                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-purple-400">
                             <Sparkles className="h-3 w-3" />
-                            <span>{totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0}%</span>
                         </div>
                     </div>
                     <div className="relative mb-3">
@@ -401,7 +460,7 @@ export function Goals() {
                 </div>
             ) : (
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {goals.map((goal) => {
+                    {goals.map((goal, i) => {
                         const GoalIcon = getGoalIcon(goal.icon)
                         const progress = getProgress(goal)
                         const isCompleted = progress >= 100
@@ -410,8 +469,9 @@ export function Goals() {
                         return (
                             <div
                                 key={goal.id}
+                                style={{ animationDelay: `${i * 40}ms` }}
                                 className={cn(
-                                    'group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80',
+                                    'group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80 motion-safe:animate-fade-in-up',
                                     isCompleted && 'ring-2 ring-green-500/50'
                                 )}
                             >
@@ -438,21 +498,35 @@ export function Goals() {
                                             </div>
                                             <div>
                                                 <h3 className="text-base font-bold tracking-tight">{goal.name}</h3>
-                                                {goal.deadline && (
-                                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {daysRemaining !== null && daysRemaining >= 0
-                                                            ? `${daysRemaining} days left`
-                                                            : daysRemaining !== null && daysRemaining < 0
-                                                                ? 'Overdue'
-                                                                : format(new Date(goal.deadline), 'MMM d, yyyy')}
+                                                {goal.deadline && daysRemaining !== null && (
+                                                    <p
+                                                        className={cn(
+                                                            'text-sm font-medium flex items-center gap-1',
+                                                            daysRemaining < 0
+                                                                ? 'text-destructive'
+                                                                : daysRemaining <= 7
+                                                                    ? 'text-amber-500'
+                                                                    : 'text-muted-foreground',
+                                                        )}
+                                                    >
+                                                        <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                        {daysRemaining < 0
+                                                            ? `Overdue · ${format(new Date(goal.deadline), 'MMM d, yyyy')}`
+                                                            : daysRemaining <= 7
+                                                                ? `Due soon · ${daysRemaining === 0 ? 'today' : `${daysRemaining}d left`} · ${format(new Date(goal.deadline), 'MMM d, yyyy')}`
+                                                                : `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left · ${format(new Date(goal.deadline), 'MMM d, yyyy')}`}
                                                     </p>
                                                 )}
                                             </div>
                                         </div>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    aria-label={`Actions for ${goal.name}`}
+                                                >
                                                     <MoreHorizontal className="h-4 w-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
@@ -545,6 +619,7 @@ export function Goals() {
                                 <Input
                                     id="target"
                                     type="number"
+                                    min="0.01"
                                     step="0.01"
                                     placeholder="10000"
                                     value={formData.target_amount}
@@ -559,6 +634,7 @@ export function Goals() {
                                 <Input
                                     id="current"
                                     type="number"
+                                    min="0.01"
                                     step="0.01"
                                     placeholder="0"
                                     value={formData.current_amount}
@@ -577,6 +653,12 @@ export function Goals() {
                                 value={formData.deadline}
                                 onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                             />
+                            {formData.deadline &&
+                             differenceInDays(new Date(formData.deadline), new Date()) < 0 && (
+                                <p className="text-xs font-medium text-amber-500">
+                                    This date is in the past — the goal will show as overdue.
+                                </p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -631,7 +713,8 @@ export function Goals() {
                             <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit">
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
                                 {editingGoal ? 'Update Goal' : 'Create Goal'}
                             </Button>
                         </DialogFooter>
@@ -673,7 +756,10 @@ export function Goals() {
                             <Button type="button" variant="outline" onClick={() => setIsContributeDialogOpen(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit">Add Money</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                                Add Money
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -701,11 +787,22 @@ export function Goals() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={() => {
-                                if (goalToDelete) handleDelete(goalToDelete.id)
-                                setGoalToDelete(null)
+                            disabled={isDeleting}
+                            onClick={(e) => {
+                                // preventDefault keeps the dialog open until the
+                                // async delete resolves, then we close manually.
+                                e.preventDefault()
+                                if (!goalToDelete || isDeleting) return
+                                setIsDeleting(true)
+                                handleDelete(goalToDelete.id).finally(() => {
+                                    setIsDeleting(false)
+                                    setGoalToDelete(null)
+                                })
                             }}
                         >
+                            {isDeleting && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            )}
                             Delete Goal
                         </AlertDialogAction>
                     </AlertDialogFooter>

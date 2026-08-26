@@ -18,12 +18,18 @@ import {
   PaymentModal,
   StrategyDialog,
 } from "@/components/debts";
+import { toNumber } from "@/lib/debt-calculations";
+import type { DebtPayment } from "@/types";
+
+const NO_PAYMENTS: DebtPayment[] = [];
 
 export function Debts() {
   const {
     loading,
     debts,
-    payments,
+    paymentsByDebt,
+    loadingPaymentsId,
+    isSaving,
     isDialogOpen,
     setIsDialogOpen,
     isPaymentDialogOpen,
@@ -68,13 +74,18 @@ export function Debts() {
   if (loading) {
     return (
       <div className="flex h-full min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="h-8 w-8 motion-safe:animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
 
-  // Calculate payoff metrics for overall summary
-  const payoffProgress = totalOriginal === 0 ? 100 : (totalPaid / totalOriginal) * 100;
+  // Calculate payoff metrics for overall summary. A missing original amount
+  // must not fake a 100%-paid signal — show 0 until there's a real baseline.
+  const payoffProgress = totalOriginal === 0 ? 0 : (totalPaid / totalOriginal) * 100;
+  // Active cards lead with the costliest debt: highest APR first.
+  const activeDebtsByApr = [...activeDebts].sort(
+    (a, b) => toNumber(b.interest_rate) - toNumber(a.interest_rate),
+  );
 
   return (
     <div className="space-y-6">
@@ -86,7 +97,7 @@ export function Debts() {
             Track and accelerate your debt-free journey.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {activeDebts.length > 1 && (
             <Button
               variant="outline"
@@ -152,7 +163,7 @@ export function Debts() {
                   </span>
                 </div>
                 <div className="space-y-1 pt-1">
-                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                  <div className="flex justify-between text-xs font-bold text-muted-foreground">
                     <span>{Math.round(payoffProgress)}% Paid Off</span>
                     <span>{formatCurrency(totalPaid)} Saved</span>
                   </div>
@@ -239,13 +250,14 @@ export function Debts() {
                 </div>
               ) : (
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {activeDebts.map((debt) => (
+                  {activeDebtsByApr.map((debt) => (
                     <DebtCard
                       key={debt.id}
                       debt={debt}
                       expandedDebt={expandedDebt}
                       setExpandedDebt={setExpandedDebt}
-                      payments={payments}
+                      payments={paymentsByDebt[debt.id] ?? NO_PAYMENTS}
+                      isLoadingHistory={loadingPaymentsId === debt.id}
                       setSelectedDebt={setSelectedDebt}
                       paymentFormData={paymentFormData}
                       setPaymentFormData={setPaymentFormData}
@@ -280,7 +292,8 @@ export function Debts() {
                       debt={debt}
                       expandedDebt={expandedDebt}
                       setExpandedDebt={setExpandedDebt}
-                      payments={payments}
+                      payments={paymentsByDebt[debt.id] ?? NO_PAYMENTS}
+                      isLoadingHistory={loadingPaymentsId === debt.id}
                       setSelectedDebt={setSelectedDebt}
                       paymentFormData={paymentFormData}
                       setPaymentFormData={setPaymentFormData}
@@ -310,6 +323,7 @@ export function Debts() {
         setFormData={setFormData}
         onSubmit={handleSubmit}
         onCancel={() => setIsDialogOpen(false)}
+        isSaving={isSaving}
       />
 
       <PaymentModal
@@ -320,6 +334,7 @@ export function Debts() {
         setFormData={setPaymentFormData}
         onSubmit={handlePaymentSubmit}
         onCancel={() => setIsPaymentDialogOpen(false)}
+        isSaving={isSaving}
       />
 
       <StrategyDialog

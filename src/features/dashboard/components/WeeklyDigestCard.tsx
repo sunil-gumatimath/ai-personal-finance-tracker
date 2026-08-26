@@ -89,17 +89,25 @@ export function WeeklyDigestCard() {
 		}
 	};
 
+	// Initial load skeleton: mirrors the header-with-actions layout plus
+	// paragraph ghosts (parity with the incoming markdown).
 	if (loading) {
 		return (
-			<Card className="border-border/50 bg-card/50">
-				<CardContent className="p-5">
-					<div className="flex items-center gap-3">
-						<Skeleton className="h-9 w-9 rounded-lg shrink-0" />
-						<div className="flex-1 space-y-2">
-							<Skeleton className="h-4 w-32" />
-							<Skeleton className="h-3 w-56" />
-						</div>
+			<Card className="border-border/50 bg-card/50" aria-busy="true">
+				<CardHeader className="flex flex-row items-start justify-between gap-2">
+					<div className="space-y-2">
+						<Skeleton className="h-5 w-40" />
+						<Skeleton className="h-3 w-64" />
 					</div>
+					<div className="flex items-center gap-2">
+						<Skeleton className="h-8 w-8 rounded-md" />
+						<Skeleton className="h-8 w-28 rounded-md" />
+					</div>
+				</CardHeader>
+				<CardContent className="space-y-2.5">
+					<Skeleton className="h-4 w-full" />
+					<Skeleton className="h-4 w-11/12" />
+					<Skeleton className="h-4 w-4/5" />
 				</CardContent>
 			</Card>
 		);
@@ -119,7 +127,7 @@ export function WeeklyDigestCard() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<Button onClick={generate}>
+					<Button onClick={generate} className="active:scale-[0.98]">
 						<Sparkles className="mr-2 h-4 w-4" />
 						Generate this week&apos;s digest
 					</Button>
@@ -129,22 +137,25 @@ export function WeeklyDigestCard() {
 	}
 
 	return (
-		<Card className="border-border/50 bg-card/50">
+		<Card className="border-border/50 bg-card/50" aria-busy={generating}>
 			<CardHeader className="flex flex-row items-start justify-between gap-2">
-				<div>
+				<div className="min-w-0">
 					<CardTitle className="flex items-center gap-2">
 						<Sparkles className="h-5 w-5 text-primary" />
 						Weekly AI Digest
 					</CardTitle>
-					<CardDescription className="flex items-center gap-1.5">
-						<CalendarDays className="h-3.5 w-3.5" />
-						Week of{" "}
-						{digest ? format(new Date(digest.week_start), "MMM d, yyyy") : ""}
-						{digest?.created_at &&
-							` · updated ${format(new Date(digest.created_at), "MMM d, HH:mm")}`}
-					</CardDescription>
+					{/* Hide the date segment entirely while no digest exists yet —
+					    an empty "Week of " reads as broken. */}
+					{digest && (
+						<CardDescription className="flex items-center gap-1.5">
+							<CalendarDays className="h-3.5 w-3.5 shrink-0" />
+							Week of {format(new Date(digest.week_start), "MMM d, yyyy")}
+							{digest.created_at &&
+								` · updated ${format(new Date(digest.created_at), "MMM d, HH:mm")}`}
+						</CardDescription>
+					)}
 				</div>
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-2 shrink-0">
 					{digest && (
 						<Button
 							variant="ghost"
@@ -165,9 +176,10 @@ export function WeeklyDigestCard() {
 						size="sm"
 						onClick={generate}
 						disabled={generating}
+						className="active:scale-[0.98]"
 					>
 						<RefreshCw
-							className={`mr-2 h-3.5 w-3.5 ${generating ? "animate-spin" : ""}`}
+							className={`mr-2 h-3.5 w-3.5 ${generating ? "motion-safe:animate-spin" : ""}`}
 						/>
 						{generating ? "Generating…" : "Regenerate"}
 					</Button>
@@ -185,9 +197,14 @@ export function WeeklyDigestCard() {
 						</Markdown>
 					</div>
 				) : (
-					<p className="text-sm text-muted-foreground">
-						Generating your digest…
-					</p>
+					/* Generating for the first time: prose-shaped skeletons instead of
+					   a bare sentence, so the swap to markdown doesn't jump. */
+					<div className="space-y-2.5" aria-hidden="true">
+						<Skeleton className="h-4 w-full" />
+						<Skeleton className="h-4 w-11/12" />
+						<Skeleton className="h-4 w-4/5" />
+						<Skeleton className="h-4 w-3/5" />
+					</div>
 				)}
 			</CardContent>
 		</Card>
@@ -196,12 +213,12 @@ export function WeeklyDigestCard() {
 
 /**
  * Markdown rendering rules tuned for the digest layout:
- * - h2 section headings: compact, uppercase-ish accent look.
+ * - h2 section headings: compact, accent look.
  * - blockquote (the Tip): highlighted callout with a lightbulb icon.
  */
 const digestMarkdownComponents: Components = {
 	h2: ({ children }) => (
-		<h2 className="mt-5 mb-2 flex items-center gap-2 border-b border-border/60 pb-1.5 text-xs font-semibold uppercase tracking-wider text-primary first:mt-0">
+		<h2 className="mt-5 mb-2 flex items-center gap-2 border-b border-border/60 pb-1.5 text-sm font-semibold uppercase tracking-wider text-primary first:mt-0">
 			{children}
 		</h2>
 	),

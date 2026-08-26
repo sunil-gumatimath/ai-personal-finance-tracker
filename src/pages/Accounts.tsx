@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Plus,
   Wallet,
@@ -19,6 +20,7 @@ import {
   Search,
   Filter,
   ArrowUpDown,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,9 +55,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/system/ErrorState";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
-import { toNumber } from "@/lib/number";import { useAuth } from "@/contexts/AuthContext";
+import { toNumber } from "@/lib/number";
+import { SWATCHES } from "@/lib/palette";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/types";
@@ -99,46 +104,79 @@ const ACCOUNT_TYPES = [
   },
 ];
 
-const COLORS = [
-  { value: "#3b82f6", name: "Blue", gradient: "from-blue-500 to-blue-600" },
-  {
-    value: "#22c55e",
-    name: "Green",
-    gradient: "from-emerald-500 to-emerald-600",
-  },
-  {
-    value: "#8b5cf6",
-    name: "Purple",
-    gradient: "from-purple-500 to-violet-600",
-  },
-  { value: "#f59e0b", name: "Amber", gradient: "from-amber-500 to-orange-500" },
-  { value: "#ef4444", name: "Red", gradient: "from-red-500 to-rose-600" },
-  { value: "#ec4899", name: "Pink", gradient: "from-pink-500 to-rose-500" },
-  { value: "#06b6d4", name: "Cyan", gradient: "from-cyan-500 to-teal-500" },
-  { value: "#84cc16", name: "Lime", gradient: "from-lime-500 to-green-500" },
-  { value: "#f97316", name: "Orange", gradient: "from-orange-500 to-red-500" },
-  {
-    value: "#6366f1",
-    name: "Indigo",
-    gradient: "from-indigo-500 to-purple-500",
-  },
-];
-
 type SortOption = "name" | "balance" | "type" | "created";
+
+const SORT_OPTIONS: ReadonlyArray<{ value: SortOption; label: string }> = [
+  { value: "name", label: "Name" },
+  { value: "balance", label: "Balance" },
+  { value: "type", label: "Type" },
+  { value: "created", label: "Newest" },
+];
 
 export function Accounts() {
   const { user } = useAuth();
   const { formatCurrency, preferences } = usePreferences();
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [showBalances, setShowBalances] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Search and filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<SortOption>("name");
+  // Search/filter/sort live in the URL so views are shareable/refreshable.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get("q") ?? "";
+  const filterType = searchParams.get("type") ?? "all";
+  const sortParam = searchParams.get("sort");
+  const sortBy: SortOption = SORT_OPTIONS.some((o) => o.value === sortParam)
+    ? (sortParam as SortOption)
+    : "name";
+
+  const setSearchQueryParam = useCallback(
+    (value: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set("q", value);
+          else next.delete("q");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setFilterTypeParam = useCallback(
+    (value: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value !== "all") next.set("type", value);
+          else next.delete("type");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setSortParam = useCallback(
+    (value: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (SORT_OPTIONS.some((o) => o.value === value)) next.set("sort", value);
+          else next.delete("sort");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -150,7 +188,7 @@ export function Accounts() {
     name: "",
     type: "checking" as Account["type"],
     balance: "",
-    color: COLORS[0].value,
+    color: SWATCHES[0].value,
     is_active: true,
   });
 
@@ -163,9 +201,10 @@ export function Accounts() {
     try {
       const res = await api.accounts.list();
       setAccounts((res.accounts || []) as Account[]);
+      setFetchError(false);
     } catch (error) {
       console.error("Error fetching accounts:", error);
-      toast.error("Failed to load accounts");
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -175,6 +214,12 @@ export function Accounts() {
     fetchAccounts();
   }, [fetchAccounts]);
 
+  const handleRetry = useCallback(() => {
+    setFetchError(false);
+    setLoading(true);
+    void fetchAccounts();
+  }, [fetchAccounts]);
+
   const getAccountIcon = (type: string) => {
     const accountType = ACCOUNT_TYPES.find((t) => t.value === type);
     return accountType?.icon || Wallet;
@@ -182,7 +227,9 @@ export function Accounts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
+
+    setIsSaving(true);
 
     try {
       const accountData = {
@@ -203,12 +250,14 @@ export function Accounts() {
         toast.success("Account created successfully");
       }
 
-      setIsDialogOpen(false);
       resetForm();
+      setIsDialogOpen(false); // keep the dialog open until the save resolves
       fetchAccounts();
     } catch (error) {
       console.error("Error saving account:", error);
       toast.error("Failed to save account");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -259,7 +308,7 @@ export function Accounts() {
       name: "",
       type: "checking",
       balance: "",
-      color: COLORS[0].value,
+      color: SWATCHES[0].value,
       is_active: true,
     });
   };
@@ -308,8 +357,20 @@ export function Accounts() {
     return <LoadingSkeleton />;
   }
 
+  if (fetchError) {
+    return (
+      <div className="py-8">
+        <ErrorState
+          title="Couldn't load accounts"
+          message="We couldn't load your accounts. Check your connection and try again."
+          onRetry={handleRetry}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
+    <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header with Quick Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -317,7 +378,8 @@ export function Accounts() {
             Accounts
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            Manage your financial accounts
+            Manage your financial accounts · {accounts.length}{" "}
+            {accounts.length === 1 ? "account" : "accounts"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -350,7 +412,7 @@ export function Accounts() {
       <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-xl shadow-2xl sm:col-span-2 group border-primary/20">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-[80px] group-hover:bg-primary/20 transition-colors duration-1000" />
+          <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-[80px] group-hover:bg-primary/20 transition-colors duration-300" />
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -374,12 +436,12 @@ export function Accounts() {
               </h2>
               <div className="flex items-center gap-2 mt-2">
                 {totalBalance >= 0 ? (
-                  <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 px-2 py-0.5 pointer-events-none font-bold">
+                  <Badge className="bg-[var(--income)]/10 text-[var(--income)] border-[var(--income)]/20 hover:bg-[var(--income)]/20 px-2 py-0.5 pointer-events-none font-bold">
                     <TrendingUp className="h-3 w-3 mr-1" />
                     SURPLUS
                   </Badge>
                 ) : (
-                  <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20 px-2 py-0.5 pointer-events-none font-bold">
+                  <Badge className="bg-[var(--expense)]/10 text-[var(--expense)] border-[var(--expense)]/20 hover:bg-[var(--expense)]/20 px-2 py-0.5 pointer-events-none font-bold">
                     <TrendingDown className="h-3 w-3 mr-1" />
                     DEFICIT
                   </Badge>
@@ -392,39 +454,39 @@ export function Accounts() {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-border/50 bg-emerald-500/[0.03] backdrop-blur-md shadow-xl group border-emerald-500/20">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl group-hover:scale-125 transition-transform" />
+        <Card className="relative overflow-hidden border-border/50 bg-[var(--income)]/[0.03] backdrop-blur-md shadow-xl group border-[var(--income)]/20">
+          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[var(--income)]/10 blur-3xl group-hover:scale-125 transition-transform" />
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70">
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-[var(--income)]/70">
                 Total Assets
               </CardTitle>
-              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+              <div className="p-2 rounded-lg bg-[var(--income)]/10 text-[var(--income)] border border-[var(--income)]/20">
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </div>
             </div>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="text-2xl font-black tabular-nums text-emerald-500 tracking-tight">
+            <div className="text-2xl font-black tabular-nums text-[var(--income)] tracking-tight">
               {showBalances ? formatCurrency(totalAssets) : "••••••"}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-border/50 bg-rose-500/[0.03] backdrop-blur-md shadow-xl group border-rose-500/20">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-rose-500/10 blur-3xl group-hover:scale-125 transition-transform" />
+        <Card className="relative overflow-hidden border-border/50 bg-[var(--expense)]/[0.03] backdrop-blur-md shadow-xl group border-[var(--expense)]/20">
+          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[var(--expense)]/10 blur-3xl group-hover:scale-125 transition-transform" />
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-rose-500/70">
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-[var(--expense)]/70">
                 Liabilities
               </CardTitle>
-              <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20">
+              <div className="p-2 rounded-lg bg-[var(--expense)]/10 text-[var(--expense)] border border-[var(--expense)]/20">
                 <ArrowDownRight className="h-3.5 w-3.5" />
               </div>
             </div>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="text-2xl font-black tabular-nums text-rose-500 tracking-tight">
+            <div className="text-2xl font-black tabular-nums text-[var(--expense)] tracking-tight">
               {showBalances ? formatCurrency(totalLiabilities) : "••••••"}
             </div>
           </CardContent>
@@ -439,13 +501,13 @@ export function Accounts() {
             <Input
               placeholder="Search accounts..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQueryParam(e.target.value)}
               className="pl-10 h-10 bg-background/50 border-border/50 rounded-lg"
               aria-label="Search accounts by name"
             />
           </div>
           <div className="flex items-center gap-3">
-            <Select value={filterType} onValueChange={setFilterType}>
+            <Select value={filterType} onValueChange={setFilterTypeParam}>
               <SelectTrigger
                 className="w-[150px] h-10 bg-background/50 border-border/50 rounded-lg"
                 aria-label="Filter by account type"
@@ -464,7 +526,7 @@ export function Accounts() {
             </Select>
             <Select
               value={sortBy}
-              onValueChange={(value: SortOption) => setSortBy(value)}
+              onValueChange={(value: SortOption) => setSortParam(value)}
             >
               <SelectTrigger
                 className="w-[140px] h-10 bg-background/50 border-border/50 rounded-lg"
@@ -497,8 +559,8 @@ export function Accounts() {
           <Button
             variant="outline"
             onClick={() => {
-              setSearchQuery("");
-              setFilterType("all");
+              setSearchQueryParam("");
+              setFilterTypeParam("all");
             }}
             className="mt-4"
           >
@@ -515,7 +577,8 @@ export function Accounts() {
               Active Accounts
             </h2>
             <span className="text-xs font-bold text-muted-foreground">
-              {activeAccounts.length} TOTAL
+              {activeAccounts.length}{" "}
+              {activeAccounts.length === 1 ? "ACCOUNT" : "ACCOUNTS"}
             </span>
           </div>
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -525,16 +588,16 @@ export function Accounts() {
               return (
                 <Card
                   key={account.id}
-                  className="group relative overflow-hidden border-border/50 bg-card/30 backdrop-blur-xl transition-all duration-300 hover:border-border hover:shadow-2xl hover:-translate-y-1 flex flex-col"
+                  className="group relative flex flex-col overflow-hidden border-border/50 bg-card/30 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 ease-out hover:border-border hover:shadow-2xl hover:-translate-y-0.5"
                 >
                   <div
-                    className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-[50px] opacity-10 transition-opacity group-hover:opacity-20 pointer-events-none"
+                    className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-[50px] opacity-10 transition-opacity duration-200 group-hover:opacity-20 pointer-events-none"
                     style={{ backgroundColor: color }}
                   />
 
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/50 border border-border/50 shadow-inner group-hover:scale-110 transition-transform">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/50 border border-border/50 shadow-inner transition-transform duration-200 group-hover:scale-105">
                         <Icon className="h-6 w-6" style={{ color }} />
                       </div>
                       <div className="flex items-center gap-1">
@@ -554,6 +617,7 @@ export function Accounts() {
                             setIsDialogOpen(true);
                           }}
                           title="Edit account"
+                          aria-label={`Edit ${account.name}`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -563,6 +627,7 @@ export function Accounts() {
                           className="h-8 w-8 opacity-60 hover:opacity-100 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
                           onClick={() => initiateDelete(account)}
                           title="Delete account"
+                          aria-label={`Delete ${account.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -577,10 +642,10 @@ export function Accounts() {
                       </p>
                       <h3
                         className={cn(
-                          "text-3xl font-black tabular-nums tracking-tighter transition-all group-hover:scale-105 origin-left",
+                          "text-3xl font-black tabular-nums tracking-tighter",
                           toNumber(account.balance) >= 0
                             ? "text-foreground"
-                            : "text-rose-500",
+                            : "text-[var(--expense)]",
                         )}
                       >
                         {showBalances
@@ -617,9 +682,13 @@ export function Accounts() {
       {inactiveAccounts.length > 0 && (
         <div className="space-y-6 pt-6">
           <div className="flex items-center justify-between border-b border-border/50 pb-4">
-            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">
+            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/80">
               Inactive Accounts
             </h2>
+            <span className="text-xs font-bold text-muted-foreground">
+              {inactiveAccounts.length}{" "}
+              {inactiveAccounts.length === 1 ? "ACCOUNT" : "ACCOUNTS"}
+            </span>
           </div>
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {inactiveAccounts.map((account) => {
@@ -627,7 +696,8 @@ export function Accounts() {
               return (
                 <Card
                   key={account.id}
-                  className="group relative overflow-hidden border-dashed opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all border-border/50 bg-background/20"
+                  className="group relative overflow-hidden border-dashed border-border/50 bg-background/20 transition-[border-color,box-shadow] duration-200"
+                  style={{ opacity: 0.75 }}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
@@ -651,6 +721,7 @@ export function Accounts() {
                             setIsDialogOpen(true);
                           }}
                           title="Edit account"
+                          aria-label={`Edit ${account.name}`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -660,6 +731,7 @@ export function Accounts() {
                           className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg"
                           onClick={() => initiateDelete(account)}
                           title="Delete account"
+                          aria-label={`Delete ${account.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -668,17 +740,24 @@ export function Accounts() {
                   </CardHeader>
                   <CardContent className="space-y-4 pt-4">
                     <div>
-                      <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
                         Archived Balance
                       </p>
-                      <h3 className="text-xl font-black text-muted-foreground/80 tracking-tighter">
+                      <h3
+                        className={cn(
+                          "text-xl font-black tracking-tighter tabular-nums",
+                          toNumber(account.balance) >= 0
+                            ? "text-foreground"
+                            : "text-[var(--expense)]",
+                        )}
+                      >
                         {showBalances
                           ? formatCurrency(toNumber(account.balance))
                           : "••••••"}
                       </h3>
                     </div>
                     <div className="pt-4 border-t border-border/30">
-                      <CardTitle className="text-sm font-bold text-muted-foreground">
+                      <CardTitle className="text-sm font-bold text-foreground">
                         {account.name}
                       </CardTitle>
                     </div>
@@ -727,9 +806,9 @@ export function Accounts() {
             resetForm();
             setIsDialogOpen(true);
           }}
-          className="flex w-full items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-border/50 bg-card/20 p-12 transition-all hover:border-primary/50 hover:bg-primary/5 group"
+          className="flex w-full items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-border/50 bg-card/20 p-12 transition-[border-color,background-color] duration-200 hover:border-primary/50 hover:bg-primary/5 group"
         >
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary border border-border/50 shadow-sm transition-all group-hover:scale-110 group-hover:border-primary/30">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary border border-border/50 shadow-sm transition-[transform,border-color] duration-200 group-hover:scale-105 group-hover:border-primary/30">
             <Plus className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
           <span className="font-black text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-[0.2em] text-xs">
@@ -739,8 +818,8 @@ export function Accounts() {
       )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!isSaving) setIsDialogOpen(open); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingAccount ? (
@@ -779,14 +858,14 @@ export function Accounts() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Account Type</Label>
+                  <Label htmlFor="account-type">Account Type</Label>
                   <Select
                     value={formData.type}
                     onValueChange={(value: Account["type"]) =>
                       setFormData({ ...formData, type: value })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger id="account-type" className="h-11">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -811,25 +890,31 @@ export function Accounts() {
                     id="balance"
                     type="number"
                     step="0.01"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={formData.balance}
                     onChange={(e) =>
                       setFormData({ ...formData, balance: e.target.value })
                     }
                     className="h-11"
+                    aria-describedby="balance-help"
                   />
+                  {/* Balances may legitimately be negative (credit cards) — no min. */}
+                  <p id="balance-help" className="text-xs text-muted-foreground">
+                    Use a negative balance for what you owe (credit cards).
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Account Color</Label>
                 <div className="flex flex-wrap gap-2">
-                  {COLORS.map((color) => (
+                  {SWATCHES.map((color) => (
                     <button
                       key={color.value}
                       type="button"
                       className={cn(
-                        "h-9 w-9 rounded-full transition-all duration-200 hover:scale-110",
+                        "h-9 w-9 rounded-full transition-transform duration-200 hover:scale-110",
                         formData.color === color.value
                           ? "ring-2 ring-offset-2 ring-primary scale-110"
                           : "ring-1 ring-inset ring-black/10",
@@ -870,10 +955,17 @@ export function Accounts() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsDialogOpen(false)}
+                disabled={isSaving}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="gap-2">
+              <Button type="submit" className="gap-2" disabled={isSaving}>
+                {isSaving && (
+                  <Loader2
+                    className="h-4 w-4 motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                )}
                 {editingAccount ? "Update Account" : "Add Account"}
               </Button>
             </DialogFooter>
@@ -909,11 +1001,26 @@ export function Accounts() {
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={(e) => {
+                // Radix auto-closes on click; keep the dialog mounted so the
+                // deleting state is actually visible until the delete resolves.
+                e.preventDefault();
+                void handleDelete();
+              }}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? "Deleting..." : "Delete Account"}
+              {isDeleting ? (
+                <>
+                  <Loader2
+                    className="mr-2 h-4 w-4 motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                  Deleting…
+                </>
+              ) : (
+                "Delete Account"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -924,7 +1031,7 @@ export function Accounts() {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-200">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">

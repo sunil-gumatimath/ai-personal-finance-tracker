@@ -31,11 +31,14 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { currencyLocales } from "@/types/preferences";
+import { usePreferences } from "@/hooks/usePreferences";
 import { LogDetailDrawer } from "@/components/system-logs/LogDetailDrawer";
 import { LogTimeline } from "@/components/system-logs/LogTimeline";
 import { useSystemLogs } from "@/hooks/useSystemLogs";
 import { buildLogExport, downloadLogFile } from "@/lib/log-export";
-import { formatAction, generateHumanDescription } from "@/lib/log-formatter";
+import { formatAction, generateHumanDescription, type FormatOptions } from "@/lib/log-formatter";
 import type { LogEntry } from "@/types/api";
 
 export type { LogEntry } from "@/types/api";
@@ -50,7 +53,7 @@ const STAT_CARDS = [
 		iconColor: "text-violet-500",
 	},
 	{
-		label: "Created",
+		label: "Txns Created",
 		key: "created",
 		icon: Plus,
 		color: "text-emerald-600",
@@ -58,7 +61,7 @@ const STAT_CARDS = [
 		iconColor: "text-emerald-500",
 	},
 	{
-		label: "Edited",
+		label: "Txns Edited",
 		key: "edited",
 		icon: FileEdit,
 		color: "text-blue-600",
@@ -66,7 +69,7 @@ const STAT_CARDS = [
 		iconColor: "text-blue-500",
 	},
 	{
-		label: "Deleted",
+		label: "Txns Deleted",
 		key: "deleted",
 		icon: Trash2,
 		color: "text-rose-600",
@@ -92,7 +95,8 @@ const STAT_CARDS = [
 ] as const;
 
 export function SystemLogs() {
-	const { logs, loading, stats, wsStatus, refresh } = useSystemLogs();
+	const { logs, loading, stats, wsStatus, error, refresh } = useSystemLogs();
+	const { preferences } = usePreferences();
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedSeverity, setSelectedSeverity] = useState("all");
@@ -100,18 +104,40 @@ export function SystemLogs() {
 	const [dateRange, setDateRange] = useState("all");
 
 	const [inspectedLog, setInspectedLog] = useState<LogEntry | null>(null);
-	const [drawerVisible, setDrawerVisible] = useState(false);
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	// User's currency/locale threaded into every log formatter call.
+	const formatOptions = useMemo<FormatOptions>(
+		() => ({
+			currency: preferences.currency,
+			locale: currencyLocales[preferences.currency] || "en-US",
+		}),
+		[preferences.currency],
+	);
 
 	const openDrawer = useCallback((log: LogEntry) => {
 		setInspectedLog(log);
-		// Small delay so the backdrop renders before slide-in
-		requestAnimationFrame(() => setDrawerVisible(true));
 	}, []);
 
 	const closeDrawer = useCallback(() => {
-		setDrawerVisible(false);
-		setTimeout(() => setInspectedLog(null), 300);
+		setInspectedLog(null);
 	}, []);
+
+	/** One accurate toast per refresh; button spins + disables while pending. */
+	const handleRefresh = async () => {
+		if (isRefreshing) return;
+		setIsRefreshing(true);
+		try {
+			const ok = await refresh();
+			if (ok) {
+				toast.success("Logs refreshed");
+			} else {
+				toast.error("Couldn't refresh logs");
+			}
+		} finally {
+			setIsRefreshing(false);
+		}
+	};
 
 	const clearFilters = () => {
 		setSearchQuery("");
@@ -146,7 +172,7 @@ export function SystemLogs() {
 				(log.userEmail || "")
 					.toLowerCase()
 					.includes(searchQuery.toLowerCase()) ||
-				generateHumanDescription(log)
+				generateHumanDescription(log, formatOptions)
 					.toLowerCase()
 					.includes(searchQuery.toLowerCase());
 
@@ -166,7 +192,7 @@ export function SystemLogs() {
 
 			return matchesSearch && matchesSeverity && matchesAction && matchesDate;
 		});
-	}, [logs, searchQuery, selectedSeverity, selectedAction, dateRange]);
+	}, [logs, searchQuery, selectedSeverity, selectedAction, dateRange, formatOptions]);
 
 	const actionOptions = useMemo(() => {
 		const set = new Set<string>();
@@ -175,9 +201,14 @@ export function SystemLogs() {
 	}, [logs]);
 
 	const exportLogs = (format: "json" | "csv") => {
-		const { content, filename } = buildLogExport(logs, format);
+		// Export what the user currently sees (filtered), not the raw fetch.
+		const { content, filename } = buildLogExport(filteredLogs, format);
 		downloadLogFile(content, filename);
-		toast.success(`Exported ${format.toUpperCase()} successfully!`);
+		toast.success(
+			filteredLogs.length === logs.length
+				? `Exported ${format.toUpperCase()} successfully!`
+				: `Exported ${filteredLogs.length} filtered entries as ${format.toUpperCase()}!`,
+		);
 	};
 
 	return (
@@ -190,7 +221,7 @@ export function SystemLogs() {
 							Activity Logs
 						</h1>
 						<div
-							className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 ${
+							className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-200 ${
 								wsStatus === "connected"
 									? "bg-emerald-500/10 border-emerald-500/25 text-emerald-600"
 									: wsStatus === "reconnecting"
@@ -200,14 +231,14 @@ export function SystemLogs() {
 						>
 							<span className="relative flex h-2 w-2">
 								{wsStatus === "connected" && (
-									<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+									<span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
 								)}
 								<span
 									className={`relative inline-flex rounded-full h-2 w-2 ${
 										wsStatus === "connected"
 											? "bg-emerald-500"
 											: wsStatus === "reconnecting"
-												? "bg-amber-500 animate-pulse"
+												? "bg-amber-500 motion-safe:animate-pulse"
 												: "bg-rose-500"
 									}`}
 								></span>
@@ -222,7 +253,8 @@ export function SystemLogs() {
 						</div>
 					</div>
 					<p className="text-sm text-muted-foreground mt-1.5">
-						Track and audit all transaction changes in real-time.
+						Track and audit every change across your finances — transactions,
+						accounts, sign-ins, recurring runs, and system errors.
 					</p>
 				</div>
 
@@ -230,13 +262,16 @@ export function SystemLogs() {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={async () => {
-							await refresh();
-							toast.success("Logs refreshed");
-						}}
-						className="gap-1.5 h-9"
+						onClick={handleRefresh}
+						disabled={isRefreshing}
+						className="gap-1.5 h-9 cursor-pointer"
 					>
-						<RefreshCw className="h-3.5 w-3.5" />
+						<RefreshCw
+							className={cn(
+								"h-3.5 w-3.5",
+								isRefreshing && "motion-safe:animate-spin",
+							)}
+						/>
 						Refresh
 					</Button>
 					<DropdownMenu>
@@ -266,7 +301,7 @@ export function SystemLogs() {
 				{STAT_CARDS.map((stat) => (
 					<Card
 						key={stat.key}
-						className="group relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
+						className="group relative overflow-hidden transition-[box-shadow,translate] duration-300 ease-out hover:shadow-md hover:-translate-y-0.5"
 					>
 						<div
 							className={`absolute inset-0 bg-gradient-to-br ${stat.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
@@ -305,10 +340,14 @@ export function SystemLogs() {
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 								className="pl-9 h-10"
+								aria-label="Search activity logs"
 							/>
 						</div>
 						<Select value={selectedAction} onValueChange={setSelectedAction}>
-							<SelectTrigger className="w-full sm:w-[180px] h-10">
+							<SelectTrigger
+								aria-label="Filter by action"
+								className="w-full sm:w-[180px] h-10 cursor-pointer"
+							>
 								<SelectValue placeholder="All Actions" />
 							</SelectTrigger>
 							<SelectContent>
@@ -324,7 +363,10 @@ export function SystemLogs() {
 							value={selectedSeverity}
 							onValueChange={setSelectedSeverity}
 						>
-							<SelectTrigger className="w-full sm:w-[160px] h-10">
+							<SelectTrigger
+								aria-label="Filter by severity"
+								className="w-full sm:w-[160px] h-10 cursor-pointer"
+							>
 								<SelectValue placeholder="All Severities" />
 							</SelectTrigger>
 							<SelectContent>
@@ -336,7 +378,10 @@ export function SystemLogs() {
 							</SelectContent>
 						</Select>
 						<Select value={dateRange} onValueChange={setDateRange}>
-							<SelectTrigger className="w-full sm:w-[160px] h-10">
+							<SelectTrigger
+								aria-label="Filter by date range"
+								className="w-full sm:w-[160px] h-10 cursor-pointer"
+							>
 								<SelectValue placeholder="All Time" />
 							</SelectTrigger>
 							<SelectContent>
@@ -375,13 +420,17 @@ export function SystemLogs() {
 				loading={loading}
 				onSelectLog={openDrawer}
 				onClearFilters={clearFilters}
+				error={error}
+				onRetry={() => void refresh()}
+				formatOptions={formatOptions}
 			/>
 
-			{/* Detail Drawer — portaled to body to escape overflow-auto clipping */}
+			{/* Detail Drawer — Radix Sheet (portal, focus trap, Escape, scroll lock) */}
 			<LogDetailDrawer
 				log={inspectedLog}
-				visible={drawerVisible}
+				open={inspectedLog !== null}
 				onClose={closeDrawer}
+				formatOptions={formatOptions}
 			/>
 		</div>
 	);

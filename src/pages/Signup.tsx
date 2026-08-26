@@ -9,11 +9,26 @@ import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { Logo } from '@/components/system/Logo'
 
+type CredentialField = 'email' | 'password'
+
+/**
+ * Best-effort attribution of a failed signup to the offending field so the
+ * inline error can mark it aria-invalid. Unrecognized messages stay generic.
+ */
+function classifyCredentialError(message: string): CredentialField | null {
+    if (/password/i.test(message)) return 'password'
+    if (/e-?mail|user|account|credential/i.test(message)) return 'email'
+    return null
+}
+
 export function Signup() {
     const navigate = useNavigate()
     const { signUp } = useAuth()
-    const [loading, setLoading] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
+    const [validationError, setValidationError] = useState<string | null>(null)
+    const [formError, setFormError] = useState<string | null>(null)
+    const [errorField, setErrorField] = useState<CredentialField | null>(null)
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
@@ -28,33 +43,63 @@ export function Signup() {
         { met: /[0-9]/.test(formData.password), text: 'One number' },
     ]
 
+    const passwordMismatch =
+        formData.confirmPassword !== '' &&
+        formData.password !== formData.confirmPassword
+
+    const updateField = (field: keyof typeof formData, value: string) => {
+        setFormData({ ...formData, [field]: value })
+        if (field === 'password' || field === 'confirmPassword') {
+            setValidationError(null)
+        }
+        if (formError || errorField) {
+            setFormError(null)
+            setErrorField(null)
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
+        if (isSubmitting) return
+
         if (formData.password !== formData.confirmPassword) {
-            toast.error('Passwords do not match')
+            setValidationError('Passwords do not match')
             return
         }
 
         if (!passwordRequirements.every((req) => req.met)) {
-            toast.error('Please meet all password requirements')
+            setValidationError('Please meet all password requirements')
             return
         }
 
-        setLoading(true)
+        setIsSubmitting(true)
+        setFormError(null)
+        setErrorField(null)
 
         try {
-            const { error } = await signUp(formData.email, formData.password, formData.fullName)
-            if (error) throw error
+            await signUp(formData.email, formData.password, formData.fullName)
+            // The account is created but NOT signed in yet (email verification
+            // is pending), so route to /login where PublicRoute still applies.
             toast.success('Account created! Please check your email to verify.')
-            navigate('/login')
+            navigate('/login', { replace: true })
         } catch (error: unknown) {
             console.error('Signup error:', error)
-            toast.error(error instanceof Error ? error.message : 'Failed to create account')
+            const message =
+                error instanceof Error ? error.message : 'Failed to create account'
+            // Single error channel: inline alert (no duplicate toast).
+            setFormError(message)
+            setErrorField(classifyCredentialError(message))
         } finally {
-            setLoading(false)
+            setIsSubmitting(false)
         }
     }
+
+    const submitError = validationError ?? formError
+    const describedBy = (field: CredentialField) =>
+        formError && (errorField === field || errorField === null)
+            ? 'signup-error'
+            : undefined
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
@@ -81,10 +126,11 @@ export function Signup() {
                                     placeholder="John Doe"
                                     value={formData.fullName}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, fullName: e.target.value })
+                                        updateField('fullName', e.target.value)
                                     }
                                     required
                                     autoComplete="name"
+                                    autoFocus
                                 />
                             </div>
 
@@ -96,10 +142,14 @@ export function Signup() {
                                     placeholder="user@gmail.com"
                                     value={formData.email}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, email: e.target.value })
+                                        updateField('email', e.target.value)
                                     }
                                     required
                                     autoComplete="email"
+                                    aria-invalid={
+                                        errorField === 'email' || undefined
+                                    }
+                                    aria-describedby={describedBy('email')}
                                 />
                             </div>
 
@@ -112,17 +162,30 @@ export function Signup() {
                                         placeholder="••••••••"
                                         value={formData.password}
                                         onChange={(e) =>
-                                            setFormData({ ...formData, password: e.target.value })
+                                            updateField('password', e.target.value)
                                         }
                                         required
                                         autoComplete="new-password"
+                                        className="pr-10"
+                                        aria-invalid={
+                                            errorField === 'password' || undefined
+                                        }
+                                        aria-describedby={describedBy('password')}
                                     />
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                        onClick={() => setShowPassword((current) => !current)}
+                                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent cursor-pointer"
+                                        onClick={() =>
+                                            setShowPassword((current) => !current)
+                                        }
+                                        aria-label={
+                                            showPassword
+                                                ? 'Hide password'
+                                                : 'Show password'
+                                        }
+                                        aria-pressed={showPassword}
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -156,21 +219,46 @@ export function Signup() {
                                     placeholder="••••••••"
                                     value={formData.confirmPassword}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, confirmPassword: e.target.value })
+                                        updateField('confirmPassword', e.target.value)
                                     }
                                     required
                                     autoComplete="new-password"
+                                    aria-invalid={passwordMismatch || undefined}
+                                    aria-describedby={
+                                        passwordMismatch
+                                            ? 'confirm-password-error'
+                                            : undefined
+                                    }
                                 />
-                                {formData.confirmPassword &&
-                                    formData.password !== formData.confirmPassword && (
-                                        <p className="text-xs text-destructive">Passwords do not match</p>
-                                    )}
+                                {passwordMismatch && (
+                                    <p
+                                        role="alert"
+                                        id="confirm-password-error"
+                                        className="text-xs text-destructive"
+                                    >
+                                        Passwords do not match
+                                    </p>
+                                )}
                             </div>
 
-                            <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? (
+                            {submitError && (
+                                <p
+                                    role="alert"
+                                    id="signup-error"
+                                    className="text-sm text-destructive"
+                                >
+                                    {submitError}
+                                </p>
+                            )}
+
+                            <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <Loader2 className="mr-2 h-4 w-4 motion-safe:animate-spin" />
                                         Creating account...
                                     </>
                                 ) : (

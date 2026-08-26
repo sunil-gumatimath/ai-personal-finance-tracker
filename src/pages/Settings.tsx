@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
 	User,
 	Bell,
@@ -15,6 +16,8 @@ import {
 	AlertTriangle,
 	Eye,
 	EyeOff,
+	Loader2,
+	Check,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -40,7 +43,10 @@ import {
 } from "@/lib/ai-models";
 
 import { cn } from "@/lib/utils";
-import { THEME_OPTIONS } from "@/components/system/themes";
+import { ACCENT_OPTIONS, THEME_OPTIONS } from "@/components/system/themes";
+import { useAccent } from "@/components/system/theme-provider";
+import type { LucideIcon } from "lucide-react";
+import type { Preferences } from "@/types/preferences";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -53,46 +59,100 @@ import {
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+/**
+ * Transient inline "Saved ✓" feedback for instantly-applied preferences.
+ * Appears on success beside a section header, then fades out (motion-safe).
+ */
+function SavedIndicator({ visible }: { visible: boolean }) {
+	return (
+		<span
+			aria-live="polite"
+			className={cn(
+				"inline-flex items-center gap-1 text-xs font-medium text-emerald-600 transition-opacity duration-200 ease-out",
+				visible ? "opacity-100" : "opacity-0",
+			)}
+		>
+			<Check className="h-3 w-3" aria-hidden="true" />
+			Saved
+		</span>
+	);
+}
+
+function ThemeTile({
+	selected,
+	onClick,
+	icon: Icon,
+	label,
+	swatch,
+}: {
+	selected: boolean;
+	onClick: () => void;
+	icon: LucideIcon;
+	label: string;
+	swatch?: string;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			aria-pressed={selected}
+			className={cn(
+				"flex flex-col items-center gap-1.5 rounded-lg border p-3 cursor-pointer",
+				"transition-[border-color,background-color,color] duration-150 hover:bg-muted/50",
+				"focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+				selected
+					? "border-primary bg-primary/5 text-primary"
+					: "border-border/50 text-muted-foreground",
+			)}
+		>
+			{swatch ? (
+				<span
+					className="h-4 w-4 rounded-full border border-border/60"
+					style={{ backgroundColor: swatch }}
+					aria-hidden="true"
+				/>
+			) : (
+				<Icon className={cn("h-4 w-4", selected ? "text-primary" : "text-muted-foreground")} />
+			)}
+			<span className={cn("text-xs", selected ? "text-primary font-medium" : "text-muted-foreground")}>
+				{label}
+			</span>
+		</button>
+	);
+}
+
 function ThemeSelector() {
 	const { theme, setTheme } = useTheme();
+	const { accent, setAccent } = useAccent();
 
 	return (
-		<div
-			className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-			role="group"
-			aria-label="Theme"
-		>
-			{THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
-				<button
-					key={value}
-					type="button"
-					onClick={() => setTheme(value)}
-					aria-pressed={theme === value}
-					className={cn(
-						"flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all hover:bg-muted/50 cursor-pointer",
-						theme === value
-							? "border-primary bg-primary/5 text-primary"
-							: "border-border/50 text-muted-foreground",
-					)}
-				>
-					<Icon
-						className={cn(
-							"h-4 w-4",
-							theme === value ? "text-primary" : "text-muted-foreground",
-						)}
+		<div className="space-y-3">
+			<div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Appearance mode">
+				{THEME_OPTIONS.map(({ value, label, icon }) => (
+					<ThemeTile
+						key={value}
+						selected={theme === value}
+						onClick={() => setTheme(value)}
+						icon={icon}
+						label={label}
 					/>
-					<span
-						className={cn(
-							"text-xs",
-							theme === value
-								? "text-primary font-medium"
-								: "text-muted-foreground",
-						)}
-					>
-						{label}
-					</span>
-				</button>
-			))}
+				))}
+			</div>
+			<div className="grid grid-cols-2 gap-2" role="group" aria-label="Accent color">
+				{ACCENT_OPTIONS.map(({ value, label, icon }) => (
+					<ThemeTile
+						key={value}
+						selected={accent === value}
+						onClick={() => setAccent(value)}
+						icon={icon}
+						label={label}
+						swatch={value === "emerald" ? "#10b981" : undefined}
+					/>
+				))}
+			</div>
+			<p className="text-xs text-muted-foreground">
+				Accent works with both light and dark mode.
+			</p>
 		</div>
 	);
 }
@@ -101,10 +161,17 @@ export function Settings() {
 	const { user, signOut, updateProfile, resetPassword, deleteAccount } =
 		useAuth();
 	const { preferences, savePreferences } = usePreferences();
-	const [loading, setLoading] = useState(false);
+	const navigate = useNavigate();
+	const [isSavingProfile, setIsSavingProfile] = useState(false);
+	const [isSendingReset, setIsSendingReset] = useState(false);
 	const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 	const [aiSaving, setAiSaving] = useState(false);
 	const [showKey, setShowKey] = useState(false);
+	// Section whose instant-applied changes just saved ("Saved ✓" feedback).
+	const [savedSection, setSavedSection] = useState<
+		"interface" | "notifications" | null
+	>(null);
+	const savedTimeoutRef = useRef<number | null>(null);
 	const [profileData, setProfileData] = useState({
 		fullName: user?.user_metadata?.full_name || "",
 		email: user?.email || "",
@@ -139,7 +206,7 @@ export function Settings() {
 	}, [preferences.kilocodeModel]);
 
 	const handleProfileUpdate = async () => {
-		setLoading(true);
+		setIsSavingProfile(true);
 		try {
 			const { error } = await updateProfile({
 				full_name: profileData.fullName,
@@ -151,7 +218,32 @@ export function Settings() {
 			console.error("Error updating profile:", error);
 			toast.error("Failed to update profile");
 		} finally {
-			setLoading(false);
+			setIsSavingProfile(false);
+		}
+	};
+
+	/**
+	 * Instant-apply preference save: the provider applies optimistically and
+	 * rolls back on failure, so here we only surface the outcome — a transient
+	 * "Saved ✓" beside the section header on success, a toast on failure.
+	 */
+	const handleInstantPreferenceSave = async (
+		section: "interface" | "notifications",
+		patch: Partial<Preferences>,
+	) => {
+		try {
+			await savePreferences(patch);
+			setSavedSection(section);
+			if (savedTimeoutRef.current !== null) {
+				window.clearTimeout(savedTimeoutRef.current);
+			}
+			savedTimeoutRef.current = window.setTimeout(() => {
+				setSavedSection(null);
+				savedTimeoutRef.current = null;
+			}, 2000);
+		} catch (error) {
+			console.error("Failed to save preference:", error);
+			toast.error("Couldn't save preference");
 		}
 	};
 
@@ -195,8 +287,9 @@ export function Settings() {
 	};
 
 	const handlePasswordReset = async () => {
-		if (!user?.email) return;
+		if (!user?.email || isSendingReset) return;
 
+		setIsSendingReset(true);
 		try {
 			const { error } = await resetPassword(user.email);
 			if (error) throw error;
@@ -204,18 +297,21 @@ export function Settings() {
 		} catch (error) {
 			console.error("Error sending reset email:", error);
 			toast.error("Failed to send password reset email");
+		} finally {
+			setIsSendingReset(false);
 		}
 	};
 
 	const handleDeleteAccount = async () => {
+		if (isDeletingAccount) return;
 		setIsDeletingAccount(true);
 		try {
-			const { error } = await deleteAccount();
-			if (error) throw error;
+			await deleteAccount();
 			toast.success("Goodbye! We'll miss you. 👋", {
 				description:
 					"Your account and all associated data have been permanently deleted.",
 			});
+			navigate("/login", { replace: true });
 		} catch (error) {
 			console.error("Error deleting account:", error);
 			toast.error("Failed to delete account");
@@ -234,28 +330,28 @@ export function Settings() {
 			</div>
 
 			<Tabs defaultValue="profile" className="space-y-4">
-				<TabsList className="h-9 rounded-lg bg-muted/50 p-1">
+				<TabsList className="max-w-full min-h-9 overflow-x-auto rounded-lg bg-muted/50 p-1">
 					<TabsTrigger
 						value="profile"
-						className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
+						className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
 					>
 						<User className="h-3.5 w-3.5" /> Profile
 					</TabsTrigger>
 					<TabsTrigger
 						value="preferences"
-						className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
+						className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
 					>
 						<Palette className="h-3.5 w-3.5" /> Preferences
 					</TabsTrigger>
 					<TabsTrigger
 						value="notifications"
-						className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
+						className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
 					>
 						<Bell className="h-3.5 w-3.5" /> Alerts
 					</TabsTrigger>
 					<TabsTrigger
 						value="security"
-						className="rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
+						className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
 					>
 						<Shield className="h-3.5 w-3.5" /> Security
 					</TabsTrigger>
@@ -265,7 +361,7 @@ export function Settings() {
 				<TabsContent value="profile" className="space-y-4">
 					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
 						<div className="px-4 py-3 border-b border-border/50">
-							<h3 className="text-sm font-medium">Account Details</h3>
+							<h2 className="text-sm font-medium">Account Details</h2>
 						</div>
 						<div className="p-4 space-y-4">
 							<div className="flex items-center gap-4 mb-4">
@@ -314,11 +410,18 @@ export function Settings() {
 							</div>
 							<Button
 								onClick={handleProfileUpdate}
-								disabled={loading}
+								disabled={isSavingProfile}
 								size="sm"
 								className="h-8 cursor-pointer"
 							>
-								{loading ? "Saving..." : "Save Changes"}
+								{isSavingProfile ? (
+									<>
+										<Loader2 className="mr-1.5 h-3.5 w-3.5 motion-safe:animate-spin" />
+										Saving...
+									</>
+								) : (
+									"Save Changes"
+								)}
 							</Button>
 						</div>
 					</div>
@@ -328,8 +431,9 @@ export function Settings() {
 				<TabsContent value="preferences" className="space-y-4">
 					{/* Interface */}
 					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-						<div className="px-4 py-3 border-b border-border/50">
-							<h3 className="text-sm font-medium">Interface</h3>
+						<div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/50">
+							<h2 className="text-sm font-medium">Interface</h2>
+							<SavedIndicator visible={savedSection === "interface"} />
 						</div>
 						<div className="p-4 space-y-4">
 							<div className="space-y-2">
@@ -339,12 +443,22 @@ export function Settings() {
 
 							<div className="grid sm:grid-cols-2 gap-4">
 								<div className="space-y-1.5">
-									<Label className="text-xs">Currency</Label>
+									<Label className="text-xs" htmlFor="currency-select">
+										Currency
+									</Label>
 									<Select
 										value={preferences.currency}
-										onValueChange={(v) => savePreferences({ currency: v })}
+										onValueChange={(v) =>
+											void handleInstantPreferenceSave(
+												"interface",
+												{ currency: v },
+											)
+										}
 									>
-										<SelectTrigger className="h-9 text-sm cursor-pointer">
+										<SelectTrigger
+											id="currency-select"
+											className="h-9 text-sm cursor-pointer"
+										>
 											<Globe className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
 											<SelectValue />
 										</SelectTrigger>
@@ -358,12 +472,22 @@ export function Settings() {
 									</Select>
 								</div>
 								<div className="space-y-1.5">
-									<Label className="text-xs">Date Format</Label>
+									<Label className="text-xs" htmlFor="date-format-select">
+										Date Format
+									</Label>
 									<Select
 										value={preferences.dateFormat}
-										onValueChange={(v) => savePreferences({ dateFormat: v })}
+										onValueChange={(v) =>
+											void handleInstantPreferenceSave(
+												"interface",
+												{ dateFormat: v },
+											)
+										}
 									>
-										<SelectTrigger className="h-9 text-sm cursor-pointer">
+										<SelectTrigger
+											id="date-format-select"
+											className="h-9 text-sm cursor-pointer"
+										>
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
@@ -381,7 +505,7 @@ export function Settings() {
 					<div className="group relative overflow-hidden rounded-xl border border-primary/20 bg-primary/[0.02] backdrop-blur-sm">
 						<div className="px-4 py-3 border-b border-primary/10 flex items-center gap-2">
 							<Brain className="h-4 w-4 text-primary" />
-							<h3 className="text-sm font-medium">AI Integration</h3>
+							<h2 className="text-sm font-medium">AI Integration</h2>
 						</div>
 						<div className="p-4 space-y-4">
 							{/* Provider */}
@@ -439,8 +563,10 @@ export function Settings() {
 										/>
 										<button
 											type="button"
-											onClick={() => setShowKey(!showKey)}
-											className="absolute right-3 text-muted-foreground hover:text-foreground cursor-pointer flex items-center justify-center"
+											onClick={() => setShowKey((current) => !current)}
+											aria-label={showKey ? "Hide API key" : "Show API key"}
+											aria-pressed={showKey}
+											className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors duration-150 cursor-pointer flex items-center justify-center"
 										>
 											{showKey ? (
 												<EyeOff className="h-4 w-4" />
@@ -505,7 +631,11 @@ export function Settings() {
 									size="sm"
 									className="h-8 gap-1.5 cursor-pointer"
 								>
-									<Save className="h-3.5 w-3.5" />
+									{aiSaving ? (
+										<Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" />
+									) : (
+										<Save className="h-3.5 w-3.5" />
+									)}
 									{aiSaving ? "Saving..." : "Save AI Settings"}
 								</Button>
 							</div>
@@ -516,8 +646,11 @@ export function Settings() {
 				{/* Notifications Tab */}
 				<TabsContent value="notifications" className="space-y-4">
 					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-						<div className="px-4 py-3 border-b border-border/50">
-							<h3 className="text-sm font-medium">Notification Preferences</h3>
+						<div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/50">
+							<h2 className="text-sm font-medium">
+								Notification Preferences
+							</h2>
+							<SavedIndicator visible={savedSection === "notifications"} />
 						</div>
 						<div>
 							{[
@@ -546,26 +679,24 @@ export function Settings() {
 								>
 									<div className="space-y-0.5">
 										<Label
+											htmlFor={`switch-${item.id}`}
 											className="text-sm cursor-pointer"
-											onClick={() =>
-												savePreferences({
-													[item.id]:
-														!preferences[item.id as keyof typeof preferences],
-												})
-											}
 										>
 											{item.label}
 										</Label>
 										<p className="text-xs text-muted-foreground">{item.desc}</p>
 									</div>
 									<Switch
+										id={`switch-${item.id}`}
 										checked={
 											preferences[
 												item.id as keyof typeof preferences
 											] as boolean
 										}
 										onCheckedChange={(checked) =>
-											savePreferences({ [item.id]: checked })
+											void handleInstantPreferenceSave("notifications", {
+												[item.id]: checked,
+											})
 										}
 										className="cursor-pointer"
 									/>
@@ -579,7 +710,7 @@ export function Settings() {
 				<TabsContent value="security" className="space-y-4">
 					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
 						<div className="px-4 py-3 border-b border-border/50">
-							<h3 className="text-sm font-medium">Password</h3>
+							<h2 className="text-sm font-medium">Password</h2>
 						</div>
 						<div className="p-4">
 							<div className="flex items-center justify-between gap-4">
@@ -593,9 +724,20 @@ export function Settings() {
 									variant="outline"
 									size="sm"
 									onClick={handlePasswordReset}
+									disabled={isSendingReset}
 									className="h-8 cursor-pointer"
 								>
-									Send Link <ChevronRight className="ml-1 h-3.5 w-3.5" />
+									{isSendingReset ? (
+										<>
+											<Loader2 className="mr-1.5 h-3.5 w-3.5 motion-safe:animate-spin" />
+											Sending...
+										</>
+									) : (
+										<>
+											Send Link
+											<ChevronRight className="ml-1 h-3.5 w-3.5" />
+										</>
+									)}
 								</Button>
 							</div>
 						</div>
@@ -603,9 +745,9 @@ export function Settings() {
 
 					<div className="group relative overflow-hidden rounded-xl border border-destructive/20 bg-destructive/[0.02] backdrop-blur-sm">
 						<div className="px-4 py-3 border-b border-destructive/10">
-							<h3 className="text-xs font-medium text-destructive uppercase tracking-wide">
+							<h2 className="text-xs font-medium text-destructive uppercase tracking-wide">
 								Danger Zone
-							</h3>
+							</h2>
 						</div>
 						<div className="p-4">
 							<div className="flex items-center justify-between gap-4">
@@ -641,8 +783,17 @@ export function Settings() {
 											className="h-8 bg-destructive hover:bg-destructive/90 cursor-pointer"
 											disabled={isDeletingAccount}
 										>
-											<AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
-											{isDeletingAccount ? "Deleting..." : "Delete Account"}
+											{isDeletingAccount ? (
+												<>
+													<Loader2 className="mr-1.5 h-3.5 w-3.5 motion-safe:animate-spin" />
+													Deleting...
+												</>
+											) : (
+												<>
+													<AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
+													Delete Account
+												</>
+											)}
 										</Button>
 									</AlertDialogTrigger>
 									<AlertDialogContent className="rounded-xl">

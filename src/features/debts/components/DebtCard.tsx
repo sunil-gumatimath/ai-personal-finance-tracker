@@ -16,6 +16,7 @@ import {
   ChevronUp,
   CheckCircle2,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,10 @@ interface DebtCardProps {
   debt: Debt;
   expandedDebt: string | null;
   setExpandedDebt: (id: string | null) => void;
+  /** This card's own payments only — the parent scopes the array per debt. */
   payments: DebtPayment[];
+  /** True while this debt's history is being fetched. */
+  isLoadingHistory: boolean;
   setSelectedDebt: (debt: Debt) => void;
   paymentFormData: {
     amount: string;
@@ -86,6 +90,7 @@ export function DebtCard({
   expandedDebt,
   setExpandedDebt,
   payments,
+  isLoadingHistory,
   setSelectedDebt,
   paymentFormData,
   setPaymentFormData,
@@ -99,17 +104,21 @@ export function DebtCard({
   formatCurrency,
 }: DebtCardProps) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const getDebtIcon = (type: Debt["type"]) => {
-    const found = debtTypes.find((t) => t.value === type);
-    return found?.icon || CreditCard;
-  };
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const DebtIcon = getDebtIcon(debt.type);
-  const progress = getProgress(debt);
+  const DebtIcon =
+    debtTypes.find((t) => t.value === debt.type)?.icon || CreditCard;
+  // Defensive in-card scope: even if the parent hands us a wider array, only
+  // THIS debt's payments may render here.
+  const debtPayments = payments.filter((p) => p.debt_id === debt.id);
+  const hasOriginalAmount = toNumber(debt.original_amount) > 0;
+  const progress = hasOriginalAmount ? getProgress(debt) : null;
+  const apr = toNumber(debt.interest_rate).toFixed(2);
   const isPaidOff = debt.current_balance === 0;
   const payoffMonths = calculatePayoffTime(debt);
   const totalInterest = calculateTotalInterest(debt);
   const isExpanded = expandedDebt === debt.id;
+  const historyPanelId = `debt-history-${debt.id}`;
 
   return (
     <div
@@ -165,7 +174,7 @@ export function DebtCard({
                   <>
                     <span>•</span>
                     <span className="text-amber-500 font-semibold">
-                      {debt.interest_rate}% APR
+                      {apr}% APR
                     </span>
                   </>
                 )}
@@ -177,6 +186,13 @@ export function DebtCard({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
+              aria-label={
+                isExpanded
+                  ? `Collapse ${debt.name} payment history`
+                  : `Expand ${debt.name} payment history`
+              }
+              aria-expanded={isExpanded}
+              aria-controls={historyPanelId}
               onClick={() => setExpandedDebt(isExpanded ? null : debt.id)}
             >
               {isExpanded ? (
@@ -187,7 +203,12 @@ export function DebtCard({
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label={`More actions for ${debt.name}`}
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -245,11 +266,22 @@ export function DebtCard({
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => {
-                  handleDelete(debt.id);
-                  setConfirmDeleteOpen(false);
+                disabled={isDeleting}
+                onClick={(e) => {
+                  // preventDefault keeps the dialog open until the async
+                  // delete resolves, then we close manually.
+                  e.preventDefault();
+                  if (isDeleting) return;
+                  setIsDeleting(true);
+                  Promise.resolve(handleDelete(debt.id)).finally(() => {
+                    setIsDeleting(false);
+                    setConfirmDeleteOpen(false);
+                  });
                 }}
               >
+                {isDeleting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                )}
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -262,42 +294,59 @@ export function DebtCard({
             <span className="text-muted-foreground font-medium">
               Payoff Progress
             </span>
-            <span className="font-semibold" style={{ color: debt.color }}>
-              {Math.round(progress)}% paid
-            </span>
+            {progress !== null && (
+              <span className="font-semibold" style={{ color: debt.color }}>
+                {Math.round(progress)}% paid
+              </span>
+            )}
           </div>
-          <Progress
-            value={progress}
-            className="h-2 rounded-full bg-secondary/50"
-            style={
-              {
-                "--progress-color": debt.color,
-              } as React.CSSProperties
-            }
-          />
-          <div className="flex justify-between text-xs font-medium">
-            <span className="text-foreground font-semibold">
-              {formatCurrency(toNumber(debt.current_balance))} remaining
-            </span>
-            <span className="text-muted-foreground">
-              of {formatCurrency(toNumber(debt.original_amount))}
-            </span>
-          </div>
+          {progress !== null ? (
+            <>
+              <Progress
+                value={progress}
+                className="h-2 rounded-full bg-secondary/50"
+                style={
+                  {
+                    "--progress-color": debt.color,
+                  } as React.CSSProperties
+                }
+              />
+              <div className="flex justify-between gap-2 text-xs font-medium">
+                <span className="text-foreground font-semibold">
+                  {formatCurrency(toNumber(debt.current_balance))} remaining
+                </span>
+                <span className="flex items-center gap-1.5 min-w-0">
+                  {toNumber(debt.interest_rate) > 0 && (
+                    <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-500">
+                      {apr}% APR
+                    </span>
+                  )}
+                  <span className="text-muted-foreground shrink-0">
+                    of {formatCurrency(toNumber(debt.original_amount))}
+                  </span>
+                </span>
+              </div>
+            </>
+          ) : (
+            <p className="rounded-lg border border-dashed border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              Add an original amount to track payoff progress.
+            </p>
+          )}
         </div>
 
         {/* Quick stats */}
         {!isPaidOff && (
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/30 text-center">
             <div>
-              <p className="text-[10px] text-muted-foreground font-medium">
+              <p className="text-xs text-muted-foreground font-medium">
                 Min Payment
               </p>
-              <p className="text-xs font-bold text-foreground mt-0.5">
+              <p className="text-xs font-bold text-foreground mt-0.5 tabular-nums">
                 {formatCurrency(toNumber(debt.minimum_payment))}
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground font-medium">
+              <p className="text-xs text-muted-foreground font-medium">
                 Due Date
               </p>
               <p className="text-xs font-bold text-foreground mt-0.5">
@@ -305,7 +354,7 @@ export function DebtCard({
               </p>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground font-medium">
+              <p className="text-xs text-muted-foreground font-medium">
                 Payoff Time
               </p>
               <p className="text-xs font-bold text-foreground mt-0.5">
@@ -321,7 +370,10 @@ export function DebtCard({
 
         {/* Expanded content - Payment history */}
         {isExpanded && (
-          <div className="pt-4 border-t border-border/40 space-y-4">
+          <div
+            id={historyPanelId}
+            className="pt-4 border-t border-border/40 space-y-4"
+          >
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-bold text-foreground">
                 Recent Payments
@@ -330,7 +382,7 @@ export function DebtCard({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs gap-1"
+                  className="h-7 text-xs gap-1 active:scale-[0.98] transition-transform duration-150 ease-out"
                   onClick={() => {
                     setSelectedDebt(debt);
                     setPaymentFormData({
@@ -346,17 +398,26 @@ export function DebtCard({
               )}
             </div>
 
-            {payments.length === 0 ? (
+            {isLoadingHistory ? (
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground text-center py-6 bg-muted/20 rounded-xl border border-dashed border-border/50">
+                <Loader2
+                  className="h-3.5 w-3.5 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+                Loading payment history…
+              </p>
+            ) : debtPayments.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-6 bg-muted/20 rounded-xl border border-dashed border-border/50">
                 No payments recorded yet
               </p>
             ) : (
               <div className="relative pl-6 border-l border-dashed border-border/80 space-y-3 ml-3 py-1">
-                {payments.map((payment) => (
+                {debtPayments.map((payment) => (
                   <div key={payment.id} className="relative group/item">
                     {/* Dotted indicator */}
                     <div
-                      className="absolute -left-[31px] top-1.5 h-4.5 w-4.5 rounded-full border-2 border-background bg-card flex items-center justify-center transition-all duration-300 group-hover/item:scale-110"
+                      aria-hidden="true"
+                      className="absolute -left-[31px] top-1.5 h-4.5 w-4.5 rounded-full border-2 border-background bg-card flex items-center justify-center transition-colors duration-200"
                       style={{ borderColor: debt.color }}
                     >
                       <div
@@ -365,13 +426,13 @@ export function DebtCard({
                       />
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-border/30 bg-card/60 backdrop-blur-sm transition-all duration-200 hover:border-border/60 hover:bg-card/90 gap-2">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-border/30 bg-card/60 backdrop-blur-sm transition-colors duration-200 hover:border-border/60 hover:bg-card/90 gap-2">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-foreground tabular-nums">
                             {formatCurrency(toNumber(payment.amount))}
                           </span>
-                          <span className="text-[10px] text-muted-foreground font-medium">
+                          <span className="text-xs text-muted-foreground font-medium">
                             {format(
                               parseTransactionDate(payment.payment_date),
                               "MMM d, yyyy",
@@ -379,17 +440,17 @@ export function DebtCard({
                           </span>
                         </div>
                         {payment.notes && (
-                          <p className="text-xs text-muted-foreground italic font-medium">
+                          <p className="text-xs text-muted-foreground italic font-medium truncate">
                             "{payment.notes}"
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold">
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--income)]/10 text-[var(--income)] border border-[var(--income)]/20 shrink-0 tabular-nums whitespace-nowrap">
                           Principal:{" "}
                           {formatCurrency(toNumber(payment.principal_amount))}
                         </span>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0 tabular-nums whitespace-nowrap">
                           Interest: {formatCurrency(toNumber(payment.interest_amount))}
                         </span>
                       </div>

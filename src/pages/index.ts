@@ -40,3 +40,28 @@ export const SystemLogs = lazy(() =>
 export const Reports = lazy(() =>
 	import("./Reports").then((m) => ({ default: m.Reports })),
 );
+
+// ---------------------------------------------------------------------------
+// Shared route metadata — single source of truth for navigation vocabulary.
+// Used by App.tsx (document titles), Header.tsx (breadcrumbs/title) and
+// AppSidebar.tsx so every surface uses the SAME short label per route.
+// ---------------------------------------------------------------------------
+export const ROUTE_TITLES: Record<string, string> = {
+	"/": "Dashboard",
+	"/transactions": "Transactions",
+	"/reports": "Reports",
+	"/calendar": "Calendar",
+	"/budgets": "Budgets",
+	"/goals": "Goals",
+	"/debts": "Debts",
+	"/accounts": "Accounts",
+	"/categories": "Categories",
+	"/system-logs": "System Logs",
+	"/settings": "Settings",
+};
+
+/** Brand suffix for document titles, e.g. "Dashboard · FinanceTrack". */
+export const APP_BRAND = "FinanceTrack";
+
+/** Base document title — must match the <title> in index.html. */
+export const APP_TITLE = "Personal Finance Tracker";

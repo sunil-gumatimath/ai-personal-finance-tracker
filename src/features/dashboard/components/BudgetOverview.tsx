@@ -3,31 +3,32 @@ import { Pie, PieChart, Cell, Sector, type TooltipProps } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePreferences } from '@/hooks/usePreferences'
 import type { SpendingByCategory } from '@/types'
-import { 
-    PieChartIcon, 
-    TrendingDown, 
-    TrendingUp, 
-    ArrowRight, 
-    Plus, 
-    Utensils, 
-    Lightbulb, 
-    Home, 
-    Film, 
-    Car, 
-    ShoppingBag, 
-    Heart, 
-    GraduationCap, 
-    Smartphone, 
-    Coffee, 
-    Bus, 
-    Plane, 
-    Gamepad2, 
-    Briefcase, 
+import {
+    PieChartIcon,
+    TrendingDown,
+    TrendingUp,
+    ArrowRight,
+    Plus,
+    Utensils,
+    Lightbulb,
+    Home,
+    Film,
+    Car,
+    ShoppingBag,
+    Heart,
+    GraduationCap,
+    Smartphone,
+    Coffee,
+    Bus,
+    Plane,
+    Gamepad2,
+    Briefcase,
     HelpCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
     type ChartConfig,
     ChartContainer,
@@ -37,6 +38,8 @@ import {
 interface BudgetOverviewProps {
     spendingByCategory: SpendingByCategory[]
     previousMonthData?: SpendingByCategory[]
+    /** While the parent fetch is in flight — mirrors the loaded layout. */
+    isLoading?: boolean
 }
 
 type ChartDatum = {
@@ -46,19 +49,13 @@ type ChartDatum = {
     fill: string
 }
 
-const COLORS = [
-    'hsl(346.8 77.2% 49.8%)', // Rose
-    'hsl(142.1 76.2% 36.3%)', // Green
-    'hsl(221.2 83.2% 53.3%)', // Blue
-    'hsl(262.1 83.3% 57.8%)', // Purple
-    'hsl(24.6 95% 53.1%)',    // Orange
-    'hsl(47.9 95.8% 53.1%)',  // Yellow
-    'hsl(173.4 80.4% 40%)',   // Teal
-    'hsl(280 65.3% 60%)',     // Violet
-    'hsl(340 75.5% 55%)',     // Pink
-    'hsl(200 80% 50%)',       // Cyan
-    'hsl(15 80% 55%)',        // Coral
-    'hsl(60 70% 45%)',        // Olive
+// Fallback palette cycles the shared chart tokens instead of hardcoded hex.
+const FALLBACK_COLORS = [
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
 ]
 
 // Custom helper to map categories to Lucide icons
@@ -79,7 +76,7 @@ const getCategoryIcon = (categoryName: string) => {
     if (name.includes('phone') || name.includes('mobile') || name.includes('internet') || name.includes('wifi')) return Smartphone;
     if (name.includes('saving') || name.includes('invest') || name.includes('stock')) return TrendingUp;
     if (name.includes('work') || name.includes('office') || name.includes('job')) return Briefcase;
-    
+
     return HelpCircle; // Fallback
 }
 
@@ -159,9 +156,17 @@ const renderActiveShape = (props: React.ComponentProps<typeof Sector>) => {
     );
 };
 
-export function BudgetOverview({ spendingByCategory, previousMonthData }: BudgetOverviewProps) {
+export function BudgetOverview({ spendingByCategory, previousMonthData, isLoading = false }: BudgetOverviewProps) {
     const { formatCurrency } = usePreferences()
-    const [activeIndex, setActiveIndex] = useState<number | null>(null)
+    // Hover highlights temporarily; a click/tap pins a slice until it is
+    // clicked again — so touch users can select slices too.
+    const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+    const [pinnedIndex, setPinnedIndex] = useState<number | null>(null)
+
+    const togglePinned = (index: number) =>
+        setPinnedIndex((prev) => (prev === index ? null : index))
+
+    const activeIndex = pinnedIndex ?? hoverIndex
 
     const totalSpending = spendingByCategory.reduce((sum, cat) => sum + cat.amount, 0)
 
@@ -188,7 +193,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
         category: cat.category,
         amount: cat.amount,
         percentage: cat.percentage,
-        fill: cat.color || COLORS[index % COLORS.length],
+        fill: cat.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length],
     }))
 
     const chartConfig = {
@@ -196,11 +201,44 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
         ...spendingByCategory.reduce((acc, cat, index) => {
             acc[cat.category] = {
                 label: cat.category,
-                color: cat.color || COLORS[index % COLORS.length]
+                color: cat.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
             }
             return acc
         }, {} as ChartConfig)
     } satisfies ChartConfig
+
+    // Loading skeleton mirrors the loaded donut + list layout
+    if (isLoading) {
+        return (
+            <Card className="h-full flex flex-col overflow-hidden border border-border bg-card" aria-busy="true">
+                <CardHeader className="pb-3 border-b border-border/10 bg-muted/5">
+                    <div className="flex items-center gap-2.5">
+                        <Skeleton className="h-9 w-9 rounded-xl" />
+                        <div className="space-y-1.5">
+                            <Skeleton className="h-3.5 w-24" />
+                            <Skeleton className="h-2.5 w-36" />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="flex-1 pb-4 pt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
+                        <Skeleton className="aspect-square max-h-[220px] w-full max-w-[220px] mx-auto rounded-full" />
+                        <div className="space-y-3">
+                            {[0, 1, 2].map((i) => (
+                                <div key={i} className="flex items-center gap-3">
+                                    <Skeleton className="h-8 w-8 rounded-lg" />
+                                    <div className="flex-1 space-y-1.5">
+                                        <Skeleton className="h-3 w-3/4" />
+                                        <Skeleton className="h-1.5 w-full" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
 
     // Empty state with enhanced visuals
     if (spendingByCategory.length === 0) {
@@ -220,8 +258,9 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                     </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col items-center justify-center py-12 text-center">
+                    {/* Static halo — decorative, never pulses */}
                     <div className="relative mb-6">
-                        <div className="absolute inset-0 bg-primary/10 rounded-full blur-xl animate-pulse" />
+                        <div className="absolute inset-0 bg-primary/10 rounded-full blur-xl" />
                         <div className="relative bg-muted/50 rounded-full p-6">
                             <PieChartIcon className="h-12 w-12 text-muted-foreground/60" />
                         </div>
@@ -230,7 +269,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                     <p className="text-xs text-muted-foreground mb-4 max-w-[200px]">
                         Start tracking your expenses to see your spending patterns visualized here.
                     </p>
-                    <Button asChild size="sm" variant="outline" className="gap-2">
+                    <Button asChild size="sm" variant="outline" className="gap-2 active:scale-[0.98]">
                         <Link to="/transactions?action=new">
                             <Plus className="h-4 w-4" />
                             Add First Expense
@@ -242,7 +281,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
     }
 
     return (
-        <Card className="h-full flex flex-col overflow-hidden border border-border bg-card shadow-sm hover:shadow-md/50 transition-shadow duration-300">
+        <Card aria-label="Spending by category breakdown" className="h-full flex flex-col overflow-hidden border border-border bg-card shadow-sm">
             <CardHeader className="pb-3 border-b border-border/10 bg-muted/5">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -259,7 +298,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                         </div>
                     </div>
                     <div className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-muted border border-border/40 text-muted-foreground uppercase tracking-wider">
-                        {spendingByCategory.length} Sectors
+                        {spendingByCategory.length} Categories
                     </div>
                 </div>
             </CardHeader>
@@ -270,6 +309,8 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                         <ChartContainer
                             config={chartConfig}
                             className="w-full h-full"
+                            role="img"
+                            aria-label="Donut chart of spending split by category"
                         >
                             <PieChart>
                                 <ChartTooltip
@@ -286,8 +327,9 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                     paddingAngle={2}
                                     activeIndex={activeIndex !== null ? activeIndex : undefined}
                                     activeShape={renderActiveShape}
-                                    onMouseEnter={(_, index) => setActiveIndex(index)}
-                                    onMouseLeave={() => setActiveIndex(null)}
+                                    onMouseEnter={(_, index) => setHoverIndex(index)}
+                                    onMouseLeave={() => setHoverIndex(null)}
+                                    onClick={(_, index) => togglePinned(index)}
                                     animationBegin={0}
                                     animationDuration={600}
                                     animationEasing="ease-out"
@@ -298,7 +340,6 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                             fill={entry.fill}
                                             stroke="hsl(var(--background))"
                                             strokeWidth={2}
-                                            className="transition-all duration-300"
                                         />
                                     ))}
                                 </Pie>
@@ -310,18 +351,18 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                             <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest max-w-[100px] truncate">
                                 {activeIndex !== null ? chartData[activeIndex].category : "Total Spent"}
                             </span>
-                            <span className="text-lg font-extrabold tracking-tight mt-0.5 text-foreground transition-all duration-200">
+                            <span className="text-lg font-extrabold tracking-tight mt-0.5 text-foreground">
                                 {formatCurrency(activeIndex !== null ? chartData[activeIndex].amount : totalSpending)}
                             </span>
                             <span className="text-[9px] font-semibold text-muted-foreground/80 mt-0.5">
-                                {activeIndex !== null 
-                                    ? `${chartData[activeIndex].percentage.toFixed(1)}%` 
-                                    : "All Sectors"}
+                                {activeIndex !== null
+                                    ? `${chartData[activeIndex].percentage.toFixed(1)}%`
+                                    : "All Categories"}
                             </span>
                         </div>
                     </div>
 
-                    {/* Category Legend Section */}
+                    {/* Category Legend Section — real buttons: click pins/unpins */}
                     <div className="flex flex-col justify-center space-y-2 py-1">
                         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 px-1.5">
                             Category Breakdown
@@ -333,22 +374,25 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                 const IconComponent = getCategoryIcon(cat.category)
 
                                 return (
-                                    <div
+                                    <button
                                         key={cat.category}
+                                        type="button"
+                                        aria-pressed={pinnedIndex === index}
+                                        onClick={() => togglePinned(index)}
+                                        onMouseEnter={() => setHoverIndex(index)}
+                                        onMouseLeave={() => setHoverIndex(null)}
                                         className={cn(
-                                            "flex items-center gap-3 p-2 rounded-xl border border-transparent transition-all duration-200 cursor-pointer active:scale-[0.98]",
-                                            activeIndex === index 
-                                                ? "bg-muted/60 border-border/50 shadow-xs" 
-                                                : "hover:bg-muted/30"
+                                            "flex w-full items-center gap-3 p-2 rounded-xl border text-left transition-colors duration-150 cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                            activeIndex === index
+                                                ? "bg-muted/60 border-border/50 shadow-xs"
+                                                : "border-transparent hover:bg-muted/30"
                                         )}
-                                        onMouseEnter={() => setActiveIndex(index)}
-                                        onMouseLeave={() => setActiveIndex(null)}
                                     >
-                                        {/* Icon indicator with HSL background glow */}
-                                        <div 
-                                            className="relative flex items-center justify-center w-8 h-8 rounded-lg border transition-all duration-200"
-                                            style={{ 
-                                                backgroundColor: `${color}12`, 
+                                        {/* Icon indicator with tinted background */}
+                                        <div
+                                            className="relative flex shrink-0 items-center justify-center w-8 h-8 rounded-lg border"
+                                            style={{
+                                                backgroundColor: `${color}12`,
                                                 borderColor: `${color}25`,
                                                 color: color
                                             }}
@@ -372,7 +416,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                                 <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden border border-border/5">
                                                     <div
                                                         className={cn(
-                                                            "h-full rounded-full transition-all duration-500 ease-[var(--ease-out-custom)]",
+                                                            "h-full rounded-full transition-[width] duration-500 ease-[var(--ease-out-custom)]",
                                                             activeIndex === index ? "brightness-110" : ""
                                                         )}
                                                         style={{
@@ -388,19 +432,24 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                                             </div>
                                         </div>
 
-                                        {/* Trend indicator */}
+                                        {/* Trend indicator: icon + color pairing for colorblind users */}
                                         {change.direction !== 'same' && (
                                             <div className={cn(
-                                                "flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-colors whitespace-nowrap",
+                                                "flex shrink-0 items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full border whitespace-nowrap",
                                                 change.direction === 'up'
-                                                    ? "text-rose-500 bg-rose-500/10 border-rose-500/20"
-                                                    : "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+                                                    ? "text-[var(--expense)] bg-[var(--expense)]/10 border-[var(--expense)]/20"
+                                                    : "text-[var(--income)] bg-[var(--income)]/10 border-[var(--income)]/20"
                                             )}>
+                                                {change.direction === 'up' ? (
+                                                    <TrendingUp className="h-2.5 w-2.5" />
+                                                ) : (
+                                                    <TrendingDown className="h-2.5 w-2.5" />
+                                                )}
                                                 {change.direction === 'up' ? '+' : '-'}
                                                 {change.percent.toFixed(0)}%
                                             </div>
                                         )}
-                                    </div>
+                                    </button>
                                 )
                             })}
                         </div>
@@ -408,7 +457,7 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                 </div>
             </CardContent>
 
-            {/* Premium Footer */}
+            {/* Footer */}
             <div className="border-t border-border/10 px-5 py-3 bg-muted/5 relative z-10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -431,11 +480,11 @@ export function BudgetOverview({ spendingByCategory, previousMonthData }: Budget
                         asChild
                         variant="ghost"
                         size="sm"
-                        className="group gap-1 text-xs hover:text-primary active:scale-95 font-semibold rounded-lg transition-all duration-200"
+                        className="group gap-1 text-xs hover:text-primary font-semibold rounded-lg transition-colors duration-150 active:scale-[0.98]"
                     >
                         <Link to="/categories" className="flex items-center gap-1">
                             View All
-                            <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                            <ArrowRight className="h-3 w-3 transition-transform duration-150 group-hover:translate-x-0.5" />
                         </Link>
                     </Button>
                 </div>

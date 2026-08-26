@@ -9,32 +9,65 @@ import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { Logo } from '@/components/system/Logo'
 
+type CredentialField = 'email' | 'password'
+
+/**
+ * Best-effort attribution of a failed sign-in to the offending field so the
+ * inline error can mark it aria-invalid. Unrecognized messages stay generic.
+ */
+function classifyCredentialError(message: string): CredentialField | null {
+    if (/password/i.test(message)) return 'password'
+    if (/e-?mail|user|account|credential/i.test(message)) return 'email'
+    return null
+}
+
 export function Login() {
     const navigate = useNavigate()
     const { signIn } = useAuth()
-    const [loading, setLoading] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
+    const [formError, setFormError] = useState<string | null>(null)
+    const [errorField, setErrorField] = useState<CredentialField | null>(null)
     const [formData, setFormData] = useState({
         email: '',
         password: '',
     })
 
+    const updateField = (field: keyof typeof formData, value: string) => {
+        setFormData({ ...formData, [field]: value })
+        if (formError || errorField) {
+            setFormError(null)
+            setErrorField(null)
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        setLoading(true)
+        if (isSubmitting) return
+        setIsSubmitting(true)
+        setFormError(null)
+        setErrorField(null)
 
         try {
-            const { error } = await signIn(formData.email, formData.password)
-            if (error) throw error
+            await signIn(formData.email, formData.password)
             toast.success('Welcome back!')
             navigate('/')
         } catch (error: unknown) {
             console.error('Login error:', error)
-            toast.error(error instanceof Error ? error.message : 'Failed to sign in')
+            const message =
+                error instanceof Error ? error.message : 'Failed to sign in'
+            // Single error channel: inline alert (no duplicate toast).
+            setFormError(message)
+            setErrorField(classifyCredentialError(message))
         } finally {
-            setLoading(false)
+            setIsSubmitting(false)
         }
     }
+
+    const describedBy = (field: CredentialField) =>
+        formError && (errorField === field || errorField === null)
+            ? 'login-error'
+            : undefined
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
@@ -62,10 +95,15 @@ export function Login() {
                                     placeholder="user@gmail.com"
                                     value={formData.email}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, email: e.target.value })
+                                        updateField('email', e.target.value)
                                     }
                                     required
                                     autoComplete="email"
+                                    autoFocus
+                                    aria-invalid={
+                                        errorField === 'email' || undefined
+                                    }
+                                    aria-describedby={describedBy('email')}
                                 />
                             </div>
 
@@ -86,17 +124,30 @@ export function Login() {
                                         placeholder="••••••••"
                                         value={formData.password}
                                         onChange={(e) =>
-                                            setFormData({ ...formData, password: e.target.value })
+                                            updateField('password', e.target.value)
                                         }
                                         required
                                         autoComplete="current-password"
+                                        className="pr-10"
+                                        aria-invalid={
+                                            errorField === 'password' || undefined
+                                        }
+                                        aria-describedby={describedBy('password')}
                                     />
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent cursor-pointer"
+                                        onClick={() =>
+                                            setShowPassword((current) => !current)
+                                        }
+                                        aria-label={
+                                            showPassword
+                                                ? 'Hide password'
+                                                : 'Show password'
+                                        }
+                                        aria-pressed={showPassword}
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -107,10 +158,24 @@ export function Login() {
                                 </div>
                             </div>
 
-                            <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? (
+                            {formError && (
+                                <p
+                                    role="alert"
+                                    id="login-error"
+                                    className="text-sm text-destructive"
+                                >
+                                    {formError}
+                                </p>
+                            )}
+
+                            <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <Loader2 className="mr-2 h-4 w-4 motion-safe:animate-spin" />
                                         Signing in...
                                     </>
                                 ) : (
@@ -129,9 +194,11 @@ export function Login() {
                 </Card>
 
                 {/* Demo Note */}
-                <p className="text-center text-sm text-muted-foreground">
-                    Running in demo mode? Data persistence requires database setup.
-                </p>
+                {import.meta.env.VITE_DEMO_MODE === 'true' && (
+                    <p className="text-center text-sm text-muted-foreground">
+                        Running in demo mode? Data persistence requires database setup.
+                    </p>
+                )}
             </div>
         </div>
     )

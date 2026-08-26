@@ -18,9 +18,19 @@ export interface ActionColor {
 
 export interface SeverityConfig {
 	color: string;
+	/** Optional filled treatment for high-urgency severities (critical). */
+	solid?: string;
 	icon: LucideIcon;
 	label: string;
 }
+
+/** Actions that warrant the alarming rose treatment (DELETE / ERROR only). */
+const DESTRUCTIVE_ACTIONS = new Set([
+	"TRANSACTION_DELETED",
+	"ACCOUNT_DELETED",
+	"USER_DELETED",
+	"ERROR",
+]);
 
 export function getActionColor(action: string): ActionColor {
 	if (action === "TRANSACTION_CREATED") {
@@ -41,11 +51,21 @@ export function getActionColor(action: string): ActionColor {
 			glow: "group-hover:shadow-blue-500/10",
 		};
 	}
+	if (DESTRUCTIVE_ACTIONS.has(action)) {
+		return {
+			bg: "bg-rose-500/10",
+			border: "border-rose-500/20",
+			text: "text-rose-600",
+			glow: "group-hover:shadow-rose-500/10",
+		};
+	}
+	// Neutral fallback — routine events (USER_LOGIN etc.) should not read as
+	// errors; rose is reserved for DELETE/ERROR above.
 	return {
-		bg: "bg-rose-500/10",
-		border: "border-rose-500/20",
-		text: "text-rose-600",
-		glow: "group-hover:shadow-rose-500/10",
+		bg: "bg-muted",
+		border: "border-border",
+		text: "text-muted-foreground",
+		glow: "group-hover:shadow-foreground/5",
 	};
 }
 
@@ -54,6 +74,9 @@ export function getSeverityConfig(severity: string): SeverityConfig {
 		case "critical":
 			return {
 				color: "bg-red-500/15 text-red-600 border-red-500/25",
+				// Filled treatment: weight (solid fill), not hue alone, is what
+				// separates Critical(red) from Error(rose) at a glance.
+				solid: "bg-red-600 text-white border-red-600 shadow-sm",
 				icon: AlertTriangle,
 				label: "Critical",
 			};

@@ -8,7 +8,6 @@ import {
 	Wallet,
 	Target,
 	Settings,
-	LogOut,
 	CreditCard,
 	ScrollText,
 	BarChart3,
@@ -26,41 +25,44 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/system/Logo";
+import { getInitials } from "@/lib/initials";
 
-const navItems = [
-	{ title: "Dashboard", icon: LayoutDashboard, path: "/" },
-	{ title: "Transactions", icon: ArrowLeftRight, path: "/transactions" },
-	{ title: "Reports", icon: BarChart3, path: "/reports" },
-	{ title: "Calendar", icon: Calendar, path: "/calendar" },
-	{ title: "Budgets", icon: PiggyBank, path: "/budgets" },
-	{ title: "Goals", icon: Target, path: "/goals" },
-	{ title: "Debts", icon: CreditCard, path: "/debts" },
-	{ title: "Accounts", icon: Wallet, path: "/accounts" },
-	{ title: "Categories", icon: Tags, path: "/categories" },
-	{ title: "Activity Logs", icon: ScrollText, path: "/system-logs" },
-];
-
-const bottomNavItems = [
-	{ title: "Settings", icon: Settings, path: "/settings" },
+// Canonical short labels — mirrored by ROUTE_TITLES (src/pages/index.ts)
+// so sidebar, breadcrumbs and document titles always agree.
+const NAV_GROUPS = [
+	{
+		label: "Overview",
+		items: [
+			{ title: "Dashboard", icon: LayoutDashboard, path: "/" },
+			{ title: "Reports", icon: BarChart3, path: "/reports" },
+			{ title: "Calendar", icon: Calendar, path: "/calendar" },
+		],
+	},
+	{
+		label: "Money",
+		items: [
+			{ title: "Transactions", icon: ArrowLeftRight, path: "/transactions" },
+			{ title: "Budgets", icon: PiggyBank, path: "/budgets" },
+			{ title: "Goals", icon: Target, path: "/goals" },
+			{ title: "Debts", icon: CreditCard, path: "/debts" },
+			{ title: "Accounts", icon: Wallet, path: "/accounts" },
+		],
+	},
+	{
+		label: "Manage",
+		items: [
+			{ title: "Categories", icon: Tags, path: "/categories" },
+			{ title: "System Logs", icon: ScrollText, path: "/system-logs" },
+			{ title: "Settings", icon: Settings, path: "/settings" },
+		],
+	},
 ];
 
 export function AppSidebar() {
 	const location = useLocation();
-	const { user, signOut } = useAuth();
-
-	const getInitials = (name: string | undefined) => {
-		if (!name) return "U";
-		return name
-			.split(" ")
-			.filter(Boolean)
-			.map((n) => n[0])
-			.join("")
-			.toUpperCase()
-			.slice(0, 2);
-	};
+	const { user } = useAuth();
 
 	return (
 		<Sidebar className="border-r border-border/50">
@@ -71,74 +73,56 @@ export function AppSidebar() {
 			</SidebarHeader>
 
 			<SidebarContent>
-				<SidebarGroup>
-					<SidebarGroupLabel>Navigation</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{navItems.map((item) => (
-								<SidebarMenuItem key={item.title}>
-									<SidebarMenuButton
-										asChild
-										isActive={location.pathname === item.path}
-									>
-										<Link to={item.path}>
-											<item.icon className="h-4 w-4" />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-
-				<SidebarGroup className="mt-auto">
-					<SidebarGroupLabel>Settings</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{bottomNavItems.map((item) => (
-								<SidebarMenuItem key={item.title}>
-									<SidebarMenuButton
-										asChild
-										isActive={location.pathname === item.path}
-									>
-										<Link to={item.path}>
-											<item.icon className="h-4 w-4" />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
+				{NAV_GROUPS.map((group) => (
+					<SidebarGroup key={group.label}>
+						<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+						<SidebarGroupContent>
+							<SidebarMenu>
+								{group.items.map((item) => (
+									<SidebarMenuItem key={item.title}>
+										<SidebarMenuButton
+											asChild
+											isActive={location.pathname === item.path}
+										>
+											<Link to={item.path}>
+												<item.icon className="h-4 w-4" />
+												<span>{item.title}</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								))}
+							</SidebarMenu>
+						</SidebarGroupContent>
+					</SidebarGroup>
+				))}
 			</SidebarContent>
 
-			<SidebarFooter className="border-t border-border/50 p-4">
-				<div className="flex items-center gap-3">
-					<Avatar className="h-9 w-9">
-						<AvatarImage src={user?.user_metadata?.avatar_url || undefined} />
-						<AvatarFallback className="bg-primary/10 text-primary">
-							{getInitials(user?.user_metadata?.full_name || user?.email)}
-						</AvatarFallback>
-					</Avatar>
-					<div className="flex flex-1 flex-col overflow-hidden">
-						<span className="truncate text-sm font-medium">
-							{user?.user_metadata?.full_name || "User"}
-						</span>
-						<span className="truncate text-xs text-muted-foreground">
-							{user?.email}
-						</span>
-					</div>
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={signOut}
-						className="h-8 w-8 shrink-0"
-					>
-						<LogOut className="h-4 w-4" />
-					</Button>
-				</div>
+			{/* Slim account entry point — full identity + sign-out controls live
+			    in the header user menu; this just links to settings. */}
+			<SidebarFooter className="border-t border-border/50 p-2">
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							asChild
+							tooltip="Account settings"
+							isActive={location.pathname === "/settings"}
+						>
+							<Link to="/settings" aria-label="Open account settings">
+								<Avatar className="size-6">
+									<AvatarImage
+										src={user?.user_metadata?.avatar_url || undefined}
+									/>
+									<AvatarFallback className="bg-primary/10 text-primary text-[10px]">
+										{getInitials(
+											user?.user_metadata?.full_name || user?.email,
+										)}
+									</AvatarFallback>
+								</Avatar>
+								<span>Account settings</span>
+							</Link>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				</SidebarMenu>
 			</SidebarFooter>
 		</Sidebar>
 	);

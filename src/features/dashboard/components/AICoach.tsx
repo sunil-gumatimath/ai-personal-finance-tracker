@@ -6,6 +6,7 @@ import {
 	Brain,
 	Trophy,
 	X,
+	RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,23 +24,36 @@ interface AICoachProps {
 	insights: Insight[];
 	isLoading: boolean;
 	dismissInsight: (id: string) => Promise<void> | void;
+	/** Set when insight loading failed — renders a slim retry row instead of vanishing. */
+	error?: string | null;
+	onRetry?: () => void;
 }
+
+const ROTATION_INTERVAL_MS = 8000;
 
 export function AICoach({
 	insights,
 	isLoading,
 	dismissInsight,
+	error,
+	onRetry,
 }: AICoachProps) {
 	const [currentIndex, setCurrentIndex] = useState(0);
+	const [paused, setPaused] = useState(false);
 
+	// No reset effect needed: the index is clamped defensively at render time
+	// (below) and rotation wraps via modulo, so a stale index after a
+	// dismissal can never read `undefined`.
+
+	// Rotate only while there is something to rotate to AND the user isn't
+	// reading (hover/focus-within pauses the timer).
 	useEffect(() => {
-		if (insights.length > 1) {
-			const timer = setInterval(() => {
-				setCurrentIndex((prev) => (prev + 1) % insights.length);
-			}, 8000);
-			return () => clearInterval(timer);
-		}
-	}, [insights.length]);
+		if (insights.length <= 1 || paused) return;
+		const timer = setInterval(() => {
+			setCurrentIndex((prev) => (prev + 1) % insights.length);
+		}, ROTATION_INTERVAL_MS);
+		return () => clearInterval(timer);
+	}, [insights.length, paused]);
 
 	// Loading skeleton
 	if (isLoading) {
@@ -60,16 +74,48 @@ export function AICoach({
 		);
 	}
 
+	// Fetch failed and nothing to show — slim retry row instead of silently
+	// disappearing.
+	if (insights.length === 0 && error) {
+		return (
+			<Card className="border-destructive/30 bg-destructive/5" role="alert">
+				<CardContent className="flex items-center justify-between gap-3 p-3">
+					<div className="flex min-w-0 items-center gap-2">
+						<AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
+						<p className="truncate text-sm text-muted-foreground">
+							Couldn&apos;t load your AI insights
+						</p>
+					</div>
+					{onRetry && (
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-7 shrink-0 text-xs"
+							onClick={onRetry}
+						>
+							<RefreshCw className="mr-1.5 h-3 w-3" />
+							Retry
+						</Button>
+					)}
+				</CardContent>
+			</Card>
+		);
+	}
+
 	if (insights.length === 0) return null;
 
-	const currentInsight = insights[currentIndex];
+	// Clamp defensively at render time too (covers the single frame between a
+	// dismissal and the reset effect running).
+	const clampedIndex = Math.min(currentIndex, insights.length - 1);
+	const currentInsight = insights[clampedIndex];
+	if (!currentInsight) return null;
 
 	const getIcon = (type: Insight["type"]) => {
 		switch (type) {
 			case "anomaly":
-				return <AlertCircle className="h-4 w-4 text-rose-500" />;
+				return <AlertCircle className="h-4 w-4 text-destructive" />;
 			case "kudo":
-				return <Trophy className="h-4 w-4 text-emerald-500" />;
+				return <Trophy className="h-4 w-4 text-[var(--income)]" />;
 			case "coaching":
 				return <Brain className="h-4 w-4 text-blue-500" />;
 			default:
@@ -80,9 +126,9 @@ export function AICoach({
 	const getTypeStyles = (type: Insight["type"]) => {
 		switch (type) {
 			case "anomaly":
-				return "bg-rose-500/10 text-rose-500 border-rose-500/25 dark:bg-rose-500/15";
+				return "bg-destructive/10 text-destructive border-destructive/25 dark:bg-destructive/15";
 			case "kudo":
-				return "bg-emerald-500/10 text-emerald-500 border-emerald-500/25 dark:bg-emerald-500/15";
+				return "bg-[var(--income)]/10 text-[var(--income)] border-[var(--income)]/25";
 			case "coaching":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/25 dark:bg-blue-500/15";
 			default:
@@ -104,7 +150,13 @@ export function AICoach({
 	};
 
 	return (
-		<Card className="relative overflow-hidden border border-border bg-card">
+		<Card
+			className="relative overflow-hidden border border-border bg-card"
+			onMouseEnter={() => setPaused(true)}
+			onMouseLeave={() => setPaused(false)}
+			onFocus={() => setPaused(true)}
+			onBlur={() => setPaused(false)}
+		>
 			<CardContent className="p-4">
 				<div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 					{/* Icon */}
@@ -114,8 +166,11 @@ export function AICoach({
 						</div>
 					</div>
 
-					{/* Content */}
-					<div key={currentIndex} className="flex-1 min-w-0 space-y-1">
+					{/* Content — keyed remount gives a short crossfade on swap */}
+					<div
+						key={clampedIndex}
+						className="flex-1 min-w-0 space-y-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms]"
+					>
 						<div className="flex items-center gap-2">
 							<Badge
 								variant="outline"
@@ -145,10 +200,13 @@ export function AICoach({
 								{insights.map((_, i) => (
 									<button
 										key={i}
+										type="button"
+										aria-label={`Show insight ${i + 1} of ${insights.length}`}
+										aria-current={clampedIndex === i}
 										onClick={() => setCurrentIndex(i)}
 										className={cn(
 											"h-1.5 w-1.5 rounded-full transition-colors duration-200",
-											currentIndex === i
+											clampedIndex === i
 												? "bg-primary w-3"
 												: "bg-muted-foreground/30 hover:bg-muted-foreground/50",
 										)}
@@ -158,7 +216,7 @@ export function AICoach({
 						)}
 						<Button
 							size="sm"
-							className="h-8 font-medium rounded-lg"
+							className="h-8 font-medium rounded-lg active:scale-[0.98]"
 							onClick={() =>
 								window.dispatchEvent(new CustomEvent("open-ai-chat"))
 							}
@@ -170,6 +228,7 @@ export function AICoach({
 							variant="ghost"
 							size="icon"
 							className="h-8 w-8 text-muted-foreground hover:text-foreground"
+							aria-label="Dismiss this insight"
 							title="Dismiss this insight"
 							onClick={() => dismissInsight(currentInsight.id)}
 						>

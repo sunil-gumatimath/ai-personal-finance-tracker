@@ -23,11 +23,11 @@ export function Logo({ size = "md", showText = true, vertical = false, className
     const textSizes = {
         sm: {
             title: "text-[10px] tracking-[0.2em]",
-            subtitle: "text-[8px] tracking-widest",
+            subtitle: "text-[10px] tracking-widest",
         },
         md: {
             title: "text-xs tracking-[0.25em]",
-            subtitle: "text-[9px] tracking-widest",
+            subtitle: "text-[10px] tracking-widest",
         },
         lg: {
             title: "text-lg tracking-[0.2em]",
@@ -62,8 +62,8 @@ export function Logo({ size = "md", showText = true, vertical = false, className
                 {/* Subtle gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/10 opacity-60" />
 
-                {/* Glow effect on hover */}
-                <div className="absolute -inset-1 bg-emerald-400/30 blur-xl opacity-0 group-hover/logo:opacity-100 transition-opacity duration-500" />
+                {/* Glow effect on hover (pointer-fine devices only) */}
+                <div className="absolute -inset-1 bg-emerald-400/30 blur-xl opacity-0 transition-opacity duration-200 [@media(hover:hover)]:group-hover/logo:opacity-100" />
 
                 {/* Finance/Growth Logo SVG */}
                 <svg
@@ -71,7 +71,7 @@ export function Logo({ size = "md", showText = true, vertical = false, className
                     fill="none"
                     className={cn(
                         iconSizes[size],
-                        "relative z-10 transition-all duration-500 group-hover/logo:scale-110"
+                        "relative z-10 transition-transform duration-200 [@media(hover:hover)]:group-hover/logo:scale-105"
                     )}
                 >
                     {/* Abstract upward growth arrow */}

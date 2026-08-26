@@ -31,14 +31,20 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import {
+	ChartContainer,
+	ChartTooltip,
+	ChartTooltipContent,
+} from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/system/ErrorState";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import { api } from "@/lib/api-client";
 import { downloadTransactionsCsv } from "@/lib/transaction-csv";
 import { parseTransactionDate } from "@/lib/date-utils";
-import { toNumber } from "@/lib/number";
+import { formatCompactCurrency, toNumber } from "@/lib/number";
+import { currencyLocales } from "@/types/preferences";
 import type { Account, Transaction } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -86,8 +92,11 @@ const REPORTS_TX_LIMIT = 1000;
 
 export function Reports() {
 	const { user } = useAuth();
-	const { formatCurrency } = usePreferences();
+	const { formatCurrency, preferences } = usePreferences();
+	// Same locale derivation PreferencesContext uses for formatCurrency.
+	const locale = currencyLocales[preferences.currency] || "en-US";
 	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState(false);
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [accounts, setAccounts] = useState<Account[]>([]);
 	const [truncated, setTruncated] = useState(false);
@@ -100,6 +109,7 @@ export function Reports() {
 			setLoading(false);
 			return;
 		}
+		setError(false);
 		try {
 			const [transactionsRes, accountsRes] = await Promise.all([
 				api.transactions.list({ limit: REPORTS_TX_LIMIT }),
@@ -116,9 +126,10 @@ export function Reports() {
 					? accountsRes.accounts
 					: []) as Account[],
 			);
-		} catch (error) {
-			console.error("Error fetching report data:", error);
-			toast.error("Failed to load report data");
+		} catch (err) {
+			console.error("Error fetching report data:", err);
+			// Failed fetches must not render zeroed summary cards.
+			setError(true);
 		} finally {
 			setLoading(false);
 		}
@@ -238,6 +249,24 @@ export function Reports() {
 		);
 	};
 
+	// Can't navigate into the future — next arrow disables at the current month.
+	const nowDate = new Date();
+	const currentMonthStart = new Date(
+		nowDate.getFullYear(),
+		nowDate.getMonth(),
+		1,
+	);
+	const canGoNext = periodDate.getTime() < currentMonthStart.getTime();
+
+	// All-zero history renders a textual empty state, not flat-zero axes.
+	const trendHasData = monthlyTrend.some(
+		(p) => p.income > 0 || p.expenses > 0,
+	);
+
+	// Top-6 truncation bookkeeping (chart + list + PDF stay consistent).
+	const CATEGORY_TOP_N = 6;
+	const categoryOverflow = Math.max(0, categorySpending.length - CATEGORY_TOP_N);
+
 	// ------------------------------------------------------------------ PDF
 	const exportPdf = async () => {
 		setExporting(true);
@@ -269,11 +298,12 @@ export function Reports() {
 				headStyles: { fillColor: [59, 130, 246] },
 			});
 
-			const categoryRows = categorySpending.map((c) => [
-				c.category,
-				formatCurrency(c.amount),
-				`${c.percentage.toFixed(1)}%`,
-			]);
+			const categoryRows = categorySpending
+				.slice(0, CATEGORY_TOP_N)
+				.map((c) => [c.category, formatCurrency(c.amount), `${c.percentage.toFixed(1)}%`]);
+			if (categoryOverflow > 0) {
+				categoryRows.push([`…and ${categoryOverflow} more — see CSV export`, "", ""]);
+			}
 			autoTable(doc, {
 				startY: (doc.lastAutoTable?.finalY ?? 70) + 8,
 				head: [["Category", "Spent", "Share"]],
@@ -324,6 +354,30 @@ export function Reports() {
 						<Skeleton key={i} className="h-28 rounded-xl" />
 					))}
 				</div>
+				{/* Chart-shaped placeholders keep layout stable while loading */}
+				<Skeleton className="h-[280px] w-full rounded-xl" />
+				<div className="grid gap-4 lg:grid-cols-2">
+					<Skeleton className="h-[220px] w-full rounded-xl" />
+					<div className="space-y-4">
+						<Skeleton className="h-40 w-full rounded-xl" />
+						<Skeleton className="h-56 w-full rounded-xl" />
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="space-y-6">
+				<h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+					Reports
+				</h1>
+				<ErrorState
+					title="Couldn't load your report"
+					message="We couldn't reach your transactions and accounts. Check your connection and try again."
+					onRetry={fetchData}
+				/>
 			</div>
 		);
 	}
@@ -377,6 +431,7 @@ export function Reports() {
 						<Button
 							variant={viewMode === "month" ? "default" : "ghost"}
 							size="sm"
+							aria-pressed={viewMode === "month"}
 							onClick={() => setViewMode("month")}
 						>
 							Month
@@ -384,6 +439,7 @@ export function Reports() {
 						<Button
 							variant={viewMode === "year" ? "default" : "ghost"}
 							size="sm"
+							aria-pressed={viewMode === "year"}
 							onClick={() => setViewMode("year")}
 						>
 							Last 12 months
@@ -394,9 +450,10 @@ export function Reports() {
 							<Button
 								variant="outline"
 								size="icon"
+								aria-label="Previous month"
 								onClick={() => shiftPeriod(-1)}
 							>
-								<ArrowLeft className="h-4 w-4" />
+								<ArrowLeft className="h-4 w-4" aria-hidden="true" />
 							</Button>
 							<span className="w-36 text-center text-sm font-semibold">
 								{periodLabel}
@@ -404,9 +461,11 @@ export function Reports() {
 							<Button
 								variant="outline"
 								size="icon"
+								aria-label="Next month"
+								disabled={!canGoNext}
 								onClick={() => shiftPeriod(1)}
 							>
-								<ArrowRight className="h-4 w-4" />
+								<ArrowRight className="h-4 w-4" aria-hidden="true" />
 							</Button>
 						</div>
 					)}
@@ -424,7 +483,7 @@ export function Reports() {
 							<TrendingUp className="h-4 w-4 text-[var(--income)]" />
 							Income
 						</div>
-						<p className="mt-2 text-2xl font-bold tracking-tight text-[var(--income)]">
+						<p className="mt-2 text-2xl font-bold tracking-tight text-[var(--income)] tabular-nums">
 							{formatCurrency(totals.income)}
 						</p>
 					</CardContent>
@@ -435,7 +494,7 @@ export function Reports() {
 							<TrendingDown className="h-4 w-4 text-[var(--expense)]" />
 							Expenses
 						</div>
-						<p className="mt-2 text-2xl font-bold tracking-tight text-[var(--expense)]">
+						<p className="mt-2 text-2xl font-bold tracking-tight text-[var(--expense)] tabular-nums">
 							{formatCurrency(totals.expenses)}
 						</p>
 					</CardContent>
@@ -446,8 +505,17 @@ export function Reports() {
 							<Wallet className="h-4 w-4" />
 							Net Savings
 						</div>
-						<p className="mt-2 text-2xl font-bold tracking-tight">
-							{formatCurrency(totals.net)}
+						{/* Explicit sign so a near-zero net never reads ambiguous */}
+						<p
+							className={cn(
+								"mt-2 text-2xl font-bold tracking-tight tabular-nums",
+								totals.net >= 0
+									? "text-[var(--income)]"
+									: "text-[var(--expense)]",
+							)}
+						>
+							{totals.net >= 0 ? "+" : "−"}
+							{formatCurrency(Math.abs(totals.net))}
 						</p>
 					</CardContent>
 				</Card>
@@ -459,7 +527,7 @@ export function Reports() {
 						</div>
 						<p
 							className={cn(
-								"mt-2 text-2xl font-bold tracking-tight",
+								"mt-2 text-2xl font-bold tracking-tight tabular-nums",
 								savingsRate >= 20
 									? "text-[var(--income)]"
 									: savingsRate >= 0
@@ -482,30 +550,56 @@ export function Reports() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<ChartContainer
-						config={{
-							income: { label: "Income", color: "var(--income)" },
-							expenses: { label: "Expenses", color: "var(--expense)" },
-						}}
-						className="h-[280px] w-full"
-					>
-						<AreaChart data={monthlyTrend}>
-							<CartesianGrid vertical={false} strokeDasharray="3 3" />
-							<XAxis
-								dataKey="month"
-								tickLine={false}
-								axisLine={false}
-								fontSize={11}
+					{trendHasData ? (
+						<ChartContainer
+							config={{
+								income: { label: "Income", color: "var(--income)" },
+								expenses: { label: "Expenses", color: "var(--expense)" },
+							}}
+							className="h-[280px] w-full"
+						>
+							<AreaChart data={monthlyTrend}>
+								<CartesianGrid vertical={false} strokeDasharray="3 3" />
+								<XAxis
+									dataKey="month"
+									tickLine={false}
+									axisLine={false}
+									fontSize={11}
+								/>
+								<YAxis
+									tickLine={false}
+									axisLine={false}
+									fontSize={11}
+									width={70}
+									tickFormatter={(val) =>
+										formatCompactCurrency(Number(val), preferences.currency, locale)
+									}
+								/>
+							<ChartTooltip
+								content={
+									<ChartTooltipContent
+										indicator="dot"
+										formatter={(value, name) => (
+											<div className="flex items-center justify-between gap-6 text-xs">
+												<span className="text-muted-foreground">{name}</span>
+												<span
+													className={cn(
+														"font-bold tabular-nums",
+														name === "Income"
+															? "text-[var(--income)]"
+															: "text-[var(--expense)]",
+													)}
+												>
+													{formatCurrency(Number(value))}
+												</span>
+											</div>
+										)}
+									/>
+								}
 							/>
-							<YAxis
-								tickLine={false}
-								axisLine={false}
-								fontSize={11}
-								width={70}
-							/>
-							<ChartTooltip />
 							<Area
 								type="monotone"
+								name="Income"
 								dataKey="income"
 								stroke="var(--income)"
 								fill="var(--income)"
@@ -514,14 +608,20 @@ export function Reports() {
 							/>
 							<Area
 								type="monotone"
+								name="Expenses"
 								dataKey="expenses"
 								stroke="var(--expense)"
 								fill="var(--expense)"
 								fillOpacity={0.15}
 								strokeWidth={2}
 							/>
-						</AreaChart>
-					</ChartContainer>
+							</AreaChart>
+						</ChartContainer>
+					) : (
+						<p className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+							No income or expense activity in the last 12 months.
+						</p>
+					)}
 				</CardContent>
 			</Card>
 
@@ -541,7 +641,7 @@ export function Reports() {
 							<>
 								<ChartContainer config={{}} className="h-[220px] w-full">
 									<BarChart
-										data={categorySpending.slice(0, 6)}
+										data={categorySpending.slice(0, CATEGORY_TOP_N)}
 										layout="vertical"
 										margin={{ left: 8 }}
 									>
@@ -568,24 +668,28 @@ export function Reports() {
 											]}
 										/>
 										<Bar dataKey="amount" radius={[0, 6, 6, 0]}>
-											{categorySpending.slice(0, 6).map((entry, index) => (
-												<Cell
-													key={entry.category}
-													fill={
-														CATEGORY_COLORS[index % CATEGORY_COLORS.length] ||
-														entry.color
-													}
-												/>
-											))}
+											{categorySpending
+												.slice(0, CATEGORY_TOP_N)
+												.map((entry, index) => (
+													<Cell
+														key={entry.category}
+														// Same color as the mini bars below; the fixed
+														// palette is only a fallback for uncategorized rows.
+														fill={
+															entry.color ||
+															CATEGORY_COLORS[index % CATEGORY_COLORS.length]
+														}
+													/>
+												))}
 										</Bar>
 									</BarChart>
 								</ChartContainer>
 								<div className="mt-4 space-y-2.5">
-									{categorySpending.slice(0, 6).map((entry) => (
+									{categorySpending.slice(0, CATEGORY_TOP_N).map((entry) => (
 										<div key={entry.category} className="space-y-1">
 											<div className="flex items-center justify-between text-xs">
 												<span className="font-medium">{entry.category}</span>
-												<span className="text-muted-foreground">
+												<span className="text-muted-foreground tabular-nums">
 													{formatCurrency(entry.amount)} ·{" "}
 													{entry.percentage.toFixed(1)}%
 												</span>
@@ -595,13 +699,21 @@ export function Reports() {
 													className="h-full rounded-full transition-all"
 													style={{
 														width: `${Math.min(entry.percentage, 100)}%`,
-														backgroundColor: entry.color,
+														backgroundColor:
+															entry.color ||
+															CATEGORY_COLORS[0],
 													}}
 												/>
 											</div>
 										</div>
 									))}
 								</div>
+								{categoryOverflow > 0 && (
+									<p className="mt-3 text-xs text-muted-foreground">
+										* Showing top {CATEGORY_TOP_N} of {categorySpending.length}{" "}
+										categories.
+									</p>
+								)}
 							</>
 						)}
 					</CardContent>
@@ -656,12 +768,13 @@ export function Reports() {
 												{t.description || t.category?.name || "Transaction"}
 											</p>
 											<p className="text-xs text-muted-foreground">
-												{t.date} · {t.category?.name || t.type}
+												{format(parseTransactionDate(t.date), "MMM d, yyyy")} ·{" "}
+											{t.category?.name || t.type}
 											</p>
 										</div>
 										<span
 											className={cn(
-												"ml-3 shrink-0 font-mono text-xs font-semibold",
+												"ml-3 shrink-0 font-mono text-xs font-semibold tabular-nums",
 												t.type === "income"
 													? "text-[var(--income)]"
 													: t.type === "expense"
