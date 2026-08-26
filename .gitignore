@@ -108,3 +108,4 @@ src/tests/
 .history/
 *.orig
 *.rej
+.playwright-cli/

@@ -1,13 +1,31 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Personal Finance Tracker</title>
   <meta name="description"
     content="Track your income, expenses, and budgets with FinanceTrack - your personal finance companion" />
+  <script>
+    // Blocking theme init: runs before first paint to avoid a flash of the wrong theme.
+    // Storage keys must stay in sync with src/components/system/theme-provider.tsx.
+    (function () {
+      try {
+        var theme = localStorage.getItem("financetrack-theme");
+        var dark =
+          theme === "dark" ||
+          ((!theme || theme === "system") &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.classList.toggle(
+          "theme-emerald",
+          localStorage.getItem("financetrack-accent") === "emerald"
+        );
+      } catch (e) { /* localStorage unavailable: fall back to light */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">

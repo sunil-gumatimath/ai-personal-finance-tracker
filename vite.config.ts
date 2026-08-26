@@ -15,7 +15,13 @@ export default defineConfig({
         name: "FinanceTrack",
         short_name: "FinanceTrack",
         description: "AI-Powered Personal Finance Tracker",
-        theme_color: "#000000",
+        start_url: "/",
+        display: "standalone",
+        background_color: "#09090b",
+        theme_color: "#09090b",
+        // NOTE: icons are SVG-only. Most platforms accept them, but Android
+        // install prompts and some store validators still expect at least one
+        // 192px/512px PNG — worth adding later.
         icons: [
           {
             src: "pwa-192x192.svg",
