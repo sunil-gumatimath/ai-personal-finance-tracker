@@ -246,6 +246,11 @@ async function writeLogToDb(log: SystemLogEntry) {
  * Broadcasts logs to all connected WebSocket clients
  */
 function broadcastLog(log: SystemLogEntry) {
+	// System-level entries (no owner — server errors, deployment events) stay
+	// server-side: they are not visible in any user's read scope either, and
+	// fanning them out to every connected client would leak infra detail.
+	if (!log.userId) return;
+
 	const logMsg = JSON.stringify({
 		...log,
 		id: log.id || Math.random().toString(36).substring(7),
@@ -257,7 +262,7 @@ function broadcastLog(log: SystemLogEntry) {
 
 	for (const client of activeWsClients) {
 		try {
-			if (log.userId && client.data?.userId !== log.userId) continue;
+			if (client.data?.userId !== log.userId) continue;
 			client.send(logMsg);
 		} catch {
 			activeWsClients.delete(client);
