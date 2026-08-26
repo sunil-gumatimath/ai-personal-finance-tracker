@@ -48,11 +48,23 @@ async function apiFetch<T>(
 	if (!headers.has("Content-Type")) {
 		headers.set("Content-Type", "application/json");
 	}
-	const res = await fetch(path, {
-		...options,
-		headers,
-		credentials: "include",
-	});
+
+	let res: Response;
+	try {
+		res = await fetch(path, {
+			...options,
+			headers,
+			credentials: "include",
+		});
+	} catch {
+		// fetch() rejects on network failures (offline, server down, DNS
+		// issues) with a raw TypeError. Convert it to a typed ApiError so
+		// callers get a friendly message and isRetryable() works.
+		throw new ApiError("Network error — please check your connection and try again.", {
+			status: 0,
+			code: "NETWORK_ERROR",
+		});
+	}
 
 	if (!res.ok) {
 		const error = await ApiError.fromResponse(res);

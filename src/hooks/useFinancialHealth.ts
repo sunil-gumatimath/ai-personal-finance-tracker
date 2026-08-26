@@ -1,12 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
-import { usePreferences } from '@/hooks/usePreferences'
 import { toNumber } from '@/lib/number'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 import type { Transaction, Budget, Account } from '@/types'
 
-
+/**
+ * A recommended action. Currency amounts are kept RAW here and formatted at
+ * render time (the component owns formatCurrency) so changing the user's
+ * currency never re-runs this hook's fetch/calculation chain.
+ */
+export type HealthNextStep =
+    | { kind: 'message'; text: string }
+    | { kind: 'savings-boost'; amount: number }
+    | { kind: 'emergency-fund'; amount: number }
 
 export interface FinancialHealth {
     score: number
@@ -22,16 +29,32 @@ export interface FinancialHealth {
         targetEmergencyFund: number
         currentEmergencyFund: number
     }
-    nextSteps: string[]
+    nextSteps: HealthNextStep[]
+}
+
+/** Formats a raw step into human copy using the caller's currency formatter. */
+export function formatHealthNextStep(
+    step: HealthNextStep,
+    formatCurrency: (amount: number) => string,
+): string {
+    switch (step.kind) {
+        case 'savings-boost':
+            return `Increase monthly savings by ${formatCurrency(step.amount)} to boost your score.`
+        case 'emergency-fund':
+            return `Add ${formatCurrency(step.amount)} to your emergency fund.`
+        default:
+            return step.text
+    }
 }
 
 export function useFinancialHealth() {
     const { user } = useAuth()
-    const { formatCurrency } = usePreferences()
     const [data, setData] = useState<FinancialHealth | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    // NOTE: deliberately does NOT depend on formatCurrency/preferences.
+    // All currency values are stored raw; formatting happens at render time.
     const calculateHealth = useCallback(async () => {
         if (!user) {
             setLoading(false)
@@ -136,29 +159,30 @@ export function useFinancialHealth() {
             // Check if user has debt (for next steps)
             const hasDebt = typedAccounts.some(a => a.type === 'credit' && toNumber(a.balance) < 0)
 
-            // 6. Generate Next Steps (Actionable Advice)
-            const nextSteps: string[] = []
+            // 6. Generate Next Steps (Actionable Advice) — amounts stay raw;
+            // formatHealthNextStep() applies the currency at render time.
+            const nextSteps: HealthNextStep[] = []
 
             if (!hasEnoughData) {
-                nextSteps.push('Add your first income or expense transaction to start tracking.')
-                nextSteps.push('Set up budgets for your spending categories.')
+                nextSteps.push({ kind: 'message', text: 'Add your first income or expense transaction to start tracking.' })
+                nextSteps.push({ kind: 'message', text: 'Set up budgets for your spending categories.' })
             } else {
                 if (savingsRate < 0.2 && income > 0) {
-                    nextSteps.push(`Increase monthly savings by ${formatCurrency(Math.round(income * 0.1))} to boost your score.`)
+                    nextSteps.push({ kind: 'savings-boost', amount: Math.round(income * 0.1) })
                 } else if (savingsRate < 0.2 && income === 0) {
-                    nextSteps.push('Add your income transactions to accurately track your savings rate.')
+                    nextSteps.push({ kind: 'message', text: 'Add your income transactions to accurately track your savings rate.' })
                 }
                 if (budgetAdherence < 0.8) {
-                    nextSteps.push('Review categories that are over budget and adjust spending.')
+                    nextSteps.push({ kind: 'message', text: 'Review categories that are over budget and adjust spending.' })
                 }
                 if (emergencyFundProgress < 0.5) {
-                    nextSteps.push(`Add ${formatCurrency(Math.round(targetEmergencyFund * 0.1))} to your emergency fund.`)
+                    nextSteps.push({ kind: 'emergency-fund', amount: Math.round(targetEmergencyFund * 0.1) })
                 }
                 if (hasDebt) {
-                    nextSteps.push('Prioritize paying off high-interest credit card debt.')
+                    nextSteps.push({ kind: 'message', text: 'Prioritize paying off high-interest credit card debt.' })
                 }
                 if (nextSteps.length === 0) {
-                    nextSteps.push('Great job! Maintain your current habits to keep your score high.')
+                    nextSteps.push({ kind: 'message', text: 'Great job! Maintain your current habits to keep your score high.' })
                 }
             }
 
@@ -185,7 +209,7 @@ export function useFinancialHealth() {
         } finally {
             setLoading(false)
         }
-    }, [user, formatCurrency])
+    }, [user])
 
     useEffect(() => {
         calculateHealth()

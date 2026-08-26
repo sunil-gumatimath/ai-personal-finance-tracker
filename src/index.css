@@ -72,7 +72,7 @@
   --ease-in-out-custom: cubic-bezier(0.77, 0, 0.175, 1);
 
   --animate-spark-pulse: spark-pulse 2s infinite ease-in-out;
-  --animate-fade-in-up: fade-in-up 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  --animate-fade-in-up: fade-in-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 
   @keyframes spark-pulse {
     0%, 100% {
@@ -90,13 +90,11 @@
   @keyframes fade-in-up {
     from {
       opacity: 0;
-      transform: translateY(16px);
-      filter: blur(2px);
+      transform: translateY(10px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
-      filter: blur(0);
     }
   }
 }
@@ -104,6 +102,9 @@
 @layer utilities {
   .animate-delay-50 {
     animation-delay: 50ms;
+  }
+  .animate-delay-75 {
+    animation-delay: 75ms;
   }
   .animate-delay-100 {
     animation-delay: 100ms;
@@ -122,22 +123,29 @@
   }
 
   .premium-glass {
-    background: hsl(var(--card) / 0.45);
+    /* Tokens hold full hsl() values, so alpha variants must be built with color-mix(). */
+    background: color-mix(in srgb, var(--card) 45%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--border) / 0.4);
+    border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
   }
 
   .premium-glass-hover {
-    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    transition:
+      background-color 0.3s cubic-bezier(0.23, 1, 0.32, 1),
+      border-color 0.3s cubic-bezier(0.23, 1, 0.32, 1),
+      transform 0.3s cubic-bezier(0.23, 1, 0.32, 1),
+      box-shadow 0.3s cubic-bezier(0.23, 1, 0.32, 1);
   }
 
-  .premium-glass-hover:hover {
-    background: hsl(var(--card) / 0.7);
-    border-color: hsl(var(--primary) / 0.15);
-    transform: translateY(-2px);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+  @media (hover: hover) {
+    .premium-glass-hover:hover {
+      background: color-mix(in srgb, var(--card) 70%, transparent);
+      border-color: color-mix(in srgb, var(--primary) 15%, transparent);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+    }
   }
 
   .premium-glass-hover:active {
@@ -155,7 +163,7 @@
 
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent) transparent;
   }
 
   .custom-scrollbar::-webkit-scrollbar {
@@ -168,13 +176,13 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
+    background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
     border-radius: 10px;
     transition: background 0.2s ease;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
+    background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
   }
 }
 
@@ -243,6 +251,10 @@
   --expense: oklch(0.55 0.22 25);
   --savings: oklch(0.52 0.18 245);
   --investment: oklch(0.52 0.18 300);
+
+  /* Shared overlay scrim for dialog / alert-dialog / sheet */
+  --overlay: hsl(0 0% 0% / 0.5);
+  color-scheme: light;
 }
 
 /* ============================================
@@ -286,28 +298,31 @@
   --shadow-y: 1px;
   --shadow-blur: 4px;
   --shadow-spread: 0px;
-  --shadow-opacity: 0.05;
+  --shadow-opacity: 0.2;
   --shadow-color: #000000;
-  --shadow-2xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
-  --shadow-xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
-  --shadow-sm: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
-  --shadow: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
-  --shadow-md: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 2px 4px -1px hsl(0 0% 0% / 0.05);
-  --shadow-lg: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 4px 6px -1px hsl(0 0% 0% / 0.05);
-  --shadow-xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 8px 10px -1px hsl(0 0% 0% / 0.05);
-  --shadow-2xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.13);
+  --shadow-2xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.12);
+  --shadow-xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 1px 4px 0px hsl(0 0% 0% / 0.2), 0px 1px 2px -1px hsl(0 0% 0% / 0.2);
+  --shadow: 0px 1px 4px 0px hsl(0 0% 0% / 0.2), 0px 1px 2px -1px hsl(0 0% 0% / 0.2);
+  --shadow-md: 0px 1px 4px 0px hsl(0 0% 0% / 0.22), 0px 2px 4px -1px hsl(0 0% 0% / 0.2);
+  --shadow-lg: 0px 1px 4px 0px hsl(0 0% 0% / 0.22), 0px 4px 6px -1px hsl(0 0% 0% / 0.2);
+  --shadow-xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.25), 0px 8px 10px -1px hsl(0 0% 0% / 0.2);
+  --shadow-2xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.3);
 
   --income: oklch(0.65 0.14 155);
   --expense: oklch(0.6 0.22 25);
   --savings: oklch(0.65 0.16 235);
   --investment: oklch(0.6 0.18 300);
+
+  /* Shared overlay scrim for dialog / alert-dialog / sheet (stronger on dark) */
+  --overlay: hsl(0 0% 0% / 0.65);
   color-scheme: dark;
 }
 
 /* ============================================
-   EMERALD THEME (Light)
+   EMERALD ACCENT (Light mode)
    ============================================ */
-.emerald {
+.theme-emerald:not(.dark) {
   --background: hsl(150 30% 98%);
   --foreground: hsl(158 35% 12%);
   --card: hsl(0 0% 100%);
@@ -347,6 +362,25 @@
   color-scheme: light;
 }
 
+/* ============================================
+   EMERALD ACCENT (Dark mode)
+   Overrides only accent-bearing tokens so the
+   emerald accent stays legible on dark surfaces.
+   ============================================ */
+.theme-emerald.dark {
+  --primary: hsl(160 74% 36%);
+  --primary-foreground: hsl(0 0% 100%);
+  --ring: hsl(160 74% 46%);
+  --sidebar-primary: hsl(160 74% 42%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-ring: hsl(160 74% 46%);
+  --chart-1: hsl(160 74% 44%);
+  --chart-2: hsl(197 68% 56%);
+  --chart-3: hsl(43 86% 60%);
+  --chart-4: hsl(270 65% 65%);
+  --chart-5: hsl(340 75% 62%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -370,5 +404,19 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ============================================
+   Reduced motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -243,4 +243,48 @@ describe("buildSimulations", () => {
 		expect(sims.mergedData).toHaveLength(0);
 		expect(sims.snowball.months).toBe(0);
 	});
+
+	it("holds the minimums series flat (never zero) when minimums never pay off", () => {
+		// Stuck debt: $10/month vs $20/month of interest → neverPayoff.
+		// The healthy companion debt finishes fast, so the shared chart horizon
+		// comes from snowball/avalanche — the gray "Minimums Only" area must
+		// hold at the outstanding balance for every rendered month instead of
+		// plummeting to zero (which would visually claim instant payoff).
+		const stuck = makeDebt({
+			id: "stuck",
+			name: "Stuck Card",
+			current_balance: 1000,
+			original_amount: 1000,
+			minimum_payment: 10,
+			interest_rate: 24,
+		});
+		const healthy = makeDebt({
+			id: "healthy",
+			name: "Healthy Card",
+			current_balance: 100,
+			original_amount: 100,
+			minimum_payment: 50,
+			interest_rate: 0,
+		});
+
+		const sims = buildSimulations([stuck, healthy], 0);
+
+		expect(sims.minimums.neverPayoff).toBe(true);
+		expect(sims.mergedData.length).toBeGreaterThan(1);
+
+		// Opening month shows the full combined balance...
+		expect(sims.mergedData[0].minimums).toBe(1100);
+		// ...and every later month still owes money on the minimums path.
+		for (const row of sims.mergedData) {
+			expect(row.minimums).toBe(1100);
+		}
+
+		// Control: a paying minimums series still drops to 0 after its horizon
+		// (the debt genuinely IS paid) — fill-forward must not apply there.
+		const paying = buildSimulations([healthy], 0);
+		expect(paying.minimums.neverPayoff ?? false).toBe(false);
+		const afterPayoff =
+			paying.mergedData[paying.snowball.monthlyData.length - 1];
+		expect(afterPayoff?.minimums).toBe(0);
+	});
 });

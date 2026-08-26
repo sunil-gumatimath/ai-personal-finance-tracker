@@ -103,36 +103,43 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  // Save preferences to localStorage and Database
+  // Save preferences to localStorage and Database.
+  // Optimistic with rollback: snapshot the previous prefs, apply immediately
+  // (state + storage), then on API failure restore the snapshot and rethrow so
+  // callers can surface the failure — a failed save never silently sticks.
   const savePreferences = useCallback(
     async (
       newPreferences: Partial<Preferences>,
       apiKeys?: ProviderApiKeyUpdate,
     ) => {
+      const previous = preferencesRef.current;
       // Compute the next state from the latest preferences (ref, not closure)
       // and persist OUTSIDE any setState updater — updaters must stay pure
       // because React may invoke them twice (e.g. StrictMode).
       const merged = normalizePreferences({
-        ...preferencesRef.current,
+        ...previous,
         ...newPreferences,
       });
       setPreferences(merged);
       localStorage.setItem(PREFERENCES_KEY, JSON.stringify(merged));
 
-      if (user) {
-        try {
-          const response = await api.profile.update({
-            preferences: merged,
-            apiKeys,
-            currency: newPreferences.currency,
-          });
-          const serverState = normalizePreferences(response.preferences);
-          setPreferences(serverState);
-          localStorage.setItem(PREFERENCES_KEY, JSON.stringify(serverState));
-        } catch (error) {
-          console.error("Failed to save preferences to DB:", error);
-          throw error;
-        }
+      if (!user) return;
+
+      try {
+        const response = await api.profile.update({
+          preferences: merged,
+          apiKeys,
+          currency: newPreferences.currency,
+        });
+        const serverState = normalizePreferences(response.preferences);
+        setPreferences(serverState);
+        localStorage.setItem(PREFERENCES_KEY, JSON.stringify(serverState));
+      } catch (error) {
+        console.error("Failed to save preferences to DB:", error);
+        // Roll back both state and storage to the pre-save snapshot.
+        setPreferences(previous);
+        localStorage.setItem(PREFERENCES_KEY, JSON.stringify(previous));
+        throw error;
       }
     },
     [user],

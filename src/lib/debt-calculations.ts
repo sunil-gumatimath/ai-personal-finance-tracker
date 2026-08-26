@@ -304,6 +304,12 @@ export function buildSimulations(
 	);
 
 	const now = new Date();
+	// A never-payoff simulation stops at month 0 by construction. Filling the
+	// remaining horizon with 0 would visually claim the debt vanishes instantly;
+	// instead hold the last known balance flat — "still unpaid" is the truth.
+	const holdMinimumsFlat = minOnlyRes.neverPayoff === true;
+	let lastMinOnlyBalance = minOnlyRes.monthlyData.at(-1)?.remainingBalance ?? 0;
+
 	for (let i = 0; i < maxLen; i++) {
 		const dateLabel = format(
 			new Date(now.getFullYear(), now.getMonth() + i, 1),
@@ -317,10 +323,17 @@ export function buildSimulations(
 			i < avalancheRes.monthlyData.length
 				? avalancheRes.monthlyData[i].remainingBalance
 				: 0;
-		const minOnlyVal =
+		let minOnlyVal =
 			i < minOnlyRes.monthlyData.length
 				? minOnlyRes.monthlyData[i].remainingBalance
 				: 0;
+
+		if (holdMinimumsFlat && minOnlyVal === 0 && lastMinOnlyBalance > 0) {
+			minOnlyVal = lastMinOnlyBalance;
+		}
+		if (minOnlyVal > 0) {
+			lastMinOnlyBalance = minOnlyVal;
+		}
 
 		mergedData.push({
 			month: i,

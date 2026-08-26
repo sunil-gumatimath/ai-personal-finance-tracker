@@ -11,22 +11,28 @@ export function useAIInsights() {
 	const { user } = useAuth();
 	const [insights, setInsights] = useState<Insight[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
 	const fetchInsights = useCallback(async () => {
-		if (!user) return;
+		if (!user) {
+			setLoading(false);
+			return [];
+		}
 
 		try {
 			setLoading(true);
+			setError(null);
 			const res = await api.ai.insights.list();
 			const rows = (res.insights || []) as Insight[];
-			if (rows.length > 0) {
-				setInsights(rows);
-				setLoading(false);
-				return rows;
-			}
-			return [];
+			setInsights(rows);
+			return rows;
 		} catch (error) {
 			console.error("Error fetching insights:", error);
+			setError(
+				error instanceof Error
+					? error.message
+					: "We couldn't load your AI insights right now.",
+			);
 			return [];
 		} finally {
 			setLoading(false);
@@ -43,16 +49,22 @@ export function useAIInsights() {
 			// 1. Try to fetch existing insights first (if not forcing refresh)
 			if (!forceRefresh) {
 				const existing = await fetchInsights();
-				if (existing && existing.length > 0) return;
+				if (existing.length > 0) return;
 			}
 
 			try {
 				setLoading(true);
+				setError(null);
 				const res = await api.ai.insights.generate(forceRefresh);
 				const rows = (res.insights || []) as Insight[];
 				setInsights(rows);
 			} catch (error) {
 				console.error("Error generating insights:", error);
+				setError(
+					error instanceof Error
+						? error.message
+						: "We couldn't generate new insights right now.",
+				);
 			} finally {
 				setLoading(false);
 			}
@@ -81,7 +93,10 @@ export function useAIInsights() {
 	return {
 		insights,
 		loading,
+		error,
 		refresh: () => generateInsights(true),
+		/** Plain re-fetch of existing insights — used by failure retry rows. */
+		retry: fetchInsights,
 		dismissInsight,
 	};
 }

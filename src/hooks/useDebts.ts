@@ -24,14 +24,17 @@ export const debtTypes = [
 	{ value: "other", label: "Other" },
 ];
 
-export const debtColors = [
+// Selectable accent swatches. Green (#22c55e) is deliberately excluded — it's
+// the reserved "Paid Off" signal color, and a selectable green swatch would
+// collide with that status.
+export const SWATCHES = [
 	{ value: "#ef4444", label: "Red" },
 	{ value: "#f97316", label: "Orange" },
 	{ value: "#eab308", label: "Yellow" },
-	{ value: "#22c55e", label: "Green" },
 	{ value: "#3b82f6", label: "Blue" },
 	{ value: "#8b5cf6", label: "Purple" },
 	{ value: "#ec4899", label: "Pink" },
+	{ value: "#64748b", label: "Slate" },
 ];
 
 // Pure debt math (payoff time, strategies, simulations) lives in
@@ -53,7 +56,15 @@ export function useDebts() {
 	const { formatCurrency } = usePreferences();
 	const [loading, setLoading] = useState(true);
 	const [debts, setDebts] = useState<Debt[]>([]);
-	const [payments, setPayments] = useState<DebtPayment[]>([]);
+	// Payment history is fetched per expanded debt and keyed by debt id so one
+	// card's history can never render under another card.
+	const [paymentsByDebt, setPaymentsByDebt] = useState<
+		Record<string, DebtPayment[]>
+	>({});
+	const [loadingPaymentsId, setLoadingPaymentsId] = useState<string | null>(
+		null,
+	);
+	const [isSaving, setIsSaving] = useState(false);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 	const [isStrategyDialogOpen, setIsStrategyDialogOpen] = useState(false);
@@ -109,6 +120,7 @@ export function useDebts() {
 		async (debtId: string) => {
 			if (!user) return;
 
+			setLoadingPaymentsId(debtId);
 			try {
 				const res = await api.debts.payments.list(debtId);
 				const rows = (res.payments || []) as DebtPayment[];
@@ -120,9 +132,11 @@ export function useDebts() {
 					interest_amount: toNumber(payment.interest_amount),
 				}));
 
-				setPayments(typedRows);
+				setPaymentsByDebt((prev) => ({ ...prev, [debtId]: typedRows }));
 			} catch (error) {
 				console.error("Error fetching payments:", error);
+			} finally {
+				setLoadingPaymentsId(null);
 			}
 		},
 		[user],
@@ -140,7 +154,17 @@ export function useDebts() {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!user) return;
+		if (!user || isSaving) return;
+
+		// A blank Current Balance is only allowed while CREATING (it means "same
+		// as original amount"). On edit, silently resetting to the original
+		// would resurrect a paid-down balance.
+		if (editingDebt && formData.current_balance.trim() === "") {
+			toast.error("Current balance is required when editing a debt");
+			return;
+		}
+
+		setIsSaving(true);
 
 		try {
 			// Explicit empty-string check: a blank field means "same as original
@@ -180,15 +204,24 @@ export function useDebts() {
 		} catch (error) {
 			console.error("Error saving debt:", error);
 			toast.error("Failed to save debt");
+		} finally {
+			setIsSaving(false);
 		}
 	};
 
 	const handlePaymentSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!user || !selectedDebt) return;
+		if (!user || !selectedDebt || isSaving) return;
+
+		const amount = parseFloat(paymentFormData.amount);
+		if (!Number.isFinite(amount) || amount <= 0) {
+			toast.error("Enter a payment amount greater than 0");
+			return;
+		}
+
+		setIsSaving(true);
 
 		try {
-			const amount = parseFloat(paymentFormData.amount);
 			const interestAmount = parseFloat(paymentFormData.interest_amount) || 0;
 			const principalAmount =
 				parseFloat(paymentFormData.principal_amount) || amount - interestAmount;
@@ -252,6 +285,8 @@ export function useDebts() {
 		} catch (error) {
 			console.error("Error recording payment:", error);
 			toast.error("Failed to record payment");
+		} finally {
+			setIsSaving(false);
 		}
 	};
 
@@ -338,7 +373,9 @@ export function useDebts() {
 	return {
 		loading,
 		debts,
-		payments,
+		paymentsByDebt,
+		loadingPaymentsId,
+		isSaving,
 		isDialogOpen,
 		setIsDialogOpen,
 		isPaymentDialogOpen,

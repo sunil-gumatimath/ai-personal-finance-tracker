@@ -336,6 +336,8 @@ export interface SystemLogEntry {
 
 export interface SystemLogsResponse {
 	logs: SystemLogEntry[];
+	/** Full matched count for the user's scope before the server limit. */
+	total?: number;
 }
 
 // Alias used by the system-logs UI (logs page, log-formatter, useSystemLogs)

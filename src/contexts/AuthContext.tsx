@@ -21,13 +21,20 @@ type User = {
 
 interface AuthContextType {
     user: User | null
+    /**
+     * True ONLY during the initial session bootstrap on page load. Route
+     * guards block rendering on this flag alone — mutations never touch it,
+     * so pages own their own pending UI.
+     */
+    initializing: boolean
+    /** Legacy alias of `initializing`. */
     loading: boolean
-    signIn: (email: string, password: string) => Promise<{ error: Error | null }>
-    signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
+    signIn: (email: string, password: string) => Promise<void>
+    signUp: (email: string, password: string, fullName: string) => Promise<void>
     signOut: () => Promise<void>
     resetPassword: (email: string) => Promise<{ error: Error | null }>
     updateProfile: (data: { full_name?: string; avatar_url?: string }) => Promise<{ error: Error | null }>
-    deleteAccount: () => Promise<{ error: Error | null }>
+    deleteAccount: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -55,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const location = useLocation()
 
     const [user, setUser] = useState<User | null>(null)
-    const [loading, setLoading] = useState(true)
+    const [initializing, setInitializing] = useState(true)
 
     const restoreSession = useCallback(async () => {
         // Remove bearer tokens left by older releases. Authentication now
@@ -69,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.error('Failed to restore auth session:', err)
             setUser(null)
         } finally {
-            setLoading(false)
+            setInitializing(false)
         }
     }, [])
 
@@ -77,32 +84,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         restoreSession()
     }, [restoreSession])
 
+    /**
+     * Mutations below NEVER flip a global loading flag and REJECT with the
+     * Error on failure — callers own their pending UI and error handling.
+     */
+
     const signIn = useCallback(async (email: string, password: string) => {
         try {
-            setLoading(true)
             const { user: authedUser } = await api.auth.login(email, password)
             setUser(authedUser)
-            return { error: null }
         } catch (err) {
             console.error('Sign in error:', err)
-            return { error: toError(err) }
-        } finally {
-            setLoading(false)
+            throw toError(err)
         }
     }, [])
 
     const signUp = useCallback(async (email: string, password: string, fullName: string) => {
         try {
-            setLoading(true)
-            const { user: authedUser } = await api.auth.signup(email, password, fullName)
-            setUser(authedUser)
-
-            return { error: null }
+            // Deliberately do NOT adopt any session the backend may return:
+            // signup leaves email verification pending, so the account is not
+            // signed in yet. The user completes verification / signs in on
+            // /login — keeping `user` null here prevents PublicRoute from
+            // bouncing them to "/" before they can verify.
+            await api.auth.signup(email, password, fullName)
         } catch (err) {
             console.error('Sign up error:', err)
-            return { error: toError(err) }
-        } finally {
-            setLoading(false)
+            throw toError(err)
         }
     }, [])
 
@@ -128,17 +135,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const deleteAccount = useCallback(async () => {
         try {
-            setLoading(true)
             await api.auth.deleteAccount()
             await authClient.signOut().catch(() => undefined)
             localStorage.removeItem('auth_token')
             setUser(null)
-            return { error: null }
         } catch (err) {
             console.error('Delete account error:', err)
-            return { error: toError(err) }
-        } finally {
-            setLoading(false)
+            throw toError(err)
         }
     }, [])
 
@@ -194,7 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const value = useMemo(
         () => ({
             user,
-            loading,
+            initializing,
+            loading: initializing,
             signIn,
             signUp,
             signOut,
@@ -202,7 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             updateProfile,
             deleteAccount,
         }),
-        [user, loading, signIn, signUp, signOut, resetPassword, updateProfile, deleteAccount],
+        [user, initializing, signIn, signUp, signOut, resetPassword, updateProfile, deleteAccount],
     )
 
     return (

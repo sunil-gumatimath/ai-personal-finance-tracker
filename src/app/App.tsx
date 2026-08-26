@@ -1,10 +1,21 @@
-import { Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense, useEffect } from "react";
+import {
+	BrowserRouter,
+	Routes,
+	Route,
+	Navigate,
+	useLocation,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PreferencesProvider } from "@/contexts/PreferencesContext";
 import { ThemeProvider } from "@/components/system/theme-provider";
+import { ErrorBoundary } from "@/components/system/ErrorBoundary";
+import { FullScreenLoader } from "@/components/system/FullScreenLoader";
 import { MainLayout } from "@/components/layout";
 import {
+	APP_BRAND,
+	APP_TITLE,
+	ROUTE_TITLES,
 	Dashboard,
 	Transactions,
 	Budgets,
@@ -24,14 +35,13 @@ import { Toaster } from "@/components/ui/sonner";
 
 // Protected Route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-	const { user, loading } = useAuth();
+	const { user, initializing } = useAuth();
+	// Gate ONLY on the initial session bootstrap; sign-in/up actions own their
+	// pending state at the page level.
+	const booted = initializing ?? false;
 
-	if (loading) {
-		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-			</div>
-		);
+	if (booted) {
+		return <FullScreenLoader label="Checking your session…" />;
 	}
 
 	if (!user) {
@@ -43,14 +53,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // Public Route wrapper (redirect to dashboard if already logged in)
 function PublicRoute({ children }: { children: React.ReactNode }) {
-	const { user, loading } = useAuth();
+	const { user, initializing } = useAuth();
+	const booted = initializing ?? false;
 
-	if (loading) {
-		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-			</div>
-		);
+	if (booted) {
+		return <FullScreenLoader label="Checking your session…" />;
 	}
 
 	if (user) {
@@ -60,143 +67,93 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 	return <>{children}</>;
 }
 
-// Shared loading fallback for lazy-loaded pages
-const PageLoader = () => (
-	<div className="flex min-h-[60vh] items-center justify-center">
-		<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-	</div>
-);
+/** Keeps the browser tab title in sync with the active route. */
+function DocumentTitle() {
+	const location = useLocation();
+
+	useEffect(() => {
+		const title = ROUTE_TITLES[location.pathname];
+		document.title = title ? `${title} · ${APP_BRAND}` : APP_TITLE;
+	}, [location.pathname]);
+
+	return null;
+}
+
+/** Path → lazily-loaded page, protected by MainLayout. */
+const PROTECTED_ROUTES: Array<[string, React.ComponentType]> = [
+	["/", Dashboard],
+	["/transactions", Transactions],
+	["/reports", Reports],
+	["/calendar", Calendar],
+	["/budgets", Budgets],
+	["/goals", Goals],
+	["/debts", Debts],
+	["/categories", Categories],
+	["/accounts", Accounts],
+	["/settings", Settings],
+	["/system-logs", SystemLogs],
+];
 
 function AppRoutes() {
 	return (
-		<Routes>
-			{/* Public Routes */}
-			<Route
-				path="/login"
-				element={
-					<PublicRoute>
-						<Login />
-					</PublicRoute>
-				}
-			/>
-			<Route
-				path="/signup"
-				element={
-					<PublicRoute>
-						<Signup />
-					</PublicRoute>
-				}
-			/>
-			<Route
-				path="/forgot-password"
-				element={
-					<PublicRoute>
-						<ForgotPassword />
-					</PublicRoute>
-				}
-			/>
+		<>
+			<DocumentTitle />
+			<Routes>
+				{/* Public Routes */}
+				<Route
+					path="/login"
+					element={
+						<PublicRoute>
+							<Login />
+						</PublicRoute>
+					}
+				/>
+				<Route
+					path="/signup"
+					element={
+						<PublicRoute>
+							<Signup />
+						</PublicRoute>
+					}
+				/>
+				<Route
+					path="/forgot-password"
+					element={
+						<PublicRoute>
+							<ForgotPassword />
+						</PublicRoute>
+					}
+				/>
 
-			{/* Protected Routes — lazy-loaded with Suspense */}
-			<Route
-				element={
-					<ProtectedRoute>
-						<MainLayout />
-					</ProtectedRoute>
-				}
-			>
+				{/* Protected Routes — lazy-loaded with Suspense. The second
+				    ErrorBoundary contains crashes to the routed area so a broken
+				    page can never blank out the whole app shell. */}
 				<Route
-					path="/"
 					element={
-						<Suspense fallback={<PageLoader />}>
-							<Dashboard />
-						</Suspense>
+						<ProtectedRoute>
+							<ErrorBoundary>
+								<MainLayout />
+							</ErrorBoundary>
+						</ProtectedRoute>
 					}
-				/>
-				<Route
-					path="/transactions"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Transactions />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/reports"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Reports />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/calendar"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Calendar />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/budgets"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Budgets />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/goals"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Goals />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/debts"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Debts />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/categories"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Categories />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/accounts"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Accounts />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/settings"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<Settings />
-						</Suspense>
-					}
-				/>
-				<Route
-					path="/system-logs"
-					element={
-						<Suspense fallback={<PageLoader />}>
-							<SystemLogs />
-						</Suspense>
-					}
-				/>
-			</Route>
+				>
+					{PROTECTED_ROUTES.map(([path, Page]) => (
+						<Route
+							key={path}
+							path={path}
+							element={
+								<Suspense fallback={<FullScreenLoader />}>
+									<Page />
+								</Suspense>
+							}
+						/>
+					))}
+				</Route>
 
-			{/* Catch all - redirect to dashboard */}
-			<Route path="*" element={<Navigate to="/" replace />} />
-		</Routes>
+				{/* Catch all - redirect to dashboard */}
+				<Route path="*" element={<Navigate to="/" replace />} />
+			</Routes>
+		</>
 	);
 }
 

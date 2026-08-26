@@ -24,7 +24,10 @@ const EMPTY_STATS: LogStats = {
 	thisWeek: 0,
 };
 
-function computeStats(currentLogs: LogEntry[]): LogStats {
+function computeStats(
+	currentLogs: LogEntry[],
+	totalOverride?: number,
+): LogStats {
 	const now = new Date();
 	const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 	const weekStart = new Date(todayStart);
@@ -32,7 +35,9 @@ function computeStats(currentLogs: LogEntry[]): LogStats {
 
 	return currentLogs.reduce<LogStats>(
 		(acc, curr) => {
-			acc.total++;
+			// The server reports the full matched count before its limit is
+			// applied; fall back to the in-window count when unavailable.
+			acc.total = Math.max(acc.total + 1, totalOverride ?? 0);
 			if (curr.action === "TRANSACTION_CREATED") acc.created++;
 			if (curr.action === "TRANSACTION_EDITED") acc.edited++;
 			if (curr.action === "TRANSACTION_DELETED") acc.deleted++;
@@ -42,7 +47,7 @@ function computeStats(currentLogs: LogEntry[]): LogStats {
 			if (logDate >= weekStart) acc.thisWeek++;
 			return acc;
 		},
-		{ ...EMPTY_STATS },
+		{ ...EMPTY_STATS, total: totalOverride ?? 0 },
 	);
 }
 
@@ -56,30 +61,48 @@ export function useSystemLogs() {
 	const [loading, setLoading] = useState(true);
 	const [stats, setStats] = useState<LogStats>(EMPTY_STATS);
 	const [wsStatus, setWsStatus] = useState<WsStatus>("disconnected");
+	const [error, setError] = useState<string | null>(null);
 
 	const wsRef = useRef<WebSocket | null>(null);
 	const reconnectTimeoutRef = useRef<number | null>(null);
 	const disposedRef = useRef(false);
 	const reconnectAttemptsRef = useRef(0);
+	// Server-reported total for the user's scope (before the fetch limit);
+	// bumped on every live push so "Total Events" stays truthful.
+	const serverTotalRef = useRef(0);
 
 	// Capped exponential backoff: 1s, 2s, 4s … max 30s.
 	const RECONNECT_BASE_DELAY_MS = 1000;
 	const RECONNECT_MAX_DELAY_MS = 30000;
 
 	const updateStats = useCallback((currentLogs: LogEntry[]) => {
-		setStats(computeStats(currentLogs));
+		setStats(computeStats(currentLogs, serverTotalRef.current));
 	}, []);
 
-	const fetchInitialData = useCallback(async () => {
+	/**
+	 * Initial fetch / manual refresh. Returns whether it succeeded so callers
+	 * can show exactly one accurate toast; the error is also exposed via
+	 * `error` so the page can render an ErrorState instead of an empty state.
+	 */
+	const fetchInitialData = useCallback(async (): Promise<boolean> => {
 		try {
 			setLoading(true);
 			const logsData = await api.systemLogs.list();
 			const fetchedLogs = logsData.logs || [];
+			serverTotalRef.current =
+				logsData.total ?? serverTotalRef.current ?? fetchedLogs.length;
 			setLogs(fetchedLogs);
 			updateStats(fetchedLogs);
+			setError(null);
+			return true;
 		} catch (err) {
 			console.error("Failed to fetch logs:", err);
-			toast.error("Failed to load system logs");
+			setError(
+				err instanceof Error
+					? err.message
+					: "We couldn't reach the activity log service.",
+			);
+			return false;
 		} finally {
 			setLoading(false);
 		}
@@ -116,6 +139,7 @@ export function useSystemLogs() {
 		socket.onmessage = (event) => {
 			try {
 				const log: LogEntry = JSON.parse(event.data);
+				serverTotalRef.current += 1;
 				setLogs((prev) => {
 					const newLogs = [log, ...prev];
 					updateStats(newLogs);
@@ -196,5 +220,5 @@ export function useSystemLogs() {
 		};
 	}, [fetchInitialData, connectWebSocket]);
 
-	return { logs, loading, stats, wsStatus, refresh: fetchInitialData };
+	return { logs, loading, stats, wsStatus, error, refresh: fetchInitialData };
 }
