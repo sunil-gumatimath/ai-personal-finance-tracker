@@ -1,6 +1,6 @@
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
-import { type AccentName, type ThemeName } from "./themes"
+import { ACCENT_OPTIONS, type AccentName, type ThemeName } from "./themes"
 
 const ACCENT_STORAGE_KEY = "financetrack-accent"
 
@@ -21,7 +21,8 @@ const AccentContext = createContext<AccentContextValue | null>(null)
 
 function readStoredAccent(): AccentName {
     try {
-        return window.localStorage.getItem(ACCENT_STORAGE_KEY) === "emerald" ? "emerald" : "default"
+        const stored = window.localStorage.getItem(ACCENT_STORAGE_KEY)
+        return ACCENT_OPTIONS.some(({ value }) => value === stored) ? (stored as AccentName) : "default"
     } catch {
         return "default"
     }
@@ -39,7 +40,13 @@ export function ThemeProvider({
     const [accent, setAccent] = useState<AccentName>(readStoredAccent)
 
     useEffect(() => {
-        document.documentElement.classList.toggle("theme-emerald", accent === "emerald")
+        // Class names follow the "theme-<accent>" convention in index.css.
+        const root = document.documentElement
+        for (const { value } of ACCENT_OPTIONS) {
+            if (value !== "default") {
+                root.classList.toggle(`theme-${value}`, accent === value)
+            }
+        }
         try {
             window.localStorage.setItem(ACCENT_STORAGE_KEY, accent)
         } catch {

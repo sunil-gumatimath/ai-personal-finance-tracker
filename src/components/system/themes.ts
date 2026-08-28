@@ -1,7 +1,7 @@
-import { Leaf, Monitor, Moon, Palette, Sun, type LucideIcon } from "lucide-react"
+import { Anchor, Compass, Flame, Heart, Leaf, Monitor, Moon, Palette, Sparkles, Sun, type LucideIcon } from "lucide-react"
 
 export type ThemeName = "light" | "dark" | "system"
-export type AccentName = "default" | "emerald"
+export type AccentName = "default" | "emerald" | "navy" | "violet" | "cyan" | "rose" | "amber"
 
 export interface ThemeOption {
     value: ThemeName
@@ -28,4 +28,9 @@ export interface AccentOption {
 export const ACCENT_OPTIONS: readonly AccentOption[] = [
     { value: "default", label: "Default", icon: Palette },
     { value: "emerald", label: "Emerald", icon: Leaf },
+    { value: "navy", label: "Navy", icon: Anchor },
+    { value: "violet", label: "Violet", icon: Sparkles },
+    { value: "cyan", label: "Cyan", icon: Compass },
+    { value: "rose", label: "Rose", icon: Heart },
+    { value: "amber", label: "Sunset", icon: Flame },
 ]

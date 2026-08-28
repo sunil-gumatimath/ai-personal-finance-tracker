@@ -19,10 +19,13 @@
           ((!theme || theme === "system") &&
             window.matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.classList.toggle(
-          "theme-emerald",
-          localStorage.getItem("financetrack-accent") === "emerald"
-        );
+        var accent = localStorage.getItem("financetrack-accent");
+        document.documentElement.classList.toggle("theme-emerald", accent === "emerald");
+        document.documentElement.classList.toggle("theme-navy", accent === "navy");
+        document.documentElement.classList.toggle("theme-violet", accent === "violet");
+        document.documentElement.classList.toggle("theme-cyan", accent === "cyan");
+        document.documentElement.classList.toggle("theme-rose", accent === "rose");
+        document.documentElement.classList.toggle("theme-amber", accent === "amber");
       } catch (e) { /* localStorage unavailable: fall back to light */ }
     })();
   </script>

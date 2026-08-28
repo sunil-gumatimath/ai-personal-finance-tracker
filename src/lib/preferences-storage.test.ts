@@ -26,4 +26,20 @@ describe("preferences storage sanitization", () => {
     expect(result.aiProvider).toBe("kilocode");
     expect(result.kilocodeApiKeyConfigured).toBe(true);
   });
+
+  test("keeps a valid accent and drops an invalid one", () => {
+    expect(sanitizePreferences({ accent: "navy" })).toEqual({ accent: "navy" });
+    expect(sanitizePreferences({ accent: "violet" })).toEqual({ accent: "violet" });
+    expect(sanitizePreferences({ accent: "cyan" })).toEqual({ accent: "cyan" });
+    expect(sanitizePreferences({ accent: "rose" })).toEqual({ accent: "rose" });
+    expect(sanitizePreferences({ accent: "amber" })).toEqual({ accent: "amber" });
+
+    const tampered = sanitizePreferences({ accent: "pink-polka-dot" });
+    expect(tampered).toEqual({});
+  });
+
+  test("leaves accent absent when not present (no implicit reset to default)", () => {
+    const result = normalizePreferences({ currency: "USD" });
+    expect(result.accent).toBeUndefined();
+  });
 });

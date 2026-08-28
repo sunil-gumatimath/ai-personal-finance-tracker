@@ -1,4 +1,5 @@
 import { DEFAULT_AI_MODEL } from "@/lib/ai-models";
+import type { AccentName } from "@/components/system/themes";
 
 export interface Preferences {
 	currency: string;
@@ -9,6 +10,12 @@ export interface Preferences {
 	aiProvider?: "kilocode";
 	kilocodeApiKeyConfigured: boolean;
 	kilocodeModel?: string;
+	/**
+	 * UI accent (Default/Emerald/Navy/Gold). Optional + absent until the user
+	 * picks one, so devices that have never chosen an accent keep their local
+	 * choice instead of being reset to "default" on sync.
+	 */
+	accent?: AccentName;
 }
 
 export const PREFERENCES_KEY = "financetrack_preferences";
