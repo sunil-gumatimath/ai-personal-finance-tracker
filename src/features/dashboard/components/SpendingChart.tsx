@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePreferences } from '@/hooks/usePreferences'
-import { TrendingUp, TrendingDown, ChartLine } from 'lucide-react'
+import { TrendingUp, TrendingDown, ChartLine, Plus } from 'lucide-react'
 import {
     type ChartConfig,
     ChartContainer,
@@ -13,7 +13,6 @@ import { formatCompactCurrency } from '@/lib/number'
 import { currencyLocales } from '@/types/preferences'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
 
 interface MonthlyTrend {
     month: string

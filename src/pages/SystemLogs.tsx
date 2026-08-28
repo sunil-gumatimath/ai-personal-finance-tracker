@@ -301,7 +301,7 @@ export function SystemLogs() {
 				{STAT_CARDS.map((stat) => (
 					<Card
 						key={stat.key}
-						className="group relative overflow-hidden transition-[box-shadow,translate] duration-300 ease-out hover:shadow-md hover:-translate-y-0.5"
+						className="group relative overflow-hidden py-0 gap-0 transition-[box-shadow,translate] duration-300 ease-out hover:shadow-md hover:-translate-y-0.5"
 					>
 						<div
 							className={`absolute inset-0 bg-gradient-to-br ${stat.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
@@ -330,7 +330,7 @@ export function SystemLogs() {
 			</div>
 
 			{/* Filters */}
-			<Card>
+			<Card className="py-0 gap-0">
 				<CardContent className="p-4">
 					<div className="flex flex-col sm:flex-row gap-3">
 						<div className="relative flex-1">

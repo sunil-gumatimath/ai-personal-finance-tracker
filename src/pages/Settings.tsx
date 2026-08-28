@@ -18,6 +18,7 @@ import {
 	EyeOff,
 	Loader2,
 	Check,
+	type LucideIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -43,11 +44,13 @@ import {
 } from "@/lib/ai-models";
 
 import { cn } from "@/lib/utils";
-import { ACCENT_OPTIONS, THEME_OPTIONS } from "@/components/system/themes";
+import {
+	ACCENT_OPTIONS,
+	THEME_OPTIONS,
+	type AccentName,
+} from "@/components/system/themes";
 import { useAccent } from "@/components/system/theme-provider";
-import type { LucideIcon } from "lucide-react";
 import type { Preferences } from "@/types/preferences";
-import type { AccentName } from "@/components/system/themes";
 import {
 	AlertDialog,
 	AlertDialogAction,

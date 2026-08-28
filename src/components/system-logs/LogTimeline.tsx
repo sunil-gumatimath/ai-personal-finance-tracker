@@ -1,4 +1,5 @@
-import { ChevronRight, Plus, ScrollText, User, X } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronRight, Plus, ScrollText, User, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,8 +25,7 @@ import {
 	getSeverityConfig,
 } from "./log-visuals";
 
-/** Upper bound on rendered rows so an unbounded live feed can't grow forever. */
-const MAX_RENDERED_ROWS = 200;
+const PAGE_SIZE = 50;
 
 interface LogTimelineProps {
 	logs: LogEntry[];
@@ -49,17 +49,19 @@ export function LogTimeline({
 	onRetry,
 	formatOptions,
 }: LogTimelineProps) {
-	const visibleLogs = logs.slice(0, MAX_RENDERED_ROWS);
+	const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
+	const visibleLogs = logs.slice(0, displayLimit);
+	const hasMore = logs.length > displayLimit;
 
 	return (
-		<Card className="overflow-hidden">
-			<CardHeader className="border-b bg-muted/30">
+		<Card className="overflow-hidden py-0 gap-0">
+			<CardHeader className="border-b bg-muted/30 px-6 py-4 [.border-b]:pb-4">
 				<div className="flex items-center justify-between">
 					<div>
 						<CardTitle className="text-base font-semibold">
 							Activity Timeline
 						</CardTitle>
-						<CardDescription className="mt-0.5">
+						<CardDescription className="mt-1">
 							{logs.length} {logs.length === 1 ? "entry" : "entries"} found
 						</CardDescription>
 					</div>
@@ -72,10 +74,10 @@ export function LogTimeline({
 							<div
 								key={i}
 								className="flex items-center gap-4 p-4 motion-safe:animate-pulse"
-								style={{ animationDelay: `${i * 100}ms` }}
+								style={{ animationDelay: `${i * 80}ms` }}
 							>
-								<div className="h-10 w-10 rounded-full bg-muted shrink-0" />
-								<div className="flex-1 space-y-2.5">
+								<div className="h-10 w-10 rounded-full bg-muted shrink-0 ring-4 ring-background" />
+								<div className="flex-1 space-y-2">
 									<div className="h-4 bg-muted rounded-md w-2/5" />
 									<div className="h-3.5 bg-muted rounded-md w-3/5" />
 								</div>
@@ -97,8 +99,8 @@ export function LogTimeline({
 					/>
 				) : visibleLogs.length > 0 ? (
 					<div className="relative">
-						{/* Vertical timeline line */}
-						<div className="absolute left-[36px] top-0 bottom-0 w-px bg-border/50 hidden sm:block" />
+						{/* Vertical timeline line bounded cleanly within item margins */}
+						<div className="absolute left-[36px] top-6 bottom-6 w-px bg-border/60 hidden sm:block" />
 
 						{visibleLogs.map((log, index) => {
 							const timeInfo = formatTimestamp(log.timestamp);
@@ -124,7 +126,7 @@ export function LogTimeline({
 										}
 									}}
 									className={cn(
-										"group relative flex items-center gap-4 px-4 py-3.5 cursor-pointer transition-colors duration-200 hover:bg-muted/40 active:bg-muted/60 focus-visible:bg-muted/40 focus-visible:outline-none",
+										"group relative flex items-center gap-4 px-4 py-3.5 cursor-pointer transition-[background-color,transform] duration-150 ease-out hover:bg-muted/40 active:bg-muted/60 active:scale-[0.995] focus-visible:bg-muted/40 focus-visible:outline-none",
 										// Staggered entrance; delays capped at 300ms.
 										"motion-safe:animate-fade-in-up",
 									)}
@@ -133,9 +135,15 @@ export function LogTimeline({
 										animationFillMode: "both",
 									}}
 								>
-									{/* Icon node */}
+									{/* Icon node with opaque ring preventing timeline rail bleed-through */}
 									<div
-										className={`relative z-10 flex items-center justify-center h-10 w-10 rounded-full border shrink-0 transition-shadow duration-200 group-hover:shadow-md ${actionColors.bg} ${actionColors.border} ${actionColors.text} ${actionColors.glow}`}
+										className={cn(
+											"relative z-10 flex items-center justify-center h-10 w-10 rounded-full border shrink-0 bg-background ring-4 ring-background transition-shadow duration-200 group-hover:shadow-md",
+											actionColors.bg,
+											actionColors.border,
+											actionColors.text,
+											actionColors.glow,
+										)}
 									>
 										<IconComponent className="h-4 w-4" />
 									</div>
@@ -149,35 +157,35 @@ export function LogTimeline({
 											<Badge
 												variant="outline"
 												className={cn(
-													"text-[10px] px-1.5 py-0 h-5 font-medium border",
+													"text-[10px] px-1.5 py-0 h-5 font-medium border inline-flex items-center gap-1 shrink-0",
 													severityConfig.solid ?? severityConfig.color,
 												)}
 											>
-												<severityConfig.icon aria-hidden="true" />
+												<severityConfig.icon className="h-3 w-3 shrink-0" aria-hidden="true" />
 												{severityConfig.label}
 											</Badge>
 											{log.status === "failure" && (
 												<Badge
 													variant="destructive"
-													className="text-[10px] px-1.5 py-0 h-5"
+													className="text-[10px] px-1.5 py-0 h-5 font-medium inline-flex items-center shrink-0"
 												>
 													Failed
 												</Badge>
 											)}
 										</div>
-										<p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+										<p className="text-sm text-muted-foreground mt-0.5 line-clamp-2 leading-snug">
 											{description}
 										</p>
 									</div>
 
 									{/* Right side info */}
 									<div className="text-right shrink-0 flex flex-col items-end gap-0.5">
-										<span className="text-xs font-medium text-foreground/80">
+										<span className="text-xs font-medium text-foreground/80 tabular-nums">
 											{timeInfo.relative}
 										</span>
-										<span className="text-[11px] text-muted-foreground flex items-center gap-1">
-											<User className="h-3 w-3" />
-											{log.userEmail?.split("@")[0] || "system"}
+										<span className="text-[11px] text-muted-foreground flex items-center gap-1 max-w-[120px]">
+											<User className="h-3 w-3 shrink-0" />
+											<span className="truncate">{log.userEmail?.split("@")[0] || "system"}</span>
 										</span>
 									</div>
 
@@ -187,12 +195,26 @@ export function LogTimeline({
 							);
 						})}
 
-						{logs.length > MAX_RENDERED_ROWS && (
-							<p className="border-t px-4 py-2.5 text-center text-xs text-muted-foreground">
-								Showing latest {MAX_RENDERED_ROWS} of {logs.length} entries
-								— refine your filters or export to see more.
+						{hasMore ? (
+							<div className="border-t p-3 text-center bg-muted/20 flex flex-col items-center gap-2">
+								<p className="text-xs text-muted-foreground">
+									Showing {visibleLogs.length} of {logs.length} entries
+								</p>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
+									className="gap-1.5 h-8 text-xs font-medium active:scale-[0.98]"
+								>
+									<ChevronDown className="h-3.5 w-3.5" />
+									Load More ({Math.min(PAGE_SIZE, logs.length - visibleLogs.length)} more)
+								</Button>
+							</div>
+						) : logs.length > PAGE_SIZE ? (
+							<p className="border-t px-4 py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
+								All {logs.length} entries loaded
 							</p>
-						)}
+						) : null}
 					</div>
 				) : (
 					<div className="text-center py-20 px-4">

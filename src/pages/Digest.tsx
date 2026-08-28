@@ -12,8 +12,7 @@ import {
 	Calendar as CalendarIcon,
 } from "lucide-react";
 import { format } from "date-fns";
-import Markdown from "react-markdown";
-import type { Components } from "react-markdown";
+import Markdown, { type Components } from "react-markdown";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {

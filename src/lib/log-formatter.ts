@@ -121,18 +121,25 @@ export function shouldShowField(field: string): boolean {
 
 export function formatFieldValue(
 	field: string,
-	value: any,
+	value: unknown,
 	opts?: FormatOptions,
 ): string {
 	if (value === null || value === undefined) return "None";
 
-	if (field === "amount") return formatCurrency(value, opts);
-	if (field === "date") return new Date(value).toLocaleDateString();
-	if (field === "updated_at" || field === "created_at")
+	if (field === "amount" && (typeof value === "number" || typeof value === "string")) {
+		return formatCurrency(value, opts);
+	}
+	if (field === "date" && (typeof value === "string" || typeof value === "number" || value instanceof Date)) {
+		return new Date(value).toLocaleDateString();
+	}
+	if ((field === "updated_at" || field === "created_at") && (typeof value === "string" || typeof value === "number" || value instanceof Date)) {
 		return new Date(value).toLocaleString();
-	if (field === "type") return value.charAt(0).toUpperCase() + value.slice(1);
+	}
+	if (field === "type" && typeof value === "string") {
+		return value.charAt(0).toUpperCase() + value.slice(1);
+	}
 	if (field === "is_recurring") return value ? "Yes" : "No";
-	if (field === "description" || field === "notes") return value || "None";
+	if (field === "description" || field === "notes") return String(value || "None");
 
 	return String(value);
 }
@@ -252,8 +259,8 @@ export function generateHumanDescription(
 
 interface FieldChange {
 	field: string;
-	oldValue: any;
-	newValue: any;
+	oldValue: unknown;
+	newValue: unknown;
 	summary: string;
 }
 
@@ -309,18 +316,19 @@ export function getFieldChanges(
 }
 
 export function formatMetadata(
-	metadata: Record<string, any>,
+	metadata: Record<string, unknown>,
 	opts?: FormatOptions,
 ): Array<{ label: string; value: string }> {
 	return Object.entries(metadata).map(([key, value]) => {
 		const label = formatFieldName(key);
 		let formattedValue: string;
 
-		if (key.toLowerCase().includes("amount")) {
+		if (key.toLowerCase().includes("amount") && (typeof value === "number" || typeof value === "string")) {
 			formattedValue = formatCurrency(value, opts);
 		} else if (
-			key.toLowerCase().includes("date") ||
-			key.toLowerCase().includes("time")
+			(key.toLowerCase().includes("date") ||
+			key.toLowerCase().includes("time")) &&
+			(typeof value === "string" || typeof value === "number" || value instanceof Date)
 		) {
 			formattedValue = new Date(value).toLocaleString();
 		} else if (typeof value === "boolean") {

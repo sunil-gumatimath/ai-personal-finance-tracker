@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
-import type { FinancialHealth, HealthNextStep } from '@/hooks/useFinancialHealth'
-import { formatHealthNextStep } from '@/hooks/useFinancialHealth'
+import {
+    type FinancialHealth,
+    type HealthNextStep,
+    formatHealthNextStep,
+} from '@/hooks/useFinancialHealth'
 import {
     Activity,
     ShieldCheck,

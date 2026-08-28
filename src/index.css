@@ -395,7 +395,7 @@
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(222 40% 12%);
   --primary: hsl(222 72% 28%);
-  --primary-foreground: hsl(210 40% 98%);
+  --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(217 24% 92.5%);
   --secondary-foreground: hsl(222 42% 16%);
   --muted: hsl(217 20% 93.5%);
@@ -415,50 +415,35 @@
   --sidebar: hsl(220 18% 95.5%);
   --sidebar-foreground: hsl(222 30% 20%);
   --sidebar-primary: hsl(222 72% 30%);
-  --sidebar-primary-foreground: hsl(210 40% 98%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(216 28% 90%);
   --sidebar-accent-foreground: hsl(222 42% 16%);
   --sidebar-border: hsl(218 16% 87%);
   --sidebar-ring: hsl(222 72% 32%);
+  --income: oklch(0.52 0.15 155);
+  --expense: oklch(0.55 0.22 25);
+  --savings: oklch(0.52 0.18 245);
+  --investment: oklch(0.52 0.18 300);
   color-scheme: light;
 }
 
 /* ============================================
    ROYAL NAVY ACCENT (Dark mode)
-   Midnight navy-tinted surfaces with a brighter
-   royal-blue accent so it stays legible in the dark.
+   Overrides only accent-bearing tokens so the
+   sapphire accent stays crisp on dark surfaces.
    ============================================ */
 .theme-navy.dark {
-  --background: hsl(222 44% 7%);
-  --foreground: hsl(213 40% 96%);
-  --card: hsl(222 40% 10%);
-  --card-foreground: hsl(213 40% 96%);
-  --popover: hsl(222 41% 9%);
-  --popover-foreground: hsl(213 40% 96%);
-  --primary: hsl(215 78% 52%);
-  --primary-foreground: hsl(210 40% 98%);
-  --secondary: hsl(220 30% 16%);
-  --secondary-foreground: hsl(213 40% 94%);
-  --muted: hsl(220 30% 15%);
-  --muted-foreground: hsl(217 18% 64%);
-  --accent: hsl(220 32% 17%);
-  --accent-foreground: hsl(213 40% 94%);
-  --border: hsl(220 26% 19%);
-  --input: hsl(220 26% 19%);
-  --ring: hsl(215 90% 62%);
-  --chart-1: hsl(214 90% 62%);
-  --chart-2: hsl(190 85% 55%);
-  --chart-3: hsl(45 95% 62%);
-  --chart-4: hsl(265 85% 68%);
-  --chart-5: hsl(340 80% 62%);
-  --sidebar: hsl(222 40% 9%);
-  --sidebar-foreground: hsl(213 30% 92%);
-  --sidebar-primary: hsl(215 82% 58%);
-  --sidebar-primary-foreground: hsl(210 40% 98%);
-  --sidebar-accent: hsl(220 32% 17%);
-  --sidebar-accent-foreground: hsl(213 40% 94%);
-  --sidebar-border: hsl(220 26% 19%);
-  --sidebar-ring: hsl(215 90% 62%);
+  --primary: hsl(217 80% 48%);
+  --primary-foreground: hsl(0 0% 100%);
+  --ring: hsl(217 80% 58%);
+  --sidebar-primary: hsl(217 80% 50%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-ring: hsl(217 80% 58%);
+  --chart-1: hsl(217 80% 56%);
+  --chart-2: hsl(173 70% 48%);
+  --chart-3: hsl(43 86% 60%);
+  --chart-4: hsl(270 65% 65%);
+  --chart-5: hsl(340 75% 62%);
 }
 
 /* ============================================
@@ -472,7 +457,7 @@
   --card-foreground: hsl(265 35% 12%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(265 35% 12%);
-  --primary: hsl(262 83% 58%);
+  --primary: hsl(262 76% 45%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(265 24% 92.5%);
   --secondary-foreground: hsl(265 40% 16%);
@@ -484,58 +469,44 @@
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(265 16% 87.5%);
   --input: hsl(265 16% 87.5%);
-  --ring: hsl(262 83% 58%);
-  --chart-1: hsl(262 83% 58%);
-  --chart-2: hsl(190 85% 45%);
-  --chart-3: hsl(330 80% 55%);
-  --chart-4: hsl(45 92% 50%);
-  --chart-5: hsl(160 70% 40%);
+  --ring: hsl(262 76% 45%);
+  --chart-1: hsl(262 76% 48%);
+  --chart-2: hsl(190 85% 42%);
+  --chart-3: hsl(330 75% 50%);
+  --chart-4: hsl(45 92% 48%);
+  --chart-5: hsl(160 70% 38%);
   --sidebar: hsl(265 20% 95.8%);
   --sidebar-foreground: hsl(265 28% 20%);
-  --sidebar-primary: hsl(262 83% 58%);
+  --sidebar-primary: hsl(262 76% 45%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(265 28% 90.5%);
   --sidebar-accent-foreground: hsl(265 40% 16%);
   --sidebar-border: hsl(265 16% 87.5%);
-  --sidebar-ring: hsl(262 83% 58%);
+  --sidebar-ring: hsl(262 76% 45%);
+  --income: oklch(0.52 0.15 155);
+  --expense: oklch(0.55 0.22 25);
+  --savings: oklch(0.52 0.18 245);
+  --investment: oklch(0.52 0.18 300);
   color-scheme: light;
 }
 
 /* ============================================
    ELECTRIC VIOLET ACCENT (Dark mode)
-   Deep obsidian-velvet surfaces with luminous neon violet.
+   Overrides only accent-bearing tokens so the
+   amethyst violet accent stays crisp on dark surfaces.
    ============================================ */
 .theme-violet.dark {
-  --background: hsl(265 40% 6%);
-  --foreground: hsl(265 30% 96%);
-  --card: hsl(265 35% 9%);
-  --card-foreground: hsl(265 30% 96%);
-  --popover: hsl(265 35% 8.5%);
-  --popover-foreground: hsl(265 30% 96%);
-  --primary: hsl(263 90% 66%);
-  --primary-foreground: hsl(265 45% 10%);
-  --secondary: hsl(265 25% 15%);
-  --secondary-foreground: hsl(265 30% 94%);
-  --muted: hsl(265 25% 14%);
-  --muted-foreground: hsl(265 15% 65%);
-  --accent: hsl(265 28% 16%);
-  --accent-foreground: hsl(265 30% 94%);
-  --border: hsl(265 20% 18%);
-  --input: hsl(265 20% 18%);
-  --ring: hsl(263 90% 66%);
-  --chart-1: hsl(263 90% 66%);
-  --chart-2: hsl(190 90% 55%);
-  --chart-3: hsl(330 85% 65%);
-  --chart-4: hsl(45 95% 60%);
-  --chart-5: hsl(160 75% 55%);
-  --sidebar: hsl(265 35% 8%);
-  --sidebar-foreground: hsl(265 25% 92%);
-  --sidebar-primary: hsl(263 90% 66%);
-  --sidebar-primary-foreground: hsl(265 45% 10%);
-  --sidebar-accent: hsl(265 28% 16%);
-  --sidebar-accent-foreground: hsl(265 30% 94%);
-  --sidebar-border: hsl(265 20% 18%);
-  --sidebar-ring: hsl(263 90% 66%);
+  --primary: hsl(262 76% 54%);
+  --primary-foreground: hsl(0 0% 100%);
+  --ring: hsl(262 76% 64%);
+  --sidebar-primary: hsl(262 76% 56%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-ring: hsl(262 76% 64%);
+  --chart-1: hsl(262 76% 62%);
+  --chart-2: hsl(197 75% 52%);
+  --chart-3: hsl(340 75% 62%);
+  --chart-4: hsl(43 86% 60%);
+  --chart-5: hsl(160 70% 48%);
 }
 
 /* ============================================
@@ -549,7 +520,7 @@
   --card-foreground: hsl(200 40% 12%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(200 40% 12%);
-  --primary: hsl(192 90% 34%);
+  --primary: hsl(192 90% 30%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(195 24% 92.5%);
   --secondary-foreground: hsl(200 40% 16%);
@@ -561,58 +532,44 @@
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(195 16% 87%);
   --input: hsl(195 16% 87%);
-  --ring: hsl(192 90% 34%);
-  --chart-1: hsl(192 90% 36%);
+  --ring: hsl(192 90% 30%);
+  --chart-1: hsl(192 90% 34%);
   --chart-2: hsl(160 70% 38%);
   --chart-3: hsl(262 70% 50%);
   --chart-4: hsl(38 90% 48%);
   --chart-5: hsl(340 75% 50%);
   --sidebar: hsl(195 20% 95.5%);
   --sidebar-foreground: hsl(200 30% 20%);
-  --sidebar-primary: hsl(192 90% 34%);
+  --sidebar-primary: hsl(192 90% 30%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(195 28% 90.5%);
   --sidebar-accent-foreground: hsl(200 40% 16%);
   --sidebar-border: hsl(195 16% 87%);
-  --sidebar-ring: hsl(192 90% 34%);
+  --sidebar-ring: hsl(192 90% 30%);
+  --income: oklch(0.52 0.15 155);
+  --expense: oklch(0.55 0.22 25);
+  --savings: oklch(0.52 0.18 245);
+  --investment: oklch(0.52 0.18 300);
   color-scheme: light;
 }
 
 /* ============================================
    CYAN ACCENT (Dark mode)
-   Deep obsidian-slate surfaces with neon electric cyan.
+   Overrides only accent-bearing tokens so the
+   ocean teal accent stays crisp on dark surfaces.
    ============================================ */
 .theme-cyan.dark {
-  --background: hsl(200 45% 6%);
-  --foreground: hsl(195 30% 96%);
-  --card: hsl(200 40% 9%);
-  --card-foreground: hsl(195 30% 96%);
-  --popover: hsl(200 40% 8.5%);
-  --popover-foreground: hsl(195 30% 96%);
-  --primary: hsl(188 95% 48%);
-  --primary-foreground: hsl(200 50% 10%);
-  --secondary: hsl(200 30% 15%);
-  --secondary-foreground: hsl(195 30% 94%);
-  --muted: hsl(200 30% 14%);
-  --muted-foreground: hsl(195 18% 64%);
-  --accent: hsl(200 32% 16%);
-  --accent-foreground: hsl(195 30% 94%);
-  --border: hsl(200 24% 18%);
-  --input: hsl(200 24% 18%);
-  --ring: hsl(188 95% 48%);
-  --chart-1: hsl(188 95% 48%);
-  --chart-2: hsl(160 80% 48%);
-  --chart-3: hsl(265 85% 65%);
-  --chart-4: hsl(42 95% 58%);
-  --chart-5: hsl(340 85% 62%);
-  --sidebar: hsl(200 40% 8%);
-  --sidebar-foreground: hsl(195 25% 92%);
-  --sidebar-primary: hsl(188 95% 48%);
-  --sidebar-primary-foreground: hsl(200 50% 10%);
-  --sidebar-accent: hsl(200 32% 16%);
-  --sidebar-accent-foreground: hsl(195 30% 94%);
-  --sidebar-border: hsl(200 24% 18%);
-  --sidebar-ring: hsl(188 95% 48%);
+  --primary: hsl(192 85% 38%);
+  --primary-foreground: hsl(0 0% 100%);
+  --ring: hsl(192 85% 48%);
+  --sidebar-primary: hsl(192 85% 42%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-ring: hsl(192 85% 48%);
+  --chart-1: hsl(192 85% 48%);
+  --chart-2: hsl(160 70% 48%);
+  --chart-3: hsl(265 75% 62%);
+  --chart-4: hsl(43 86% 60%);
+  --chart-5: hsl(340 75% 62%);
 }
 
 /* ============================================
@@ -626,7 +583,7 @@
   --card-foreground: hsl(350 35% 12%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(350 35% 12%);
-  --primary: hsl(346 77% 49%);
+  --primary: hsl(346 77% 44%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(350 24% 92.5%);
   --secondary-foreground: hsl(350 40% 16%);
@@ -638,58 +595,44 @@
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(350 16% 88%);
   --input: hsl(350 16% 88%);
-  --ring: hsl(346 77% 49%);
-  --chart-1: hsl(346 77% 49%);
+  --ring: hsl(346 77% 44%);
+  --chart-1: hsl(346 77% 46%);
   --chart-2: hsl(262 75% 55%);
   --chart-3: hsl(190 85% 45%);
   --chart-4: hsl(38 92% 50%);
   --chart-5: hsl(160 70% 40%);
   --sidebar: hsl(350 20% 96%);
   --sidebar-foreground: hsl(350 28% 20%);
-  --sidebar-primary: hsl(346 77% 49%);
+  --sidebar-primary: hsl(346 77% 44%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(350 28% 90.5%);
   --sidebar-accent-foreground: hsl(350 40% 16%);
   --sidebar-border: hsl(350 16% 88%);
-  --sidebar-ring: hsl(346 77% 49%);
+  --sidebar-ring: hsl(346 77% 44%);
+  --income: oklch(0.52 0.15 155);
+  --expense: oklch(0.55 0.22 25);
+  --savings: oklch(0.52 0.18 245);
+  --investment: oklch(0.52 0.18 300);
   color-scheme: light;
 }
 
 /* ============================================
    ROSE ACCENT (Dark mode)
-   Deep obsidian-ruby surfaces with luminous neon rose.
+   Overrides only accent-bearing tokens so the
+   ruby rose accent stays crisp on dark surfaces.
    ============================================ */
 .theme-rose.dark {
-  --background: hsl(350 40% 6%);
-  --foreground: hsl(350 30% 96%);
-  --card: hsl(350 35% 9%);
-  --card-foreground: hsl(350 30% 96%);
-  --popover: hsl(350 35% 8.5%);
-  --popover-foreground: hsl(350 30% 96%);
-  --primary: hsl(346 89% 65%);
-  --primary-foreground: hsl(350 50% 10%);
-  --secondary: hsl(350 25% 15%);
-  --secondary-foreground: hsl(350 30% 94%);
-  --muted: hsl(350 25% 14%);
-  --muted-foreground: hsl(350 15% 65%);
-  --accent: hsl(350 28% 16%);
-  --accent-foreground: hsl(350 30% 94%);
-  --border: hsl(350 20% 18%);
-  --input: hsl(350 20% 18%);
-  --ring: hsl(346 89% 65%);
-  --chart-1: hsl(346 89% 65%);
-  --chart-2: hsl(265 85% 68%);
-  --chart-3: hsl(190 90% 55%);
-  --chart-4: hsl(45 95% 60%);
-  --chart-5: hsl(160 75% 55%);
-  --sidebar: hsl(350 35% 8%);
-  --sidebar-foreground: hsl(350 25% 92%);
-  --sidebar-primary: hsl(346 89% 65%);
-  --sidebar-primary-foreground: hsl(350 50% 10%);
-  --sidebar-accent: hsl(350 28% 16%);
-  --sidebar-accent-foreground: hsl(350 30% 94%);
-  --sidebar-border: hsl(350 20% 18%);
-  --sidebar-ring: hsl(346 89% 65%);
+  --primary: hsl(346 76% 46%);
+  --primary-foreground: hsl(0 0% 100%);
+  --ring: hsl(346 76% 56%);
+  --sidebar-primary: hsl(346 76% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-ring: hsl(346 76% 56%);
+  --chart-1: hsl(346 76% 58%);
+  --chart-2: hsl(265 75% 62%);
+  --chart-3: hsl(197 75% 52%);
+  --chart-4: hsl(43 86% 60%);
+  --chart-5: hsl(160 70% 48%);
 }
 
 /* ============================================
@@ -703,7 +646,7 @@
   --card-foreground: hsl(24 40% 12%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(24 40% 12%);
-  --primary: hsl(24 95% 44%);
+  --primary: hsl(24 92% 40%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(36 26% 92.5%);
   --secondary-foreground: hsl(24 40% 16%);
@@ -715,58 +658,44 @@
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(32 18% 87%);
   --input: hsl(32 18% 87%);
-  --ring: hsl(24 95% 44%);
-  --chart-1: hsl(24 95% 44%);
+  --ring: hsl(24 92% 40%);
+  --chart-1: hsl(24 92% 42%);
   --chart-2: hsl(42 90% 48%);
   --chart-3: hsl(160 70% 38%);
   --chart-4: hsl(215 75% 46%);
   --chart-5: hsl(340 75% 50%);
   --sidebar: hsl(36 22% 95.6%);
   --sidebar-foreground: hsl(24 30% 20%);
-  --sidebar-primary: hsl(24 95% 44%);
+  --sidebar-primary: hsl(24 92% 40%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(36 30% 90.5%);
   --sidebar-accent-foreground: hsl(24 40% 16%);
   --sidebar-border: hsl(32 18% 87%);
-  --sidebar-ring: hsl(24 95% 44%);
+  --sidebar-ring: hsl(24 92% 40%);
+  --income: oklch(0.52 0.15 155);
+  --expense: oklch(0.55 0.22 25);
+  --savings: oklch(0.52 0.18 245);
+  --investment: oklch(0.52 0.18 300);
   color-scheme: light;
 }
 
 /* ============================================
    SUNSET AMBER ACCENT (Dark mode)
-   Deep volcanic charcoal surfaces with radiant sunset orange.
+   Overrides only accent-bearing tokens so the
+   topaz amber accent stays crisp on dark surfaces.
    ============================================ */
 .theme-amber.dark {
-  --background: hsl(24 40% 6%);
-  --foreground: hsl(32 30% 96%);
-  --card: hsl(24 35% 9%);
-  --card-foreground: hsl(32 30% 96%);
-  --popover: hsl(24 35% 8.5%);
-  --popover-foreground: hsl(32 30% 96%);
-  --primary: hsl(24 95% 60%);
-  --primary-foreground: hsl(24 50% 10%);
-  --secondary: hsl(24 25% 15%);
-  --secondary-foreground: hsl(32 30% 94%);
-  --muted: hsl(24 25% 14%);
-  --muted-foreground: hsl(32 15% 65%);
-  --accent: hsl(24 28% 16%);
-  --accent-foreground: hsl(32 30% 94%);
-  --border: hsl(24 20% 18%);
-  --input: hsl(24 20% 18%);
-  --ring: hsl(24 95% 60%);
-  --chart-1: hsl(24 95% 60%);
-  --chart-2: hsl(45 95% 60%);
-  --chart-3: hsl(160 75% 55%);
-  --chart-4: hsl(215 85% 62%);
-  --chart-5: hsl(340 85% 62%);
-  --sidebar: hsl(24 35% 8%);
-  --sidebar-foreground: hsl(32 25% 92%);
-  --sidebar-primary: hsl(24 95% 60%);
-  --sidebar-primary-foreground: hsl(24 50% 10%);
-  --sidebar-accent: hsl(24 28% 16%);
-  --sidebar-accent-foreground: hsl(32 30% 94%);
-  --sidebar-border: hsl(24 20% 18%);
-  --sidebar-ring: hsl(24 95% 60%);
+  --primary: hsl(28 88% 46%);
+  --primary-foreground: hsl(0 0% 100%);
+  --ring: hsl(28 88% 54%);
+  --sidebar-primary: hsl(28 88% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-ring: hsl(28 88% 54%);
+  --chart-1: hsl(28 88% 56%);
+  --chart-2: hsl(43 86% 60%);
+  --chart-3: hsl(160 70% 48%);
+  --chart-4: hsl(217 80% 56%);
+  --chart-5: hsl(340 75% 62%);
 }
 
 @layer base {

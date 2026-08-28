@@ -2,7 +2,7 @@
 
 A premium, AI-powered personal finance management platform for tracking transactions, budgets, goals, accounts, debts, and financial health. The app combines a responsive React interface with Bun-powered API routes, Neon PostgreSQL storage, persisted AI insights, and configurable AI providers.
 
-> **New to the app?** Start with [HowToUse.md](./HowToUse.md) for the user guide.
+
 
 ## Features
 
@@ -32,7 +32,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 - **Recurring transaction automation**: recurring templates with frequency, optional end date, and a server-computed next-due date. A Vercel Cron job (or the in-app **Process Recurring** button) materializes occurrences automatically — each one appears as a normal transaction linked to its template.
 - **Natural-language quick entry**: type *"paid $45 for groceries yesterday"* on the Transactions page and the AI extracts the fields into the add-transaction form for review.
 - **Reports page with PDF/CSV export**: month or trailing-12-month summaries — income vs. expenses, savings rate, category breakdowns, account balances, and transactions — downloadable as a formatted PDF or CSV.
-- **Weekly AI digest**: a generated summary of the week (spending, budgets, goals, debts) rendered on the dashboard, with one-click regeneration.
+- **Weekly AI digest**: a generated summary of the week (spending, budgets, goals, debts) on the dedicated **Digest** page, with week/month/year/custom periods, one-click (re)generation, an archive of past digests, and an "Ask AI" drill-in.
 - Recurring transaction metadata and CSV export.
 - Category-based budgets with visual threshold states.
 - Savings goals with contribution tracking.
@@ -44,7 +44,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 ### Premium User Experience
 
 - Responsive design for desktop and mobile.
-- Light, dark, and system themes with multiple color options.
+- Light, dark, and system themes with seven accent colors (Default, Emerald, Navy, Violet, Cyan, Rose, Sunset).
 - Progressive Web App support through Vite PWA.
 - Multi-currency support: USD, INR, EUR, GBP, and JPY.
 - Regional date-format preferences.
@@ -278,7 +278,7 @@ The app uses Neon PostgreSQL with these primary tables:
 
 | Table | Description |
 | --- | --- |
-| `profiles` | User profile, currency, regional preferences, and AI settings stored in JSONB |
+| `profiles` | User profile with a `currency` column plus a `preferences` JSONB holding regional/date prefs and AI settings |
 | `accounts` | Checking, savings, credit, investment, and cash accounts |
 | `categories` | Income and expense categories with custom colors and icons |
 | `transactions` | Income, expense, transfer, and recurring transaction records |
@@ -309,7 +309,7 @@ on the API layer.
 
 ## Support
 
-For questions or issues, open a GitHub issue or use [HowToUse.md](./HowToUse.md) for feature guidance.
+For questions or issues, open a GitHub issue and refer to the feature descriptions above.
 
 ## License
 

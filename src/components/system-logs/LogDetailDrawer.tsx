@@ -170,9 +170,9 @@ export function LogDetailDrawer({
 												return (
 													<Badge
 														variant="outline"
-														className={`text-xs font-medium border gap-1 ${config.solid ?? config.color}`}
+														className={`text-xs font-medium border inline-flex items-center gap-1.5 ${config.solid ?? config.color}`}
 													>
-														<config.icon aria-hidden="true" />
+														<config.icon className="h-3 w-3 shrink-0" aria-hidden="true" />
 														{config.label}
 													</Badge>
 												);
