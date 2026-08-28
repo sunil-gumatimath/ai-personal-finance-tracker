@@ -18,6 +18,7 @@ export interface ParsedTransaction {
 	/** Best-effort name hints from the model, for the client to display. */
 	category_name: string | null;
 	account_name: string | null;
+	to_account_name: string | null;
 }
 
 const VALID_TYPES = new Set<ParsedTransactionType>([
@@ -103,13 +104,23 @@ export function parseTransactionExtractionJson(
 	const categoryId = cleanString(record.category_id, 64);
 	const accountId = cleanString(record.account_id, 64);
 	const toAccountId = cleanString(record.to_account_id, 64);
+	const categoryName = cleanString(record.category_name, 100);
+	const accountName = cleanString(record.account_name, 100);
+	const toAccountName = cleanString(record.to_account_name, 100);
 
 	if (!type || amount === null || !date) return null;
-	if (
-		type === "transfer" &&
-		(!accountId || !toAccountId || accountId === toAccountId)
-	) {
-		return null;
+	if (type === "transfer") {
+		const fromSpecified = Boolean(accountId || accountName);
+		const toSpecified = Boolean(toAccountId || toAccountName);
+		if (!fromSpecified || !toSpecified) return null;
+		if (accountId && toAccountId && accountId === toAccountId) return null;
+		if (
+			accountName &&
+			toAccountName &&
+			accountName.toLowerCase() === toAccountName.toLowerCase()
+		) {
+			return null;
+		}
 	}
 
 	return {
@@ -120,7 +131,8 @@ export function parseTransactionExtractionJson(
 		category_id: type === "transfer" ? null : categoryId,
 		account_id: accountId,
 		to_account_id: type === "transfer" ? toAccountId : null,
-		category_name: cleanString(record.category_name, 100),
-		account_name: cleanString(record.account_name, 100),
+		category_name: categoryName,
+		account_name: accountName,
+		to_account_name: type === "transfer" ? toAccountName : null,
 	};
 }

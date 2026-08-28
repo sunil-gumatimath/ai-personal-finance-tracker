@@ -51,6 +51,15 @@ describe("AIQueryProcessor", () => {
 			expect(AIQueryProcessor.extractTimeframe("all time")).toBe("all");
 		});
 
+		test("does not falsely treat 'current' in 'current monthly spending' as today", () => {
+			expect(
+				AIQueryProcessor.extractTimeframe("what is my current monthly spending"),
+			).toBe("month");
+			expect(
+				AIQueryProcessor.extractTimeframe("show current budget status"),
+			).toBeUndefined();
+		});
+
 		test("returns undefined when no timeframe is mentioned", () => {
 			expect(
 				AIQueryProcessor.extractTimeframe("how is my savings"),

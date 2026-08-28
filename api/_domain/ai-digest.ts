@@ -177,14 +177,14 @@ function renderBudgetCheck(stats: DigestStats): string {
 }
 
 function renderGoalsAndDebt(stats: DigestStats, prose: DigestProse): string {
-	const goalLines = stats.goals.map((g) => {
+	const goalLines = stats.goals.map((g, index) => {
 		const base = `- **${g.name}:** ${stats.money(g.current)} / ${stats.money(g.target)} (${g.percent.toFixed(0)}% complete)`;
-		const callout = prose.goal_callouts.find((c) => c.length > 0);
+		const callout = prose.goal_callouts[index]?.trim();
 		return callout ? `${base} — ${callout}` : base;
 	});
-	const debtLines = stats.debts.map((d) => {
+	const debtLines = stats.debts.map((d, index) => {
 		const base = `- **${d.name}:** ${stats.money(d.balance)} remaining at ${d.rate}% interest`;
-		const callout = prose.debt_callouts.find((c) => c.length > 0);
+		const callout = prose.debt_callouts[index]?.trim();
 		return callout ? `${base} — ${callout}` : base;
 	});
 	const lines = [...goalLines, ...debtLines];

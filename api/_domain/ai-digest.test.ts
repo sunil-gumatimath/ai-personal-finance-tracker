@@ -137,4 +137,31 @@ describe("renderDigestMarkdown", () => {
 		expect(md).toContain("you earned $5,000.00 and spent $730.00");
 		expect(md).toContain("net savings of $4,270.00");
 	});
+
+	test("maps goal and debt callouts by index without duplicating across all rows", () => {
+		const multiStats: typeof stats = {
+			...stats,
+			goals: [
+				{ name: "Emergency Fund", current: 2000, target: 10000, percent: 20 },
+				{ name: "New Laptop", current: 500, target: 1000, percent: 50 },
+			],
+			debts: [
+				{ name: "Car Loan", balance: 8000, rate: 5 },
+				{ name: "Credit Card", balance: 1200, rate: 18 },
+			],
+		};
+
+		const md = renderDigestMarkdown(multiStats, {
+			review: "Great week",
+			observation: "Top spending normal",
+			tip: "Save more",
+			goal_callouts: ["Great start on your emergency fund", "Halfway there on laptop"],
+			debt_callouts: ["Steady progress on car loan", "Target high interest card first"],
+		});
+
+		expect(md).toContain("- **Emergency Fund:** $2,000.00 / $10,000.00 (20% complete) — Great start on your emergency fund");
+		expect(md).toContain("- **New Laptop:** $500.00 / $1,000.00 (50% complete) — Halfway there on laptop");
+		expect(md).toContain("- **Car Loan:** $8,000.00 remaining at 5% interest — Steady progress on car loan");
+		expect(md).toContain("- **Credit Card:** $1,200.00 remaining at 18% interest — Target high interest card first");
+	});
 });

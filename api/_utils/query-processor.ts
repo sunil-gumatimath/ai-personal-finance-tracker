@@ -47,7 +47,7 @@ interface ProcessedQuery {
 
 class AIQueryProcessor {
   static TIMEFRAME_PATTERNS: Record<string, RegExp> = {
-    today: /today|now|current/i,
+    today: /\b(today|right now)\b/i,
     week: /this week|past week|last 7 days|past 7 days/i,
     month: /this month|past month|last 30 days|past 30 days|monthly/i,
     last_month: /last month|previous month/i,

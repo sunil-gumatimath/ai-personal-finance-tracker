@@ -37,6 +37,12 @@ const ANOMALY_THRESHOLDS: Record<string, number> = {
   CAD: 60,
   AUD: 60,
   CNY: 300,
+  SGD: 65,
+  CHF: 50,
+  BRL: 250,
+  MXN: 800,
+  IDR: 750000,
+  VND: 1200000,
 };
 
 const DEFAULT_ANOMALY_THRESHOLD = 50;
@@ -84,8 +90,11 @@ export function detectAnomalies(
 
   const anomalies: DetectedInsight[] = [];
   for (const [categoryName, stats] of byCategory) {
-    const average = stats.total / stats.count;
+    if (stats.count < 2) continue;
     for (const t of stats.recent) {
+      const baselineTotal = stats.total - t.amount;
+      const baselineCount = stats.count - 1;
+      const average = baselineCount > 0 ? baselineTotal / baselineCount : stats.total / stats.count;
       if (t.amount > average * ANOMALY_MULTIPLIER && t.amount > threshold) {
         anomalies.push({
           type: "anomaly",
@@ -95,9 +104,10 @@ export function detectAnomalies(
           amount: t.amount,
           date: t.date,
         });
-        if (anomalies.length >= MAX_ANOMALIES) return anomalies;
+        break; // At most 1 top anomaly per category to maintain diversity
       }
     }
+    if (anomalies.length >= MAX_ANOMALIES) return anomalies;
   }
 
   return anomalies;

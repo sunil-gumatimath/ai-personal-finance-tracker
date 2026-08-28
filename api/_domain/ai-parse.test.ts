@@ -23,6 +23,32 @@ describe("parseTransactionExtractionJson", () => {
 			to_account_id: null,
 			category_name: "Food",
 			account_name: "Checking",
+			to_account_name: null,
+		});
+	});
+
+	test("parses a valid transfer with distinct accounts", () => {
+		const parsed = parseTransactionExtractionJson(
+			JSON.stringify({
+				type: "transfer",
+				amount: 150,
+				description: "Savings deposit",
+				account_name: "Checking",
+				to_account_name: "Savings",
+				date: "2026-08-03",
+			}),
+		);
+		expect(parsed).toEqual({
+			type: "transfer",
+			amount: 150,
+			description: "Savings deposit",
+			date: "2026-08-03",
+			category_id: null,
+			account_id: null,
+			to_account_id: null,
+			category_name: null,
+			account_name: "Checking",
+			to_account_name: "Savings",
 		});
 	});
 

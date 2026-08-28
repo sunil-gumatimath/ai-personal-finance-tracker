@@ -28,9 +28,16 @@ export async function resolveAiPreferences(
 		currency: string | null;
 	}>("SELECT preferences, currency FROM profiles WHERE user_id = $1", [userId]);
 
+	// Only "kilocode" is supported today; the provider layer unconditionally
+	// dispatches to KiloCode, so any other value would be silently ignored
+	// downstream (M9). Coerce to the default instead of persisting an unknown
+	// provider that looks configured but does nothing.
 	const allowedRequestPrefs: Record<string, unknown> = {};
-	if (requestPrefs && typeof requestPrefs["aiProvider"] === "string") {
-		allowedRequestPrefs["aiProvider"] = requestPrefs["aiProvider"];
+	if (
+		requestPrefs &&
+		requestPrefs["aiProvider"] === "kilocode"
+	) {
+		allowedRequestPrefs["aiProvider"] = "kilocode";
 	}
 
 	const decrypted = decryptPreferences(profile?.preferences || {}) || {};

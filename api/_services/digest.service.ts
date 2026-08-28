@@ -46,26 +46,58 @@ const EMPTY_PROSE: DigestProse = {
 	debt_callouts: [],
 };
 
+export interface DigestOptions {
+	period?: "week" | "month" | "year" | "custom";
+	days?: number;
+	startDate?: string;
+	endDate?: string;
+}
+
+export interface DigestGenerationResult {
+	content: string;
+	startDate: string;
+	endDate: string;
+}
+
 /**
- * Generate the weekly digest content (markdown) for a user from their last 7
- * days of data.
+ * Generate digest content (markdown) for a user from their data over the
+ * requested timeframe (week, month, year, or custom days).
  *
  * All numbers in the digest are computed server-side from the database; the
  * model only writes prose (via a strict JSON response), so invented figures
  * or broken structure are impossible. When the model's response is unusable,
- * a fully server-generated digest is returned instead of failing.
- *
- * Throws MissingApiKeyError when no AI key is configured.
+ * a fully server-generated digest is returned instead of failing with a 500 error.
  */
 export async function generateWeeklyDigestContent(
 	userId: string,
-): Promise<string> {
-	const { prefs, currency, hasKey } = await resolveAiPreferences(userId);
-	if (!hasKey) {
-		throw new MissingApiKeyError(
-			"KiloCode API key is not configured. Please add it in Settings > Preferences > AI Integration.",
-		);
+	options?: DigestOptions,
+	signal?: AbortSignal,
+): Promise<DigestGenerationResult> {
+	const { prefs, currency } = await resolveAiPreferences(userId);
+
+	let days = 7;
+	let periodTitle = "weekly";
+	let periodLabel = "the last 7 days";
+
+	if (options?.period === "month") {
+		days = 30;
+		periodTitle = "monthly";
+		periodLabel = "the last 30 days";
+	} else if (options?.period === "year") {
+		days = 365;
+		periodTitle = "annual / yearly";
+		periodLabel = "the last 365 days (1 year)";
+	} else if (options?.period === "custom" && typeof options.days === "number" && options.days > 0) {
+		days = Math.min(Math.max(options.days, 1), 3650);
+		periodTitle = `${days}-day`;
+		periodLabel = `the last ${days} days`;
 	}
+
+	const today = new Date();
+	const endDateStr = options?.endDate || today.toISOString().slice(0, 10);
+	const startObj = new Date(today);
+	startObj.setDate(startObj.getDate() - days);
+	const startDateStr = options?.startDate || startObj.toISOString().slice(0, 10);
 
 	const formatNumber = (value: unknown): number =>
 		typeof value === "number" ? value : Number(value || 0);
@@ -82,9 +114,9 @@ export async function generateWeeklyDigestContent(
 			`SELECT t.type, t.amount, t.description, t.date, row_to_json(c.*) as category
          FROM transactions t
          LEFT JOIN categories c ON t.category_id = c.id AND c.user_id = t.user_id
-         WHERE t.user_id = $1 AND t.date >= CURRENT_DATE - INTERVAL '7 days'
+         WHERE t.user_id = $1 AND t.date >= $2::date AND t.date <= $3::date
          ORDER BY t.date DESC`,
-			[userId],
+			[userId, startDateStr, endDateStr],
 		),
 		query<DigestBudgetRow>(
 			`SELECT b.amount, b.period, c.name as category_name,
@@ -93,9 +125,9 @@ export async function generateWeeklyDigestContent(
          LEFT JOIN categories c ON b.category_id = c.id AND c.user_id = b.user_id
          LEFT JOIN transactions t ON t.category_id = b.category_id AND t.user_id = b.user_id
            AND t.date >= CASE b.period
-             WHEN 'weekly'  THEN GREATEST(b.start_date, CURRENT_DATE - INTERVAL '7 days')
-             WHEN 'monthly' THEN GREATEST(b.start_date, DATE_TRUNC('month', CURRENT_DATE))
-             ELSE GREATEST(b.start_date, DATE_TRUNC('year', CURRENT_DATE))
+             WHEN 'weekly'  THEN GREATEST(COALESCE(b.start_date, '1970-01-01'::date), CURRENT_DATE - INTERVAL '7 days')
+             WHEN 'monthly' THEN GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('month', CURRENT_DATE))
+             ELSE GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('year', CURRENT_DATE))
            END
          WHERE b.user_id = $1 AND (b.end_date IS NULL OR b.end_date >= CURRENT_DATE)
          GROUP BY b.id, b.amount, b.period, c.name`,
@@ -194,7 +226,7 @@ export async function generateWeeklyDigestContent(
 
 	// ---- Ask the model for prose only, as strict JSON -----------------------
 	const context = `
-**Data window:** the 7 days ending today (${new Date().toISOString().slice(0, 10)}).
+**Data window:** ${periodLabel} (${startDateStr} to ${endDateStr}).
 **Currency:** ${currency}
 **Income:** ${money(income)} (${stats.incomeCount} transactions)
 **Expenses:** ${money(expenses)} (${stats.expenseCount} transactions)
@@ -202,7 +234,7 @@ export async function generateWeeklyDigestContent(
 **Top categories:** ${topCategories.map((c) => `${c.name}: ${money(c.amount)} (${c.percent.toFixed(0)}%)`).join("; ") || "none"}
 ${
 	txList
-		.slice(0, 10)
+		.slice(0, 15)
 		.map(
 			(t) =>
 				`- ${t.date} ${t.type === "income" ? "+" : t.type === "transfer" ? "⇄" : "-"}${money(formatNumber(t.amount))} ${t.category?.name ? `[${t.category.name}]` : ""} ${t.description || ""}`,
@@ -215,7 +247,7 @@ ${
 `;
 
 	const prompt = `
-You are a personal finance coach writing the prose for a user's weekly digest.
+You are a personal finance coach writing the prose for a user's ${periodTitle} digest.
 
 **The user's data (all numbers are computed — use them as-is, never compute or invent your own):**
 ${context}
@@ -223,7 +255,7 @@ ${context}
 Write the digest prose. Return ONLY a JSON object with exactly these keys:
 
 {
-  "review": "1-2 sentence summary of the week's income, spending and net",
+  "review": "1-2 sentence summary of the period's income, spending and net",
   "observation": "one short observation about the top spending categories",
   "tip": "one actionable tip tailored to the data",
   "goal_callouts": ["one short note per goal worth mentioning (no numbers)"],
@@ -236,27 +268,40 @@ Rules:
 3. Each string under 200 characters. No emojis. No markdown inside the strings. JSON only — no code fences, no extra text.
 `;
 
-	// JSON mode keeps reasoning models from leaking chain-of-thought into the
-	// response. Some gateway models reject response_format with a 400 — for
-	// those, retry in plain text mode and let the parser extract the JSON.
-	let raw: string;
+	let prose = EMPTY_PROSE;
 	try {
-		raw = await generateWithProvider(prompt, prefs, {
-			responseMimeType: "application/json",
-		});
-	} catch (error) {
-		if (error instanceof KiloCodeApiError && error.status === 400) {
-			raw = await generateWithProvider(prompt, prefs);
-		} else {
-			throw error;
+		let raw: string;
+		try {
+			raw = await generateWithProvider(
+				prompt,
+				prefs,
+				{
+					responseMimeType: "application/json",
+				},
+				signal,
+			);
+		} catch (error) {
+			if (error instanceof KiloCodeApiError && error.status === 400) {
+				raw = await generateWithProvider(prompt, prefs, undefined, signal);
+			} else {
+				throw error;
+			}
 		}
+
+		prose = parseDigestJson(raw) ?? EMPTY_PROSE;
+	} catch (err) {
+		console.warn(
+			"[Digest Service] LLM call failed or unavailable; falling back to deterministic digest rendering:",
+			err instanceof Error ? err.message : String(err),
+		);
+		prose = EMPTY_PROSE;
 	}
 
-	// Never trust the model: on any parse failure fall back to a fully
-	// server-generated digest (renderer fills in neutral prose).
-	const prose = parseDigestJson(raw) ?? EMPTY_PROSE;
-
-	return stripEmojis(renderDigestMarkdown(stats, prose));
+	return {
+		content: stripEmojis(renderDigestMarkdown(stats, prose)),
+		startDate: startDateStr,
+		endDate: endDateStr,
+	};
 }
 
 /**
