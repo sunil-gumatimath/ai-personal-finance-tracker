@@ -43,10 +43,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 	if (req.method === "GET") {
 		try {
 			const { rows } = await query<DigestRow>(
-				`SELECT * FROM ai_digests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+				`SELECT * FROM ai_digests WHERE user_id = $1 ORDER BY week_start DESC LIMIT 20`,
 				[userId],
 			);
-			res.status(200).json({ digest: rows[0] || null });
+			res.status(200).json({
+				digest: rows[0] || null,
+				history: rows,
+			});
 		} catch (error) {
 			console.error("AI digest GET error:", error);
 			sendApiError(res, error);
@@ -56,17 +59,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
 	if (req.method === "POST") {
 		try {
-			const content = await generateWeeklyDigestContent(userId);
-			const weekStart = getWeekStart();
+			const body = (req.body && typeof req.body === "object" ? req.body : {}) as {
+				period?: "week" | "month" | "year" | "custom";
+				days?: number;
+				startDate?: string;
+				endDate?: string;
+			};
 
-			// Upsert the digest for this week.
+			const result = await generateWeeklyDigestContent(userId, body, req.signal);
+			const weekStart = result.startDate || getWeekStart();
+
+			// Upsert the digest for this timeframe.
 			const { rows } = await query<DigestRow>(
 				`INSERT INTO ai_digests (user_id, week_start, content)
          VALUES ($1, $2, $3)
          ON CONFLICT (user_id, week_start)
          DO UPDATE SET content = EXCLUDED.content, created_at = NOW()
          RETURNING *`,
-				[userId, weekStart, content],
+				[userId, weekStart, result.content],
 			);
 
 			res.status(200).json({ digest: rows[0] || null });

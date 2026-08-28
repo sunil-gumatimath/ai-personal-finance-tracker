@@ -1,5 +1,6 @@
 import {
 	generateWithKiloCode,
+	streamWithKiloCode,
 	KiloCodeApiError,
 	isFreeModel,
 	getFreeModelIds,
@@ -29,6 +30,7 @@ export async function generateWithProvider(
 	prompt: string,
 	prefs: AIProviderPreferences,
 	options?: { responseMimeType?: string },
+	signal?: AbortSignal,
 ): Promise<string> {
 	const key =
 		prefs.kilocodeApiKey?.trim() || process.env.KILOCODE_API_KEY?.trim();
@@ -38,15 +40,29 @@ export async function generateWithProvider(
 		);
 	}
 
-	// Only free models are allowed. An empty model falls back to the default.
-	if (prefs.kilocodeModel && !isFreeModel(prefs.kilocodeModel)) {
-		throw new KiloCodeApiError(
-			`Model "${prefs.kilocodeModel.trim()}" is not in the free model list. Allowed models: ${getFreeModelIds().join(", ")}`,
-			400,
+	return generateWithKiloCode(prompt, key, prefs.kilocodeModel, options, signal);
+}
+
+/**
+ * Streaming counterpart of generateWithProvider: resolves the API key,
+ * enforces the free-model allowlist, then yields text deltas from the
+ * gateway as they arrive.
+ */
+export async function* streamWithProvider(
+	prompt: string,
+	prefs: AIProviderPreferences,
+	options?: { responseMimeType?: string },
+	signal?: AbortSignal,
+): AsyncGenerator<string> {
+	const key =
+		prefs.kilocodeApiKey?.trim() || process.env.KILOCODE_API_KEY?.trim();
+	if (!key) {
+		throw new MissingApiKeyError(
+			"KiloCode API key is not configured. Please add it in Settings > Preferences > AI Integration.",
 		);
 	}
 
-	return generateWithKiloCode(prompt, key, prefs.kilocodeModel, options);
+	yield* streamWithKiloCode(prompt, key, prefs.kilocodeModel, options, signal);
 }
 
 export class MissingApiKeyError extends Error {

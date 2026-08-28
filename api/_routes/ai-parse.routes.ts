@@ -117,9 +117,14 @@ ${accountList || "(none — user has no accounts yet)"}
 7. Never include extra keys.
 `;
 
-		const response = await generateWithProvider(prompt, prefs, {
-			responseMimeType: "application/json",
-		});
+		const response = await generateWithProvider(
+			prompt,
+			prefs,
+			{
+				responseMimeType: "application/json",
+			},
+			req.signal,
+		);
 
 		const parsed = parseTransactionExtractionJson(response);
 		if (!parsed) {
@@ -161,13 +166,13 @@ ${accountList || "(none — user has no accounts yet)"}
 		const account = resolveAccount(parsed.account_id, parsed.account_name);
 		const toAccount =
 			parsed.type === "transfer"
-				? resolveAccount(parsed.to_account_id, null)
+				? resolveAccount(parsed.to_account_id, parsed.to_account_name)
 				: null;
 
-		if (!account && activeAccounts.length > 0) {
+		if (parsed.type === "transfer" && (!account || !toAccount) && activeAccounts.length > 0) {
 			res.status(422).json({
 				error:
-					"Could not match a known account. Available accounts: " + accountList,
+					"Transfers require both source and destination accounts. Available accounts: " + accountList,
 			});
 			return;
 		}

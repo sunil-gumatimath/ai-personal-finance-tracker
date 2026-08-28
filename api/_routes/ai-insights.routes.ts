@@ -75,7 +75,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 			res.status(200).json({ insights: rows });
 		} catch (error) {
 			console.error("AI insights GET error:", error);
-			res.status(500).json({ error: "Server error" });
+			sendApiError(res, error);
 		}
 		return;
 	}
@@ -115,12 +115,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 				amount: number | string | null;
 				description: string | null;
 				date: string;
-				category: { name?: string } | null;
+				category_name: string | null;
 			};
 
+			// Only the columns anomaly detection / summarization need — a
+			// SELECT * over six months of transactions shipped every row's
+			// metadata (ids, timestamps, user ids) for nothing.
 			const { rows: transactions } = await query<TransactionWithCategory>(
 				`
-        SELECT t.*, row_to_json(c.*) as category
+        SELECT t.type, t.amount, t.description, t.date, c.name as category_name
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id AND c.user_id = t.user_id
         WHERE t.user_id = $1
@@ -141,7 +144,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 						amount: Number(t.amount || 0),
 						description: t.description,
 						date: t.date,
-						categoryName: t.category?.name ?? null,
+						categoryName: t.category_name,
 					})),
 				currency,
 				(amount: number) => formatCurrency(amount, currency),
@@ -152,37 +155,72 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 				hasKiloKey || Boolean(process.env.KILOCODE_API_KEY?.trim());
 
 			if (hasKey && transactions.length > 0) {
-				// Recompute per-category averages for the prompt.
-				const spendingSummary: { category: string; average: number }[] = [];
-				const categoryTotals = new Map<
-					string,
-					{ total: number; count: number }
-				>();
+				const now = new Date();
+				const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+				const priorMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+				const priorMonthKey = `${priorMonthDate.getFullYear()}-${String(priorMonthDate.getMonth() + 1).padStart(2, "0")}`;
+
+				const currentMonthCatSpend = new Map<string, number>();
+				const priorMonthCatSpend = new Map<string, number>();
+				const categoryTotals = new Map<string, { total: number; count: number }>();
+				let currentMonthIncome = 0;
+				let currentMonthExpenses = 0;
+
 				for (const t of transactions || []) {
+					const txMonth = t.date ? String(t.date).substring(0, 7) : "";
+					const amt = Number(t.amount || 0);
 					if (t.type === "expense") {
-						const name = t.category?.name || "Uncategorized";
+						const name = t.category_name || "Uncategorized";
 						const stats = categoryTotals.get(name) ?? { total: 0, count: 0 };
-						stats.total += Number(t.amount || 0);
+						stats.total += amt;
 						stats.count += 1;
 						categoryTotals.set(name, stats);
 					}
+
+					if (txMonth === currentMonthKey) {
+						if (t.type === "income") currentMonthIncome += amt;
+						if (t.type === "expense") {
+							currentMonthExpenses += amt;
+							const cat = t.category_name || "Uncategorized";
+							currentMonthCatSpend.set(cat, (currentMonthCatSpend.get(cat) || 0) + amt);
+						}
+					} else if (txMonth === priorMonthKey) {
+						if (t.type === "expense") {
+							const cat = t.category_name || "Uncategorized";
+							priorMonthCatSpend.set(cat, (priorMonthCatSpend.get(cat) || 0) + amt);
+						}
+					}
 				}
-				for (const [cat, stats] of categoryTotals) {
-					spendingSummary.push({
+
+				const currentSavingsRate = currentMonthIncome > 0
+					? Math.round(((currentMonthIncome - currentMonthExpenses) / currentMonthIncome) * 100)
+					: 0;
+
+				const categoryComparisons = [...categoryTotals.entries()].slice(0, 6).map(([cat, stats]) => {
+					const cur = currentMonthCatSpend.get(cat) || 0;
+					const prev = priorMonthCatSpend.get(cat) || 0;
+					const sixMonthAvg = Math.round(stats.total / stats.count);
+					return {
 						category: cat,
-						average: stats.total / stats.count,
-					});
-				}
+						currentMonth: cur,
+						priorMonth: prev,
+						sixMonthAvg,
+						changeFromPrior: prev > 0 ? `${Math.round(((cur - prev) / prev) * 100)}%` : "N/A",
+					};
+				});
 
 				const prompt = `
-I am a personal finance AI agent. Analyze the following spending data:
+I am a personal finance AI agent. Analyze the following real monthly spending metrics:
 Currency: ${currency}
-Category Stats: ${JSON.stringify(spendingSummary)}
+Current Month Income: ${formatCurrency(currentMonthIncome, currency)}
+Current Month Expenses: ${formatCurrency(currentMonthExpenses, currency)}
+Current Savings Rate: ${currentSavingsRate}%
+Category Month-over-Month Comparisons: ${JSON.stringify(categoryComparisons)}
 
 Generate 2-3 specific, actionable financial insights focusing on:
-- Spending shifts (Coaching)
-- Success stories where spending decreased (Kudo)
-- Actionable advice
+- Spending shifts and trends (Coaching)
+- Success stories where spending decreased or savings rate improved (Kudo)
+- Actionable budgeting/savings advice
 
 Return ONLY a JSON object containing an insights array:
 {"insights": [{"type": "coaching" | "kudo", "title": "Title", "description": "Description"}]}
@@ -208,6 +246,7 @@ No markdown, no extra text, and NO emojis.
 						prompt,
 						aiPrefs,
 						options,
+						req.signal,
 					);
 					if (aiResponse) {
 						// Strictly validate whatever the model returned; never trust it.
@@ -263,7 +302,7 @@ No markdown, no extra text, and NO emojis.
 			res.status(200).json({ insights: saved });
 		} catch (error) {
 			console.error("AI insights POST error:", error);
-			res.status(500).json({ error: "Server error" });
+			sendApiError(res, error);
 		}
 		return;
 	}

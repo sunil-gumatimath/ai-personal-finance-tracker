@@ -142,12 +142,35 @@ try {
       const mockReq: ApiRequest = {
         method: req.method,
         body,
+        signal: req.signal,
         headers: Object.fromEntries(req.headers.entries()),
         query: Object.fromEntries(url.searchParams.entries()),
       }
 
       let status = 200
       let responseBody: string | null = null
+
+      // Chunked-streaming support: a route calls startChunkedStream to switch
+      // its response into progressive mode (used by AI chat). The Response is
+      // handed back to Bun as soon as that happens, so chunks reach the client
+      // while the handler is still running.
+      let streamReadable: ReadableStream<Uint8Array> | null = null
+      let streamController: ReadableStreamDefaultController<Uint8Array> | null =
+        null
+      let streamStarted = false
+      let notifyStreamStarted: () => void = () => {}
+      const streamStartedPromise = new Promise<void>((resolve) => {
+        notifyStreamStarted = resolve
+      })
+      const encoder = new TextEncoder()
+      const enqueueLine = (line: string) => {
+        try {
+          streamController?.enqueue(encoder.encode(line))
+        } catch {
+          // stream already closed — nothing to do
+        }
+      }
+
       const mockRes: ApiResponse = {
         status(s: number) {
           status = s
@@ -165,11 +188,78 @@ try {
           responseBody = typeof data === 'string' ? data : data == null ? null : String(data)
           return this
         },
+        startChunkedStream(contentType: string) {
+          if (streamStarted) return null
+          streamStarted = true
+          headers.set('Content-Type', contentType)
+          headers.set('Cache-Control', 'no-cache, no-transform')
+          headers.set('X-Accel-Buffering', 'no')
+          streamReadable = new ReadableStream<Uint8Array>({
+            start(c) {
+              streamController = c
+            },
+          })
+          notifyStreamStarted()
+          return {
+            write(chunk: string) {
+              enqueueLine(chunk)
+            },
+            close() {
+              try {
+                streamController?.close()
+              } catch {
+                // already closed
+              }
+            },
+          }
+        },
       }
 
       try {
         console.log(`✨ ${req.method} ${pathname}`)
-        await handler(mockReq, mockRes)
+        const handled = handler(mockReq, mockRes)
+
+        const settled = await Promise.race([
+          handled.then(
+            () => 'done' as const,
+            (error: unknown) => ({ error }),
+          ),
+          streamStartedPromise.then(() => 'stream' as const),
+        ])
+
+        if (settled === 'stream') {
+          // Streaming response: keep the handler running in the background and
+          // close the stream once it settles (or surface a final error event).
+          void handled
+            .catch((streamError: unknown) => {
+              console.error(`💥 Error in ${pathname}:`, streamError)
+              logEvent(null, {
+                action: 'ERROR',
+                resource: pathname,
+                newValue:
+                  streamError instanceof Error
+                    ? streamError.message
+                    : String(streamError),
+                severity: 'critical',
+                status: 'failure',
+              }).catch(() => {})
+              enqueueLine(
+                `${JSON.stringify({ type: 'error', message: 'Internal Server Error' })}\n`,
+              )
+            })
+            .finally(() => {
+              try {
+                streamController?.close()
+              } catch {
+                // already closed
+              }
+            })
+          console.log(`🌊 Streaming response started`)
+          return new Response(streamReadable, { status: 200, headers })
+        }
+
+        if (settled !== 'done') throw (settled as { error: unknown }).error
+
         console.log(`✅ Handler finished`)
         return new Response(responseBody, { status, headers })
       } catch (error: unknown) {

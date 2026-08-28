@@ -75,6 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 	const apiReq: ApiRequest = {
 		method: req.method,
 		body,
+		signal: (req as unknown as { signal?: AbortSignal }).signal,
 		headers: Object.fromEntries(
 			Object.entries(req.headers).map(([k, v]) => [
 				k,
@@ -90,6 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 	};
 
 	let responseStatus = 200;
+	let streamStarted = false;
 	const apiRes: ApiResponse = {
 		status(code) {
 			responseStatus = code;
@@ -111,12 +113,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 				);
 			return this;
 		},
+		startChunkedStream(contentType) {
+			if (streamStarted || res.headersSent) return null;
+			streamStarted = true;
+			res.status(200);
+			res.setHeader("Content-Type", contentType);
+			res.setHeader("Cache-Control", "no-cache, no-transform");
+			// Disable proxy buffering so chunks flush to the client immediately.
+			res.setHeader("X-Accel-Buffering", "no");
+			return {
+				write(chunk) {
+					res.write(chunk);
+				},
+				close() {
+					res.end();
+				},
+			};
+		},
 	};
 
 	try {
 		await routeHandler(apiReq, apiRes);
 	} catch (error) {
 		console.error(`Error in ${pathname}:`, error);
+
+		// Once a chunked stream has started the status line is already sent;
+		// surface the failure as a final stream event instead of a 500 JSON body.
+		if (streamStarted && !res.writableEnded) {
+			res.write(
+				`${JSON.stringify({ type: "error", message: "Internal Server Error" })}\n`,
+			);
+			res.end();
+			return;
+		}
+
 		logEvent(null, {
 			action: "ERROR",
 			resource: pathname,
