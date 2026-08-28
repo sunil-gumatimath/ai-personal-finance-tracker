@@ -2,8 +2,6 @@
 
 A premium, AI-powered personal finance management platform for tracking transactions, budgets, goals, accounts, debts, and financial health. The app combines a responsive React interface with Bun-powered API routes, Neon PostgreSQL storage, persisted AI insights, and configurable AI providers.
 
-
-
 ## Features
 
 ### AI-Powered Intelligence
@@ -167,9 +165,11 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pu
 
 In-progress runs for the same branch are cancelled automatically so the latest commit is always what gets checked.
 
-## API Reference
+## Documentation
 
-All endpoints, conventions, and error codes are documented in [docs/API.md](docs/API.md).
+- [API reference](docs/API.md) — endpoints, authentication, errors, rate limits, and cron behavior.
+- Database migrations in `database/migrations/` are the canonical schema history and must be applied in filename order.
+- Pull requests use the checklist in `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## AI Features
 
@@ -223,8 +223,6 @@ Notes:
 │   │   └── ui/                # Shadcn/Radix primitives (button, card, dialog, table, etc.)
 │   ├── contexts/              # React contexts: authentication (HttpOnly cookie) and global preferences
 │   ├── features/              # Feature modules with colocated components and public entrypoints
-│   │   ├── accounts/          # Account management UI and logic
-│   │   ├── budgets/           # Budget management UI and logic
 │   │   ├── dashboard/         # Cards, charts, AI coach/chat, and financial health
 │   │   ├── debts/             # Debt cards, payment modals, and payoff planner
 │   │   ├── system-logs/       # Log timeline, detail drawer, and visual helpers

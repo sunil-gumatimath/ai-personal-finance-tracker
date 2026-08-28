@@ -4,7 +4,7 @@ The API is served under `/api/*` from a single Vercel serverless function
 (`api/handler.ts`). The local Bun dev server (`api/_server.ts`) shares the
 same route registry, so behavior is identical in development and production.
 
-All endpoints are JSON. Authentication uses an HttpOnly session cookie
+Unless noted otherwise, endpoints return JSON. Authentication uses an HttpOnly session cookie
 (`pft_session`, `SameSite=Strict`, `Secure` in production) issued by Neon Auth —
 no bearer tokens in the client. Requests without a valid session return
 `401 { "error": "Unauthorized" }` (the cron route is the exception: it
@@ -164,4 +164,5 @@ Recurring templates carry `recurring_frequency`, an optional `recurring_end_date
 ## Neon Auth proxy
 
 `/neon-auth/auth/*` is rewritten to the Neon Auth backend
-(`/neondb/auth/*`) for password reset and account flows.
+(`/neondb/auth/*`) for password reset and account flows. These requests are
+proxied by Vercel and are not part of the `/api/*` route registry.
