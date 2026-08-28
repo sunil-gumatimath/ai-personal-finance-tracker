@@ -34,8 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import { currencyLocales } from "@/types/preferences";
 import { usePreferences } from "@/hooks/usePreferences";
-import { LogDetailDrawer } from "@/components/system-logs/LogDetailDrawer";
-import { LogTimeline } from "@/components/system-logs/LogTimeline";
+import { LogDetailDrawer, LogTimeline } from "@/features/system-logs";
 import { useSystemLogs } from "@/hooks/useSystemLogs";
 import { buildLogExport, downloadLogFile } from "@/lib/log-export";
 import { formatAction, generateHumanDescription, type FormatOptions } from "@/lib/log-formatter";

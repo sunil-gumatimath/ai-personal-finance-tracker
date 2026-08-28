@@ -6,6 +6,7 @@ node_modules/
 # Bun
 bun-debug.log*
 bun.lockb
+.bun/
 
 # Lock files from other package managers
 # This project uses bun.lock as the canonical lockfile.
@@ -49,6 +50,8 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+.envrc
+.direnv/
 *.pem
 *.key
 *.crt
@@ -82,11 +85,15 @@ test-*.json
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.fleet/
+.zed/
+*.code-workspace
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.swn
 
 # OS files
 .DS_Store
@@ -108,4 +115,6 @@ src/tests/
 .history/
 *.orig
 *.rej
+*.stackdump
+core.*
 .playwright-cli/

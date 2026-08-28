@@ -218,17 +218,17 @@ Notes:
 ├── src/
 │   ├── app/                   # Frontend entrypoint and root router (main.tsx, App.tsx)
 │   ├── components/
-│   │   ├── dashboard/         # Compatibility barrel re-exporting src/features/dashboard/components
-│   │   ├── debts/             # Compatibility barrel re-exporting src/features/debts/components
 │   │   ├── layout/            # App shell: sidebar, header, main layout wrapper
 │   │   ├── system/            # App-level components: ErrorBoundary, Logo, theme provider/toggle
-│   │   ├── system-logs/       # System log timeline, detail drawer, and visual helpers
-│   │   ├── transactions/      # Transaction table and add/edit dialog
 │   │   └── ui/                # Shadcn/Radix primitives (button, card, dialog, table, etc.)
 │   ├── contexts/              # React contexts: authentication (HttpOnly cookie) and global preferences
-│   ├── features/              # Feature modules with colocated components
-│   │   ├── dashboard/components/  # StatCard, charts, AI coach/chat, health score, weekly digest
-│   │   └── debts/components/      # DebtCard, modals, payoff ring, strategy planner
+│   ├── features/              # Feature modules with colocated components and public entrypoints
+│   │   ├── accounts/          # Account management UI and logic
+│   │   ├── budgets/           # Budget management UI and logic
+│   │   ├── dashboard/         # Cards, charts, AI coach/chat, and financial health
+│   │   ├── debts/             # Debt cards, payment modals, and payoff planner
+│   │   ├── system-logs/       # Log timeline, detail drawer, and visual helpers
+│   │   └── transactions/      # Transaction table and add/edit dialog
 │   ├── hooks/                 # Custom hooks: financial health, insights, debts, preferences, sidebar, system logs
 │   ├── lib/                   # Frontend utilities
 │   │   ├── ai-models.ts       # AI model allowlist resolution
@@ -268,9 +268,8 @@ Notes:
 └── scripts/                   # Dev helpers: fullstack runner (dev.ts), migration runner (migrate.ts)
 ```
 
-> **Layout note:** `api/_routes/*` are the controllers; there is no separate `api/controllers/`
-> or `api/schemas/` layer (those directories were removed as empty scaffolding). `src/components/{dashboard,debts}`
-> are thin re-export barrels — the real implementations live in `src/features/*/components`.
+> **Layout note:** `api/_routes/*` are the controllers. Feature-specific frontend components live under
+> `src/features/*`; `src/components/` is reserved for shared application chrome and UI primitives.
 
 ## Database Schema
 

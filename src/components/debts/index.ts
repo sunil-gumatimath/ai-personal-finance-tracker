@@ -1,5 +1,0 @@
-export { PayoffProgressRing } from '../../features/debts/components/PayoffProgressRing'
-export { DebtCard } from '../../features/debts/components/DebtCard'
-export { DebtModal } from '../../features/debts/components/DebtModal'
-export { PaymentModal } from '../../features/debts/components/PaymentModal'
-export { StrategyDialog } from '../../features/debts/components/StrategyDialog'

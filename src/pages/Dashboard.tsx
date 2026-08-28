@@ -8,7 +8,7 @@ import {
 	BudgetOverview,
 	AICoach,
 	FinancialHealthScore,
-} from "@/components/dashboard";
+} from "@/features/dashboard";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";

@@ -17,7 +17,7 @@ import {
   DebtModal,
   PaymentModal,
   StrategyDialog,
-} from "@/components/debts";
+} from "@/features/debts";
 import { toNumber } from "@/lib/debt-calculations";
 import type { DebtPayment } from "@/types";
 

@@ -1,8 +1,0 @@
-export { StatCard } from "../../features/dashboard/components/StatCard";
-export { RecentTransactions } from "../../features/dashboard/components/RecentTransactions";
-export { SpendingChart } from "../../features/dashboard/components/SpendingChart";
-export { BudgetOverview } from "../../features/dashboard/components/BudgetOverview";
-export { AICoach } from "../../features/dashboard/components/AICoach";
-export { AIAgentChat } from "../../features/dashboard/components/AIAgentChat";
-export { FinancialHealthScore } from "../../features/dashboard/components/FinancialHealthScore";
-export { WeeklyDigestCard } from "../../features/dashboard/components/WeeklyDigestCard";

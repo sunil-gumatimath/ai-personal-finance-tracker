@@ -24,8 +24,8 @@ import { ErrorState } from "@/components/system/ErrorState";
 import {
 	TransactionDialog,
 	type TransactionFormData,
-} from "@/components/transactions/TransactionDialog";
-import { TransactionTable } from "@/components/transactions/TransactionTable";
+} from "@/features/transactions/components/TransactionDialog";
+import { TransactionTable } from "@/features/transactions/components/TransactionTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import { api } from "@/lib/api-client";

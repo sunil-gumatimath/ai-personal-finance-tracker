@@ -3,7 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Header } from "./Header";
-import { AIAgentChat } from "@/components/dashboard";
+import { AIAgentChat } from "@/features/dashboard";
 
 export function MainLayout() {
 	const location = useLocation();
