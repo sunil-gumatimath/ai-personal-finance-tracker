@@ -5,8 +5,10 @@ The API is served under `/api/*` from a single Vercel serverless function
 same route registry, so behavior is identical in development and production.
 
 All endpoints are JSON. Authentication uses an HttpOnly session cookie
-(`pft_session`) issued by Neon Auth — no bearer tokens in the client.
-Requests without a valid session return `401 { "error": "Unauthorized" }`.
+(`pft_session`, `SameSite=Strict`, `Secure` in production) issued by Neon Auth —
+no bearer tokens in the client. Requests without a valid session return
+`401 { "error": "Unauthorized" }` (the cron route is the exception: it
+authenticates with `CRON_SECRET`).
 
 ## Conventions
 
@@ -16,32 +18,42 @@ Requests without a valid session return `401 { "error": "Unauthorized" }`.
 | `201` | Created |
 | `400` | Validation error (`ValidationError`, message is user-safe) |
 | `401` | Not authenticated |
-| `403` | Origin not allowed (CORS) or resource belongs to another user |
-| `404` | Unknown route or missing resource |
+| `403` | Origin not allowed (CORS) or request forbidden (e.g. invalid `CRON_SECRET`) |
+| `404` | Unknown route or missing resource (a resource owned by another user reads as 404, never 403) |
 | `405` | Method not allowed for that resource |
-| `429` | Rate limit exceeded (includes `Retry-After` header) |
+| `422` | Unprocessable input (AI could not parse/understand the request) |
+| `429` | Rate limit exceeded — `{ "error": "Rate limit exceeded…" }` body plus `Retry-After` header |
 | `500` | Internal error — generic `"Server error"` body, details only in logs |
+| `502` | Upstream auth provider failed to create a session |
+| `503` | Service unavailable (e.g. `CRON_SECRET` unset, or external AI provider unreachable) |
 
 Every user-owned resource is scoped by the authenticated `user_id` server-side;
 possessing another user's UUID grants no access.
+
+Errors thrown as `AppError` subclasses map to their status code
+(`ValidationError` → 400 with a user-safe message, `NotFoundError` → 404);
+anything else is a generic 500. Rate limiting: AI endpoints are limited to
+20 req/min per client IP (auth login/signup are stricter at 5/min inside
+`auth.routes.ts`, and failed logins count triple); exceeding either blocks the
+client for 15 minutes.
 
 ## Auth
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/auth?action=me` | Current session user |
-| POST | `/api/auth?action=login` | Sign in (`email`, `password`) |
-| POST | `/api/auth?action=signup` | Register (`email`, `password`, `fullName`) |
-| POST | `/api/auth?action=sync` | Update user profile (`fullName`) |
-| POST | `/api/auth?action=logout` | End session |
-| DELETE | `/api/auth?action=delete-account` | Permanently delete the account |
+| GET | `/api/auth?action=me` | Current session user (401 if session invalid/expired) |
+| POST | `/api/auth?action=login` | Sign in (`email`, `password`) — rate limited, 5 attempts/min then 15 min block |
+| POST | `/api/auth?action=signup` | Register (`email`, `password`, `fullName`) — rate limited like login; seeds default categories |
+| POST | `/api/auth?action=sync` | Update profile after sign-in (`fullName`) and ensure default categories exist |
+| POST | `/api/auth?action=logout` | End session (clears the cookie) |
+| DELETE | `/api/auth?action=delete-account` | Permanently wipe all data + auth identity |
 
 ## Profile & Preferences
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/profile` | Profile + preferences (provider keys sanitized) |
-| PATCH | `/api/profile` | Update profile / preferences / currency / AI settings |
+| GET | `/api/profile` | Profile + preferences (API keys sanitized out of the response) |
+| PATCH | `/api/profile` | Update profile / preferences / AI settings — accepts `preferences`, `apiKeys` (e.g. `kilocodeApiKey`, `null` clears it), `currency` (ISO code), optional `full_name`, `avatar_url` |
 
 ## Accounts
 
@@ -66,7 +78,7 @@ possessing another user's UUID grants no access.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/transactions?limit=…&since=…` | List transactions |
+| GET | `/api/transactions?limit=…&since=…` | List transactions (`limit` 1–1000, `since` = `YYYY-MM-DD`) |
 | POST | `/api/transactions` | Create transaction (income / expense / transfer) |
 | PUT | `/api/transactions?id=…` | Update transaction |
 | DELETE | `/api/transactions?id=…` | Delete transaction |
@@ -97,27 +109,33 @@ possessing another user's UUID grants no access.
 | POST | `/api/debts` | Create debt |
 | PUT | `/api/debts?id=…` | Update debt |
 | DELETE | `/api/debts?id=…` | Delete debt |
-| GET | `/api/debts?action=payments&debtId=…` | List payments for a debt |
-| POST | `/api/debts?action=payments` | Record a payment |
+| GET | `/api/debts?action=payments&debtId=…` | List payments for a debt (`debtId` required) |
+| POST | `/api/debts?action=payments` | Record a payment — returns `{ payment, debt }` with the post-payment debt balance; overpayment is a 400 |
 
 ## Notifications
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/notifications` | Preferences, budget alerts, recent activity |
-| POST | `/api/notifications` | Budget alert or push subscription (`type` in body) |
+| GET | `/api/notifications` | Preferences, active budget alerts (warning at ≥80%, over at ≥100%), recent activity |
+| POST | `/api/notifications` | `type: "budget_alert"` (`message`, `severity`) or `"push_notification"` — acknowledged, not persisted |
 
 ## AI
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/ai/insights` | Persisted AI insights |
-| POST | `/api/ai/insights` | Generate insights (`forceRefresh` optional) |
+| GET | `/api/ai/insights` | Active (non-dismissed) AI insights from the last 7 days |
+| POST | `/api/ai/insights` | Generate insights (`forceRefresh: true` bypasses reuse of recent ones) |
 | PATCH | `/api/ai/insights?id=…` | Dismiss an insight |
-| POST | `/api/ai/chat` | Chat message (`message`, `aiPreferences`, `history`) |
-| POST | `/api/ai/parse-transaction` | Natural-language transaction extraction (`message`) — validates against the user's own categories/accounts, writes nothing |
+| POST | `/api/ai/chat` | Chat message (`message` ≤ 4000 chars, optional `aiPreferences.aiProvider`, optional `history`) |
+| POST | `/api/ai/chat` (streaming) | Same body with `Accept: text/event-stream` — reply streams as newline-delimited JSON events: `{"type":"delta","text":"…"}` per token, then `{"type":"done"}`, or `{"type":"error","message":"…"}` on any failure (including 401/400, which are in-band once the stream has started). Falls back to buffered JSON when the header is absent |
+| POST | `/api/ai/parse-transaction` | Natural-language transaction extraction (`message` ≤ 500 chars, optional `aiPreferences`) — validates against the user's own categories/accounts, writes nothing; returns 422 if unparseable |
 | GET | `/api/ai/digest` | Latest stored weekly AI digest |
-| POST | `/api/ai/digest` | Generate (or regenerate) this week's AI digest |
+| POST | `/api/ai/digest` | Generate (or regenerate) this week's AI digest from the last 7 days of data |
+
+AI routes require a KiloCode API key (stored in preferences or
+`KILOCODE_API_KEY` env); missing keys return 400. Only free models are allowed;
+a disallowed saved model falls back to the server default instead of erroring.
+All four AI endpoints are rate limited to 20 req/min per IP.
 
 ## Transactions (recurring)
 
@@ -131,15 +149,15 @@ Recurring templates carry `recurring_frequency`, an optional `recurring_end_date
 
 | Method | Path | Description |
 | --- | --- | --- |
-| POST | `/api/cron?action=recurring` | Daily maintenance (03:00 UTC): process due recurring transactions for all users. Requires `Authorization: Bearer <CRON_SECRET>` (Vercel Cron sends this automatically) |
+| GET/POST | `/api/cron?action=recurring` | Daily maintenance (03:00 UTC per `vercel.json`): materialize due recurring transactions for every user. `action=recurring` is the default and may be omitted. Requires `Authorization: Bearer <CRON_SECRET>` (Vercel Cron sends this) or an `x-cron-secret` header — 401 if absent, 403 if wrong, 503 if unset |
 
 ## System
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/system-logs` | Audit log entries (no sensitive payloads) |
-| GET | `/api/health` | Liveness probe — unauthenticated, no DB touch |
-| WS | `/api/ws-logs` | Real-time audit log stream (local Bun dev server) |
+| GET | `/api/system-logs?severity=…&action=…&days=…&limit=…` | Audit log entries across all event types. Optional filters: `severity` in `info\|warning\|error\|critical`, exact `action` name (e.g. `USER_LOGIN`), `days` 1–365, `limit` 1–500 (default 200). Returns `{ logs, total }` where `total` counts the full match before the limit |
+| GET | `/api/health` | Liveness probe — unauthenticated, no DB touch, always `{ "status": "ok" }` |
+| WS | `/api/ws-logs` | Real-time audit log stream — local Bun dev server only (`api/_server.ts`); requires a valid session cookie and a CORS-allowed origin, and only pushes that user's entries |
 
 ## Neon Auth proxy
 

@@ -11,7 +11,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 - **AI Financial Coach**: Personalized coaching cards, spending alerts, kudos, and anomaly detection with currency-aware thresholds.
 - **AI Assistant Chat**: Natural-language conversations about balances, budgets, goals, debt, categories, trends, and spending questions.
 - **KiloCode AI**: Configure the Kilo Gateway API key in Settings.
-- **Free Model Selection**: Choose from a curated allowlist of free KiloCode models (with context sizes and descriptions), default `nvidia/nemotron-3-ultra-550b-a55b:free`.
+- **Free Model Selection**: Choose from a curated allowlist of free KiloCode models (with context sizes and descriptions), default `inclusionai/ling-3.0-flash:free`.
 - **Persisted Insights**: AI insights are stored in the database, can be dismissed per-card, and are reused to avoid unnecessary regeneration.
 - **Chat Cooldown**: UI-level cooldown between AI requests to prevent spam.
 - **Privacy Notice**: Settings explicitly warns that financial data is sent to the KiloCode API.
@@ -28,6 +28,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 ### Core Financial Management
 
 - Transaction engine for income, expenses, and internal transfers.
+- **Sortable, paginated transaction history**: sort by date, amount, description, or category, page through results with an adjustable page size, and share filtered views — search and type filters persist in the URL.
 - **Recurring transaction automation**: recurring templates with frequency, optional end date, and a server-computed next-due date. A Vercel Cron job (or the in-app **Process Recurring** button) materializes occurrences automatically — each one appears as a normal transaction linked to its template.
 - **Natural-language quick entry**: type *"paid $45 for groceries yesterday"* on the Transactions page and the AI extracts the fields into the add-transaction form for review.
 - **Reports page with PDF/CSV export**: month or trailing-12-month summaries — income vs. expenses, savings rate, category breakdowns, account balances, and transactions — downloadable as a formatted PDF or CSV.
@@ -48,7 +49,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 - Multi-currency support: USD, INR, EUR, GBP, and JPY.
 - Regional date-format preferences.
 - Security-focused API defaults, including auth rate limiting, security headers, strict CORS handling, and sanitized error responses.
-- System logs page with real-time WebSocket streaming for monitoring audit events.
+- System logs page with real-time WebSocket streaming, severity/action/date-range filtering, search, and a per-entry detail drawer for monitoring audit events.
 
 ## Tech Stack
 
@@ -113,7 +114,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 4. **Database setup for Neon:**
 
    - Create a Neon project.
-   - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql`, `002_debts_and_payments.sql`, `003_system_logs.sql`, `004_security_hardening.sql`, `005_recurring_and_digests.sql`) in order in the Neon SQL editor.
+   - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql`, `002_debts_and_payments.sql`, `003_system_logs.sql`, `004_security_hardening.sql`, `005_recurring_and_digests.sql`, `006_data_integrity.sql`, `007_row_level_security_staged.sql`) in order in the Neon SQL editor.
    - Optionally run `database/seeds/default-categories.sql` to seed default categories.
    - The migrations under `database/migrations/` are the canonical source of truth.
    - Database tables are created empty; start adding your accounts and transactions in the UI.
@@ -228,15 +229,18 @@ Notes:
 │   ├── features/              # Feature modules with colocated components
 │   │   ├── dashboard/components/  # StatCard, charts, AI coach/chat, health score, weekly digest
 │   │   └── debts/components/      # DebtCard, modals, payoff ring, strategy planner
-│   ├── hooks/                 # Custom hooks: financial health, insights, debts, sidebar, system logs
+│   ├── hooks/                 # Custom hooks: financial health, insights, debts, preferences, sidebar, system logs
 │   ├── lib/                   # Frontend utilities
 │   │   ├── ai-models.ts       # AI model allowlist resolution
 │   │   ├── api-client.ts      # Typed API client (throws ApiError on HTTP failures)
 │   │   ├── auth.ts            # Neon Auth client setup
 │   │   ├── debt-calculations.ts # Payoff projections and snowball/avalanche comparisons
 │   │   ├── errors.ts          # ApiError class with isAuthError/isRateLimited/isRetryable
+│   │   ├── initials.ts        # Avatar-fallback initials from name/email
 │   │   ├── log-export.ts      # System log CSV export
 │   │   ├── log-formatter.ts   # System log display formatting
+│   │   ├── number.ts          # Defensive numeric coercion for money fields
+│   │   ├── palette.ts         # Shared selectable color swatches (categories/accounts/debts)
 │   │   ├── preferences-storage.ts # Preference persistence helpers
 │   │   ├── transaction-csv.ts # Transaction CSV export
 │   │   └── utils.ts           # cn() and shared helpers
@@ -251,13 +255,12 @@ Notes:
 │   ├── _repositories/         # Data access layer and query builder
 │   ├── _routes/               # HTTP route modules and route registry (index.ts)
 │   ├── _services/             # Business logic, ownership checks, auth, audit log, AI providers
-│   ├── _utils/                # Crypto, response, query-processor, DNS bypass, default categories, types
+│   ├── _utils/                # Crypto, response, money formatting, query-processor, DNS bypass, default categories, types
 │   ├── handler.ts             # Vercel serverless function entrypoint (the only deployed function)
 │   ├── _server.ts             # Local Bun HTTP server shim (also serves /api/ws-logs)
 │   └── tsconfig.json          # API-specific TypeScript configuration
 ├── database/                  # Neon PostgreSQL schema and data
 │   ├── migrations/            # Versioned migrations (canonical source of truth)
-│   ├── scripts/               # Database helper scripts
 │   └── seeds/                 # Seed data (default categories)
 ├── docs/                      # Project documentation (API reference)
 ├── .github/workflows/ci.yml   # CI: gitleaks + lint + typecheck (frontend + API) + test (coverage) + build on push/PR to main
@@ -290,8 +293,19 @@ The app uses Neon PostgreSQL with these primary tables:
 | `users` | Authentication user records |
 
 User isolation is enforced primarily through user-scoped API queries and `ownership.service.ts`
-reference checks. No PostgreSQL Row Level Security policies are defined yet; tenant isolation
-depends entirely on the API layer.
+reference checks, and this remains the only active enforcement layer at runtime. Migration
+`007_row_level_security_staged.sql` stages PostgreSQL Row Level Security for activation: it
+idempotently defines `tenant_isolation_<table>` policies (`USING` + `WITH CHECK` comparing each
+row's `user_id` to an `app.current_user_id` session variable) on all eleven tenant tables
+(`profiles`, `accounts`, `categories`, `transactions`, `budgets`, `goals`, `ai_insights`, `debts`,
+`debt_payments`, `ai_digests`, `system_logs`). The policies are deliberately **inert** — the
+`ENABLE ROW LEVEL SECURITY` / `FORCE ROW LEVEL SECURITY` statements are left commented out because
+the current data layer uses the Neon HTTP driver (`neon()`), where each query is an isolated
+auto-commit request with no way to set a per-request session variable. Enabling RLS now would make
+every policy evaluate against an unset variable and match zero rows (fail-closed). Activation is
+deferred until the data layer switches to the WebSocket pool driver and wraps requests in
+`BEGIN; SET LOCAL app.current_user_id = ...; COMMIT;`. Until then, tenant isolation depends entirely
+on the API layer.
 
 ## Support
 
