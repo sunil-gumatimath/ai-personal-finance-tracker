@@ -40,6 +40,9 @@ export const SystemLogs = lazy(() =>
 export const Reports = lazy(() =>
 	import("./Reports").then((m) => ({ default: m.Reports })),
 );
+export const Digest = lazy(() =>
+	import("./Digest").then((m) => ({ default: m.Digest })),
+);
 
 // ---------------------------------------------------------------------------
 // Shared route metadata — single source of truth for navigation vocabulary.
@@ -48,6 +51,7 @@ export const Reports = lazy(() =>
 // ---------------------------------------------------------------------------
 export const ROUTE_TITLES: Record<string, string> = {
 	"/": "Dashboard",
+	"/digest": "AI Digest",
 	"/transactions": "Transactions",
 	"/reports": "Reports",
 	"/calendar": "Calendar",

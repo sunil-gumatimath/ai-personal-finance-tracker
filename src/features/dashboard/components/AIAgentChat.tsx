@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, User, BotMessageSquare, X, Sparkles } from "lucide-react";
+import { Send, User, BotMessageSquare, X, Sparkles, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +21,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { api } from "@/lib/api-client";
 import { QUERY_EXAMPLES } from "@/lib/ai-query-examples";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
 	role: "user" | "assistant";
@@ -49,8 +50,13 @@ export function AIAgentChat() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [cooldownUntil, setCooldownUntil] = useState(0);
 	const [cooldownHintVisible, setCooldownHintVisible] = useState(false);
+	// Screen-reader announcement: only updated on completion/error so the
+	// per-token stream isn't read aloud (M5).
+	const [announcement, setAnnouncement] = useState("");
 	const lastApiCallRef = useRef(0);
 	const scrollRef = useRef<HTMLDivElement>(null);
+	// Remembers the last question so the error bubble can offer a Retry (M8).
+	const lastUserMessageRef = useRef("");
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
 	// Load messages from localStorage on mount
@@ -83,21 +89,33 @@ export function AIAgentChat() {
 		]);
 	}, [user]);
 
-	// Save messages to localStorage
+	// Save messages to localStorage. Debounced so token-by-token streaming
+	// updates don't serialize the whole transcript on every delta.
 	useEffect(() => {
 		if (!user || messages.length === 0) return;
 
-		try {
-			localStorage.setItem(
-				`${CHAT_STORAGE_KEY}_${user.id}`,
-				JSON.stringify({
-					messages,
-					timestamp: Date.now(),
-				}),
-			);
-		} catch (e) {
-			console.warn("Failed to save chat history:", e);
-		}
+		// Cap persisted turns so a very long conversation can't blow the
+		// ~5MB localStorage quota (M7). Keeps the most recent 50 messages.
+		const MAX_PERSISTED_MESSAGES = 50;
+		const toPersist =
+			messages.length > MAX_PERSISTED_MESSAGES
+				? messages.slice(-MAX_PERSISTED_MESSAGES)
+				: messages;
+
+		const timer = setTimeout(() => {
+			try {
+				localStorage.setItem(
+					`${CHAT_STORAGE_KEY}_${user.id}`,
+					JSON.stringify({
+						messages: toPersist,
+						timestamp: Date.now(),
+					}),
+				);
+			} catch (e) {
+				console.warn("Failed to save chat history:", e);
+			}
+		}, 400);
+		return () => clearTimeout(timer);
 	}, [messages, user]);
 
 	// Clear the cooldown flag once it expires so the button re-enables and
@@ -111,9 +129,15 @@ export function AIAgentChat() {
 		return () => clearTimeout(timer);
 	}, [cooldownUntil]);
 
-	// Listen for open-ai-chat event
+	// Listen for open-ai-chat event (with optional initialPrompt)
 	useEffect(() => {
-		const handleOpenChat = () => setIsOpen(true);
+		const handleOpenChat = (e: Event) => {
+			const custom = e as CustomEvent<{ initialPrompt?: string }>;
+			setIsOpen(true);
+			if (custom.detail?.initialPrompt) {
+				setInput(custom.detail.initialPrompt);
+			}
+		};
 		window.addEventListener("open-ai-chat", handleOpenChat);
 		return () => window.removeEventListener("open-ai-chat", handleOpenChat);
 	}, []);
@@ -139,8 +163,55 @@ export function AIAgentChat() {
 
 	const isCoolingDown = Date.now() < cooldownUntil || Date.now() - lastApiCallRef.current < API_COOLDOWN_MS;
 
-	const handleSend = useCallback(async () => {
-		if (!input.trim() || isLoading || !user) return;
+	// Abort controller for the in-flight chat request; aborted when the
+	// component unmounts (or is closed) so a slow generation doesn't outlive
+	// the page or keep writing to localStorage in the background.
+	const abortRef = useRef<AbortController | null>(null);
+	useEffect(() => () => abortRef.current?.abort(), []);
+
+	// Aborting a stream mid-flight must also clear the streaming-ts ref, or a
+	// late delta would try to mutate a message that no longer exists.
+	const stopStreaming = useCallback(() => {
+		abortRef.current?.abort();
+		streamingTsRef.current = null;
+	}, []);
+
+	// Closing the widget keeps the component mounted (early return below),
+	// so the unmount cleanup never fires — abort explicitly on close.
+	useEffect(() => {
+		if (!isOpen) stopStreaming();
+	}, [isOpen, stopStreaming]);
+
+	// Timestamp of the assistant message currently being streamed into.
+	const streamingTsRef = useRef<number | null>(null);
+	// Accumulates the streamed text so it can be announced to screen readers as
+	// a single completed reply (M5), not per-token.
+	const streamingContentRef = useRef("");
+
+	// Append one streamed delta, lazily creating the assistant bubble on the
+	// first token so the typing dots stay visible until generation starts.
+	const appendDelta = useCallback((delta: string) => {
+		streamingContentRef.current += delta;
+		if (streamingTsRef.current === null) {
+			const ts = Date.now();
+			streamingTsRef.current = ts;
+			setMessages((prev) => [
+				...prev,
+				{ role: "assistant", content: delta, timestamp: ts },
+			]);
+		} else {
+			const ts = streamingTsRef.current;
+			setMessages((prev) =>
+				prev.map((m) =>
+					m.timestamp === ts ? { ...m, content: m.content + delta } : m,
+				),
+			);
+		}
+	}, []);
+
+	const handleSend = useCallback(async (textToSend?: string) => {
+		const userMessage = (textToSend ?? input).trim();
+		if (!userMessage || isLoading || !user) return;
 
 		// Per-widget cooldown: give visible feedback instead of silently dropping.
 		const now = Date.now();
@@ -150,8 +221,10 @@ export function AIAgentChat() {
 			return;
 		}
 
-		const userMessage = input.trim();
-		setInput("");
+		lastUserMessageRef.current = userMessage;
+		if (!textToSend) {
+			setInput("");
+		}
 
 		const newUserMessage: Message = {
 			role: "user",
@@ -164,6 +237,7 @@ export function AIAgentChat() {
 		setCooldownHintVisible(false);
 		lastApiCallRef.current = Date.now();
 		setCooldownUntil(Date.now() + API_COOLDOWN_MS);
+		streamingContentRef.current = "";
 
 		// Format the last 6 messages as history to provide context for follow-up
 		// questions. Failed replies are excluded: new ones carry an isError flag,
@@ -177,34 +251,40 @@ export function AIAgentChat() {
 			}));
 
 		try {
-			const { response } = await api.ai.chat(
+			const controller = new AbortController();
+			abortRef.current = controller;
+			streamingTsRef.current = null;
+
+			await api.ai.chatStream(
 				userMessage,
 				{
 					aiProvider: preferences.aiProvider,
 					kilocodeModel: preferences.kilocodeModel,
 				},
 				history,
+				appendDelta,
+				controller.signal,
 			);
 
-			if (response) {
-				setMessages((prev) => [
-					...prev,
-					{
-						role: "assistant",
-						content: response,
-						timestamp: Date.now(),
-					},
-				]);
-			} else {
+			if (streamingTsRef.current === null) {
+				// Stream ended without a single delta (or an empty reply).
 				throw new Error("No response received. Please check your API key.");
 			}
+			// Announce the completed reply as a single message (M5), not per-token.
+			setAnnouncement(streamingContentRef.current.trim() || "Assistant finished replying.");
 		} catch (error: unknown) {
+			// Aborted (page unmounted/closed): nothing to surface.
+			if (error instanceof DOMException && error.name === "AbortError") return;
+
 			console.error("Chat error:", error);
 			const errorMessage =
 				error instanceof Error
 					? error.message
 					: "Something went wrong. Please try again.";
 
+			// Always surface failures as their own error bubble (which is
+			// excluded from future history). Any partially-streamed text stays
+			// visible above it as regular context.
 			setMessages((prev) => [
 				...prev,
 				{
@@ -214,13 +294,20 @@ export function AIAgentChat() {
 					timestamp: Date.now(),
 				},
 			]);
+			// Announce the failure to screen readers (M5).
+			setAnnouncement(errorMessage);
 		} finally {
+			streamingTsRef.current = null;
+			abortRef.current = null;
 			setIsLoading(false);
 		}
-	}, [input, isLoading, user, preferences, cooldownUntil, messages]);
+	}, [input, isLoading, user, preferences, cooldownUntil, messages, appendDelta]);
 
 	const clearHistory = useCallback(() => {
 		if (!user) return;
+		stopStreaming();
+		streamingTsRef.current = null;
+		streamingContentRef.current = "";
 		localStorage.removeItem(`${CHAT_STORAGE_KEY}_${user.id}`);
 		setMessages([
 			{
@@ -229,7 +316,23 @@ export function AIAgentChat() {
 				timestamp: Date.now(),
 			},
 		]);
-	}, [user]);
+	}, [user, stopStreaming]);
+
+	// Re-send the last question that produced an error bubble (M8). Replaces
+	// the input rather than replaying history so the existing user bubble
+	// isn't duplicated.
+	const handleRetry = useCallback(() => {
+		const question = lastUserMessageRef.current;
+		if (question) {
+			handleSend(question);
+		}
+	}, [handleSend]);
+
+	// Abort an in-flight generation so the user gets a Stop control (H2/M8).
+	const handleStop = useCallback(() => {
+		stopStreaming();
+		setIsLoading(false);
+	}, [stopStreaming]);
 
 	const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		// Enter sends, Shift+Enter inserts a newline (IME composition safe).
@@ -257,7 +360,7 @@ export function AIAgentChat() {
 
 	return (
 		<div className="fixed bottom-5 right-5 z-50 w-[calc(100vw-2.5rem)] max-w-[380px]">
-			<Card className="flex h-[min(520px,calc(100dvh-5rem))] w-full flex-col shadow-xl border-border/50">
+			<Card className="flex h-[min(520px,calc(100dvh-5rem))] w-full flex-col shadow-xl border-border/50 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200 ease-out origin-bottom-right">
 				{/* Header - Compact */}
 				<CardHeader className="flex flex-row items-center justify-between gap-2 px-3 py-2 border-b shrink-0">
 					<div className="flex items-center gap-2 min-w-0">
@@ -281,6 +384,7 @@ export function AIAgentChat() {
 									variant="ghost"
 									size="sm"
 									className="h-7 px-2 text-xs text-muted-foreground active:scale-[0.98]"
+								disabled={isLoading}
 								>
 									Clear
 								</Button>
@@ -318,12 +422,11 @@ export function AIAgentChat() {
 					<div
 						className="h-full overflow-y-auto px-3 py-2 space-y-2"
 						ref={scrollRef}
-						aria-live="polite"
 						aria-label="AI assistant conversation"
 					>
 						{messages.map((m, i) => (
 							<div
-								key={i}
+								key={`${m.timestamp}-${m.role}-${i}`}
 								className={cn(
 									"flex gap-2 max-w-[88%]",
 									m.role === "user" ? "ml-auto flex-row-reverse" : "",
@@ -356,38 +459,62 @@ export function AIAgentChat() {
 									)}
 								>
 									{m.role === "assistant" && !m.isError ? (
-										<Markdown>{m.content}</Markdown>
+										<Markdown remarkPlugins={[remarkGfm]}>{m.content}</Markdown>
 									) : (
-										m.content
+										<div className="whitespace-pre-wrap">{m.content}</div>
 									)}
+									{m.isError && m.role === "assistant" && (
+										<Button
+											onClick={handleRetry}
+											variant="link"
+											size="sm"
+											className="mt-1 h-auto px-0 text-xs text-muted-foreground"
+											>
+												Retry
+											</Button>
+										)}
 								</div>
 							</div>
 						))}
-						{isLoading && (
-							<div className="flex gap-2 max-w-[88%]">
-								<Avatar className="h-6 w-6 shrink-0">
-									<AvatarFallback className="bg-primary text-primary-foreground">
-										<BotMessageSquare className="h-3 w-3" />
-									</AvatarFallback>
-								</Avatar>
-								{/* Single typing device: three staggered dots */}
-								<div
-									className="bg-muted rounded-lg px-3 py-2.5 shadow-sm flex items-center gap-1"
+						{/* Typing dots only until the first streamed token lands —
+						    once the assistant bubble exists, the text itself is the
+						    progress indicator. */}
+						{isLoading &&
+							messages[messages.length - 1]?.role !== "assistant" && (
+								<div className="flex gap-2 max-w-[88%]">
+									<Avatar className="h-6 w-6 shrink-0">
+										<AvatarFallback className="bg-primary text-primary-foreground">
+											<BotMessageSquare className="h-3 w-3" />
+										</AvatarFallback>
+									</Avatar>
+									{/* Single typing device: three staggered dots */}
+									<div
+										className="bg-muted rounded-lg px-3 py-2.5 shadow-sm flex items-center gap-1"
 									aria-label="Assistant is typing"
 									role="status"
 								>
-									{[0, 1, 2].map((i) => (
-										<span
-											key={i}
-											className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 motion-safe:animate-bounce"
-											style={{ animationDelay: `${i * 120}ms` }}
-										/>
-									))}
+										{[0, 1, 2].map((i) => (
+											<span
+												key={i}
+												className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 motion-safe:animate-bounce"
+												style={{ animationDelay: `${i * 120}ms` }}
+											/>
+										))}
+									</div>
 								</div>
-							</div>
-						)}
+							)}
 					</div>
 				</CardContent>
+
+				{/* Screen-reader announcement node: updated only on completion/error
+				    so the per-token stream isn't read aloud (M5). */}
+				<div
+					aria-live="polite"
+					aria-atomic="true"
+					className="sr-only"
+				>
+					{announcement}
+				</div>
 
 				{/* Input Section */}
 				<div className="px-3 py-2 border-t shrink-0">
@@ -436,12 +563,26 @@ export function AIAgentChat() {
 							rows={1}
 							className="min-h-[36px] resize-none py-1.5 text-sm"
 						/>
-						<Button
+						{isLoading ? (
+							<Button
+								type="button"
+								size="icon"
+								aria-label="Stop generation"
+								onClick={handleStop}
+								className="h-9 w-9 shrink-0 active:scale-[0.98]"
+								>
+									<Square className="h-3.5 w-3.5" />
+								</Button>
+							) : (
+							<Button
 							type="submit"
 							size="icon"
 							aria-label="Send message"
 							disabled={
-								isLoading || !input.trim() || Date.now() < cooldownUntil
+								isLoading ||
+								!input.trim() ||
+								Date.now() < cooldownUntil ||
+								Date.now() - lastApiCallRef.current < API_COOLDOWN_MS
 							}
 							title={
 								Date.now() < cooldownUntil
@@ -452,6 +593,7 @@ export function AIAgentChat() {
 						>
 							<Send className="h-3.5 w-3.5" />
 						</Button>
+						)}
 					</form>
 					{/* Inline cooldown feedback — the disabled button alone isn't enough */}
 					{cooldownHintVisible && isCoolingDown && (

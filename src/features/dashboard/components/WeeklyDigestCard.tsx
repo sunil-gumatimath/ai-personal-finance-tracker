@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
+	ArrowUpRight,
 	CalendarDays,
 	Eye,
 	EyeOff,
@@ -155,7 +157,18 @@ export function WeeklyDigestCard() {
 						</CardDescription>
 					)}
 				</div>
-				<div className="flex items-center gap-2 shrink-0">
+				<div className="flex items-center gap-1.5 shrink-0">
+					<Button
+						variant="ghost"
+						size="sm"
+						asChild
+						className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground active:scale-[0.98]"
+					>
+						<Link to="/digest">
+							Full View
+							<ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+						</Link>
+					</Button>
 					{digest && (
 						<Button
 							variant="ghost"
@@ -163,6 +176,7 @@ export function WeeklyDigestCard() {
 							onClick={toggleHidden}
 							aria-label={hidden ? "Show digest" : "Hide digest"}
 							title={hidden ? "Show digest" : "Hide digest"}
+							className="h-8 w-8"
 						>
 							{hidden ? (
 								<Eye className="h-4 w-4" />
@@ -176,10 +190,10 @@ export function WeeklyDigestCard() {
 						size="sm"
 						onClick={generate}
 						disabled={generating}
-						className="active:scale-[0.98]"
+						className="h-8 text-xs active:scale-[0.98]"
 					>
 						<RefreshCw
-							className={`mr-2 h-3.5 w-3.5 ${generating ? "motion-safe:animate-spin" : ""}`}
+							className={`mr-1.5 h-3.5 w-3.5 ${generating ? "motion-safe:animate-spin" : ""}`}
 						/>
 						{generating ? "Generating…" : "Regenerate"}
 					</Button>

@@ -168,7 +168,7 @@ export function AICoach({
 
 					{/* Content — keyed remount gives a short crossfade on swap */}
 					<div
-						key={clampedIndex}
+						key={currentInsight.id || clampedIndex}
 						className="flex-1 min-w-0 space-y-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms]"
 					>
 						<div className="flex items-center gap-2">
@@ -205,10 +205,10 @@ export function AICoach({
 										aria-current={clampedIndex === i}
 										onClick={() => setCurrentIndex(i)}
 										className={cn(
-											"h-1.5 w-1.5 rounded-full transition-colors duration-200",
+											"h-1.5 rounded-full transition-[width,background-color] duration-200 ease-out",
 											clampedIndex === i
 												? "bg-primary w-3"
-												: "bg-muted-foreground/30 hover:bg-muted-foreground/50",
+												: "bg-muted-foreground/30 hover:bg-muted-foreground/50 w-1.5",
 										)}
 									/>
 								))}
@@ -218,7 +218,13 @@ export function AICoach({
 							size="sm"
 							className="h-8 font-medium rounded-lg active:scale-[0.98]"
 							onClick={() =>
-								window.dispatchEvent(new CustomEvent("open-ai-chat"))
+								window.dispatchEvent(
+									new CustomEvent("open-ai-chat", {
+										detail: {
+											initialPrompt: `Tell me more about this insight: "${currentInsight.title}" - ${currentInsight.description}`,
+										},
+									}),
+								)
 							}
 						>
 							Chat

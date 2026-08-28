@@ -87,6 +87,9 @@ function isPublicAuthRoute(pathname: string): boolean {
 	return ["/login", "/signup", "/forgot-password"].includes(pathname);
 }
 
+/** Default client timeout (ms) for AI requests so a hung upstream doesn't spin forever (M6). */
+const API_DEFAULT_TIMEOUT_MS = 1000 * 60;
+
 export const api = {
 	auth: {
 		me: () => apiFetch<AuthResponse>("/api/auth?action=me"),
@@ -286,6 +289,130 @@ export const api = {
 				method: "POST",
 				body: JSON.stringify({ message, aiPreferences, history }),
 			}),
+		/**
+		 * Streaming variant of chat(): the reply arrives as newline-delimited
+		 * JSON events over a chunked response, so onDelta fires as tokens are
+		 * generated instead of after the full wait. Resolves with the complete
+		 * reply text; throws ApiError on any failure (including error events
+		 * sent mid-stream). Pass an AbortSignal to cancel.
+		 */
+		chatStream: async (
+			message: string,
+			aiPreferences?: {
+				aiProvider?: string;
+				kilocodeModel?: string;
+			},
+			history?: Array<{ role: "user" | "assistant"; content: string }>,
+			onDelta?: (text: string) => void,
+			signal?: AbortSignal,
+		): Promise<string> => {
+			// Default 60s timeout so a hung upstream (or the server's own
+			// 60s maxDuration) doesn't spin forever on the client (M6). Composed
+			// with any caller-supplied signal so the Stop button still works.
+			const timeoutSignal = AbortSignal.timeout(API_DEFAULT_TIMEOUT_MS);
+			const effectiveSignal = signal
+				? (AbortSignal.any([signal, timeoutSignal]) as AbortSignal)
+				: timeoutSignal;
+
+			let res: Response;
+			try {
+				res = await fetch("/api/ai/chat", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Accept: "text/event-stream",
+					},
+					body: JSON.stringify({ message, aiPreferences, history }),
+					credentials: "include",
+					signal: effectiveSignal,
+				});
+			} catch (error) {
+				if (signal?.aborted) {
+					throw error;
+				}
+				if (timeoutSignal.aborted) {
+					throw new ApiError(
+						"The AI request timed out. Please try again.",
+						{ status: 0, code: "TIMEOUT_ERROR" },
+					);
+				}
+				throw new ApiError(
+					"Network error — please check your connection and try again.",
+					{ status: 0, code: "NETWORK_ERROR" },
+				);
+			}
+
+			if (!res.ok || !res.body) {
+				let message_ = `Request failed (${res.status})`;
+				try {
+					const data = (await res.json()) as { error?: string };
+					if (data?.error) message_ = data.error;
+				} catch {
+					// no JSON body; keep fallback
+				}
+				throw new ApiError(message_, { status: res.status });
+			}
+
+			const reader = res.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = "";
+			let full = "";
+
+			const handleLine = (rawLine: string) => {
+				const line = rawLine.trim();
+				if (!line) return;
+				let evt: { type?: string; text?: unknown; message?: unknown };
+				try {
+					evt = JSON.parse(line);
+				} catch {
+					return; // ignore malformed lines
+				}
+				if (evt.type === "delta" && typeof evt.text === "string") {
+					full += evt.text;
+					onDelta?.(evt.text);
+				} else if (evt.type === "error") {
+					throw new ApiError(
+						typeof evt.message === "string"
+							? evt.message
+							: "The AI service is temporarily unavailable. Please try again.",
+						{ status: 502 },
+					);
+				}
+			};
+
+			try {
+				for (;;) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					buffer += decoder.decode(value, { stream: true });
+					let newlineIndex: number;
+					while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+						const line = buffer.slice(0, newlineIndex);
+						buffer = buffer.slice(newlineIndex + 1);
+						handleLine(line);
+					}
+				}
+				handleLine(buffer); // flush any trailing line without newline
+			} catch (error) {
+				// Release the connection when bailing out mid-stream (error event,
+				// abort); the server notices the closed socket and stops generating.
+				await reader.cancel().catch(() => {});
+				if (signal?.aborted) {
+					throw error;
+				}
+				if (timeoutSignal.aborted) {
+					throw new ApiError(
+						"The AI request timed out. Please try again.",
+						{ status: 0, code: "TIMEOUT_ERROR" },
+					);
+				}
+				throw error;
+			} finally {
+				reader.releaseLock();
+			}
+
+			return full;
+		},
 		parseTransaction: (
 			message: string,
 			aiPreferences?: {
@@ -299,9 +426,15 @@ export const api = {
 			}),
 		digest: {
 			get: () => apiFetch<AiDigestResponse>("/api/ai/digest"),
-			generate: () =>
+			generate: (options?: {
+				period?: "week" | "month" | "year" | "custom";
+				days?: number;
+				startDate?: string;
+				endDate?: string;
+			}) =>
 				apiFetch<AiDigestResponse>("/api/ai/digest", {
 					method: "POST",
+					body: options ? JSON.stringify(options) : undefined,
 				}),
 		},
 	},

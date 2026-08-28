@@ -282,6 +282,7 @@ export interface AiDigest {
 
 export interface AiDigestResponse {
 	digest: AiDigest | null;
+	history?: AiDigest[];
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
