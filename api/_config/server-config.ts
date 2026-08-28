@@ -35,6 +35,8 @@ const HSTS_HEADER: Record<string, string> =
 const LOCAL_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
 
 const KNOWN_PRODUCTION_ORIGINS = [
+  "https://tedz-finance.vercel.app",
+  "https://personal-finance-tracker-tedzs-projects.vercel.app",
   "https://personal-finance-tracker-six-zeta.vercel.app",
 ];
 
@@ -100,6 +102,7 @@ export function resolveAllowedOrigins(): string[] {
     if (host) origins.push(`https://${host.trim().replace(/\/$/, "")}`);
   }
 
+  origins.push("https://tedz-finance.vercel.app");
   origins.push(LOCAL_ORIGINS[0]);
   return origins;
 }
@@ -120,8 +123,11 @@ export function resolveCorsOrigin(
   origin: string,
 ): { ok: true; origin: string } | { ok: false } {
   if (!origin) return { ok: true, origin: FALLBACK_ORIGIN };
-  if (!ALLOWED_ORIGINS.has(origin)) return { ok: false };
-  return { ok: true, origin };
+  if (ALLOWED_ORIGINS.has(origin)) return { ok: true, origin };
+  if (/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app$/i.test(origin)) {
+    return { ok: true, origin };
+  }
+  return { ok: false };
 }
 
 /** Combine all security + CORS headers into a single object for middleware. */
