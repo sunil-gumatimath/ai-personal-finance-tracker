@@ -412,14 +412,19 @@ async function handleSignup(req: ApiRequest, res: ApiResponse) {
 		const details = asErrorDetails(error);
 		const message = getErrorMessage(error);
 		console.error("Signup error:", error);
+		const status = Number(details.status || (details as Record<string, unknown>).statusCode) || 0;
+		const body = (details as Record<string, unknown>).body;
+		const bodyMsg = (typeof body === "object" && body !== null && "message" in body ? String((body as Record<string, unknown>).message) : "") || message;
+
 		if (
-			details.status === 400 ||
-			details.status === 409 ||
-			message.includes("already exists")
+			status === 400 ||
+			status === 409 ||
+			bodyMsg.includes("already exists") ||
+			bodyMsg.toLowerCase().includes("user already exists")
 		) {
 			res
 				.status(400)
-				.json({ error: message || "Invalid registration details" });
+				.json({ error: bodyMsg || "Invalid registration details" });
 			return;
 		}
 		res.status(500).json({ error: "Server error" });
@@ -574,7 +579,7 @@ async function handleLogin(req: ApiRequest, res: ApiResponse) {
 	} catch (error: unknown) {
 		const details = asErrorDetails(error);
 		const message = getErrorMessage(error);
-		console.error("Login failed unexpectedly");
+		console.error("Login failed:", error);
 
 		// better-auth throws APIError for 400/401 responses
 		if (message.includes("Email not verified")) {
@@ -585,17 +590,25 @@ async function handleLogin(req: ApiRequest, res: ApiResponse) {
 			return;
 		}
 
+		const status = Number(details.status || (details as Record<string, unknown>).statusCode || (details as Record<string, unknown>).statusText) || 0;
+		const body = (details as Record<string, unknown>).body;
+		const bodyMsg = (typeof body === "object" && body !== null && "message" in body ? String((body as Record<string, unknown>).message) : "") || message;
+
 		if (
+			status === 401 ||
+			status === 400 ||
+			status === 403 ||
 			message === "Invalid email or password" ||
-			details.status === 401 ||
-			details.status === 400
+			bodyMsg.toLowerCase().includes("invalid") ||
+			bodyMsg.toLowerCase().includes("credential") ||
+			bodyMsg.toLowerCase().includes("password") ||
+			bodyMsg.toLowerCase().includes("user not found") ||
+			bodyMsg.toLowerCase().includes("email")
 		) {
-			const responseMessage = message.includes(
-				"missing authentication credentials",
-			)
-				? message
+			const responseMessage = bodyMsg.includes("missing authentication credentials")
+				? bodyMsg
 				: "Invalid email or password";
-			res.status(401).json({ error: responseMessage });
+			res.status(status === 403 ? 403 : 401).json({ error: responseMessage });
 			return;
 		}
 
