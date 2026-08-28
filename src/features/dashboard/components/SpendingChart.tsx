@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Area, AreaChart, Bar, BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePreferences } from '@/hooks/usePreferences'
 import { TrendingUp, TrendingDown, ChartLine } from 'lucide-react'
@@ -125,7 +125,6 @@ const CustomTooltip = ({
 
 export function SpendingChart({ data, isLoading = false }: SpendingChartProps) {
     const { preferences, formatCurrency } = usePreferences()
-    const [chartType, setChartType] = useState<'bar' | 'line' | 'step'>('step')
     const [visibleSeries, setVisibleSeries] = useState({ income: true, expenses: true })
 
     const locale = currencyLocales[preferences.currency] || 'en-US'
@@ -148,7 +147,8 @@ export function SpendingChart({ data, isLoading = false }: SpendingChartProps) {
     const savingsRate = totalIncome > 0 ? ((netFlow / totalIncome) * 100) : 0
     const hasNoData = totalIncome === 0 && totalExpenses === 0
 
-    const chartAriaLabel = `${chartType === 'step' ? 'Area' : chartType === 'bar' ? 'Bar' : 'Line'} chart comparing monthly income and expenses over the last six months`
+    // Static accessible description — the encoding no longer varies.
+    const chartAriaLabel = 'Area chart comparing monthly income and expenses over the last six months'
 
     return (
         <Card className="border border-border bg-card relative z-10">
@@ -179,7 +179,7 @@ export function SpendingChart({ data, isLoading = false }: SpendingChartProps) {
 
                 {/* Interactive Toggles & Legend */}
                 {!isLoading && (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 mt-1 border-t border-border/5">
+                    <div className="flex items-center gap-3 pt-3 mt-1 border-t border-border/5">
                         {/* Series Toggles (Legend) */}
                         <div className="flex items-center gap-2">
                             <button
@@ -210,35 +210,6 @@ export function SpendingChart({ data, isLoading = false }: SpendingChartProps) {
                                 <span className="h-2 w-2 rounded-full bg-[var(--expense)]" />
                                 Expenses
                             </button>
-                        </div>
-
-                        {/* Chart Type Selector */}
-                        <div
-                            role="radiogroup"
-                            aria-label="Chart type"
-                            className="flex items-center gap-1 self-start sm:self-auto rounded-lg bg-muted/50 p-1 border border-border/30"
-                        >
-                            {([
-                                ['bar', 'Bar'],
-                                ['line', 'Line'],
-                                ['step', 'Step'],
-                            ] as const).map(([type, label]) => (
-                                <button
-                                    key={type}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={chartType === type}
-                                    onClick={() => setChartType(type)}
-                                    className={cn(
-                                        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                        chartType === type
-                                            ? "bg-background text-foreground shadow-xs font-semibold"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    {label}
-                                </button>
-                            ))}
                         </div>
                     </div>
                 )}
@@ -279,198 +250,76 @@ export function SpendingChart({ data, isLoading = false }: SpendingChartProps) {
                         role="img"
                         aria-label={chartAriaLabel}
                     >
-                        {chartType === 'step' ? (
-                            <AreaChart
-                                data={data}
-                                margin={{ top: 20, right: 10, left: -10, bottom: 16 }}
-                            >
-                                <defs>
-                                    <linearGradient id="fillIncomeStep" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--color-income)" stopOpacity={0.25} />
-                                        <stop offset="95%" stopColor="var(--color-income)" stopOpacity={0.0} />
-                                    </linearGradient>
-                                    <linearGradient id="fillExpensesStep" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.25} />
-                                        <stop offset="95%" stopColor="var(--color-expenses)" stopOpacity={0.0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.15} />
-                                <XAxis
-                                    dataKey="month"
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickMargin={10}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
-                                />
-                                <YAxis
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={makeTickFormatter(preferences.currency, locale)}
-                                    tickMargin={10}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
-                                />
-                                <ChartTooltip
-                                    content={
-                                        <CustomTooltip
-                                            formatCurrency={formatCurrency}
-                                            showIncome={visibleSeries.income}
-                                            showExpenses={visibleSeries.expenses}
-                                        />
-                                    }
-                                />
+                        <AreaChart
+                            data={data}
+                            margin={{ top: 20, right: 10, left: -10, bottom: 16 }}
+                        >
+                            <defs>
+                                <linearGradient id="fillIncomeStep" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-income)" stopOpacity={0.25} />
+                                    <stop offset="95%" stopColor="var(--color-income)" stopOpacity={0.0} />
+                                </linearGradient>
+                                <linearGradient id="fillExpensesStep" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.25} />
+                                    <stop offset="95%" stopColor="var(--color-expenses)" stopOpacity={0.0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.15} />
+                            <XAxis
+                                dataKey="month"
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={10}
+                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                            />
+                            <YAxis
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={makeTickFormatter(preferences.currency, locale)}
+                                tickMargin={10}
+                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                            />
+                            <ChartTooltip
+                                content={
+                                    <CustomTooltip
+                                        formatCurrency={formatCurrency}
+                                        showIncome={visibleSeries.income}
+                                        showExpenses={visibleSeries.expenses}
+                                    />
+                                }
+                            />
 
-                                {visibleSeries.income && (
-                                    <Area
-                                        dataKey="income"
-                                        type="step"
-                                        fill="url(#fillIncomeStep)"
-                                        stroke="var(--color-income)"
-                                        strokeWidth={2}
-                                        activeDot={{
-                                            r: 5,
-                                            fill: "var(--color-income)",
-                                            stroke: "hsl(var(--background))",
-                                            strokeWidth: 2,
-                                        }}
-                                    />
-                                )}
-                                {visibleSeries.expenses && (
-                                    <Area
-                                        dataKey="expenses"
-                                        type="step"
-                                        fill="url(#fillExpensesStep)"
-                                        stroke="var(--color-expenses)"
-                                        strokeWidth={2}
-                                        activeDot={{
-                                            r: 5,
-                                            fill: "var(--color-expenses)",
-                                            stroke: "hsl(var(--background))",
-                                            strokeWidth: 2,
-                                        }}
-                                    />
-                                )}
-                            </AreaChart>
-                        ) : chartType === 'bar' ? (
-                            <BarChart
-                                data={data}
-                                margin={{ top: 20, right: 10, left: -10, bottom: 16 }}
-                            >
-                                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.15} />
-                                <XAxis
-                                    dataKey="month"
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickMargin={10}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                            {visibleSeries.income && (
+                                <Area
+                                    dataKey="income"
+                                    type="step"
+                                    fill="url(#fillIncomeStep)"
+                                    stroke="var(--color-income)"
+                                    strokeWidth={2}
+                                    activeDot={{
+                                        r: 5,
+                                        fill: "var(--color-income)",
+                                        stroke: "hsl(var(--background))",
+                                        strokeWidth: 2,
+                                    }}
                                 />
-                                <YAxis
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={makeTickFormatter(preferences.currency, locale)}
-                                    tickMargin={10}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                            )}
+                            {visibleSeries.expenses && (
+                                <Area
+                                    dataKey="expenses"
+                                    type="step"
+                                    fill="url(#fillExpensesStep)"
+                                    stroke="var(--color-expenses)"
+                                    strokeWidth={2}
+                                    activeDot={{
+                                        r: 5,
+                                        fill: "var(--color-expenses)",
+                                        stroke: "hsl(var(--background))",
+                                        strokeWidth: 2,
+                                    }}
                                 />
-                                <ChartTooltip
-                                    content={
-                                        <CustomTooltip
-                                            formatCurrency={formatCurrency}
-                                            showIncome={visibleSeries.income}
-                                            showExpenses={visibleSeries.expenses}
-                                        />
-                                    }
-                                />
-
-                                {visibleSeries.income && (
-                                    <Bar
-                                        dataKey="income"
-                                        fill="var(--color-income)"
-                                        radius={[4, 4, 0, 0]}
-                                        maxBarSize={32}
-                                        animationDuration={400}
-                                    />
-                                )}
-                                {visibleSeries.expenses && (
-                                    <Bar
-                                        dataKey="expenses"
-                                        fill="var(--color-expenses)"
-                                        radius={[4, 4, 0, 0]}
-                                        maxBarSize={32}
-                                        animationDuration={400}
-                                    />
-                                )}
-                            </BarChart>
-                        ) : (
-                            <LineChart
-                                data={data}
-                                margin={{ top: 20, right: 10, left: -10, bottom: 16 }}
-                            >
-                                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.15} />
-                                <XAxis
-                                    dataKey="month"
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickMargin={10}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
-                                />
-                                <YAxis
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={makeTickFormatter(preferences.currency, locale)}
-                                    tickMargin={10}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
-                                />
-                                <ChartTooltip
-                                    content={
-                                        <CustomTooltip
-                                            formatCurrency={formatCurrency}
-                                            showIncome={visibleSeries.income}
-                                            showExpenses={visibleSeries.expenses}
-                                        />
-                                    }
-                                />
-
-                                {visibleSeries.income && (
-                                    <Line
-                                        dataKey="income"
-                                        type="natural"
-                                        stroke="var(--color-income)"
-                                        strokeWidth={2.5}
-                                        dot={{
-                                            r: 3.5,
-                                            fill: "var(--color-income)",
-                                            strokeWidth: 0,
-                                        }}
-                                        activeDot={{
-                                            r: 5.5,
-                                            fill: "var(--color-income)",
-                                            stroke: "hsl(var(--background))",
-                                            strokeWidth: 2,
-                                        }}
-                                        animationDuration={400}
-                                    />
-                                )}
-                                {visibleSeries.expenses && (
-                                    <Line
-                                        dataKey="expenses"
-                                        type="natural"
-                                        stroke="var(--color-expenses)"
-                                        strokeWidth={2.5}
-                                        dot={{
-                                            r: 3.5,
-                                            fill: "var(--color-expenses)",
-                                            strokeWidth: 0,
-                                        }}
-                                        activeDot={{
-                                            r: 5.5,
-                                            fill: "var(--color-expenses)",
-                                            stroke: "hsl(var(--background))",
-                                            strokeWidth: 2,
-                                        }}
-                                        animationDuration={400}
-                                    />
-                                )}
-                            </LineChart>
-                        )}
+                            )}
+                        </AreaChart>
                     </ChartContainer>
                 )}
             </CardContent>

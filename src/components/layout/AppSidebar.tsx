@@ -11,6 +11,7 @@ import {
 	CreditCard,
 	ScrollText,
 	BarChart3,
+	Sparkles,
 } from "lucide-react";
 import {
 	Sidebar,
@@ -36,6 +37,7 @@ const NAV_GROUPS = [
 		label: "Overview",
 		items: [
 			{ title: "Dashboard", icon: LayoutDashboard, path: "/" },
+			{ title: "AI Digest", icon: Sparkles, path: "/digest" },
 			{ title: "Reports", icon: BarChart3, path: "/reports" },
 			{ title: "Calendar", icon: Calendar, path: "/calendar" },
 		],

@@ -19,6 +19,7 @@ import {
 	BarChart,
 	CartesianGrid,
 	Cell,
+	LabelList,
 	XAxis,
 	YAxis,
 } from "recharts";
@@ -89,6 +90,47 @@ const CATEGORY_COLORS = [
 
 /** Max transactions fetched for reports — beyond this, results are capped server-side. */
 const REPORTS_TX_LIMIT = 1000;
+
+// Hoisted so it isn't recreated per render (keeps Recharts' tooltip layer stable).
+// Carries amount + share so the chart fully replaces the old progress-bar list.
+interface CategoryTooltipProps {
+	active?: boolean;
+	payload?: Array<{ payload?: unknown }>;
+	formatCurrency: (amount: number) => string;
+}
+
+function CategoryTooltip({
+	active,
+	payload,
+	formatCurrency,
+}: CategoryTooltipProps) {
+	if (!active || !payload?.length) return null;
+	const data = payload[0]?.payload as CategorySpend | undefined;
+	if (!data) return null;
+	return (
+		<div className="bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl p-3 min-w-[170px] z-50">
+			<div className="flex items-center gap-2 mb-1.5 border-b border-border pb-1.5">
+				<span
+					className="h-2.5 w-2.5 rounded-full shrink-0"
+					style={{ backgroundColor: data.color }}
+				/>
+				<span className="text-xs font-semibold">{data.category}</span>
+			</div>
+			<div className="flex items-center justify-between gap-4 text-xs">
+				<span className="text-muted-foreground">Spent</span>
+				<span className="font-bold tabular-nums">
+					{formatCurrency(data.amount)}
+				</span>
+			</div>
+			<div className="mt-1 flex items-center justify-between gap-4 text-xs">
+				<span className="text-muted-foreground">Share</span>
+				<span className="font-semibold tabular-nums">
+					{data.percentage.toFixed(1)}%
+				</span>
+			</div>
+		</div>
+	);
+}
 
 export function Reports() {
 	const { user } = useAuth();
@@ -643,7 +685,8 @@ export function Reports() {
 									<BarChart
 										data={categorySpending.slice(0, CATEGORY_TOP_N)}
 										layout="vertical"
-										margin={{ left: 8 }}
+										// Right margin reserves room for the compact value labels.
+										margin={{ left: 8, right: 52 }}
 									>
 										<CartesianGrid horizontal={false} strokeDasharray="3 3" />
 										<XAxis
@@ -662,12 +705,24 @@ export function Reports() {
 											width={90}
 										/>
 										<ChartTooltip
-											formatter={(value: number) => [
-												formatCurrency(value),
-												"Spent",
-											]}
+											content={<CategoryTooltip formatCurrency={formatCurrency} />}
 										/>
 										<Bar dataKey="amount" radius={[0, 6, 6, 0]}>
+											{/* Compact end-of-bar values keep amounts glanceable */}
+											{/* without a duplicate legend list below the chart. */}
+											<LabelList
+												dataKey="amount"
+												position="right"
+												fontSize={10}
+												fill="hsl(var(--muted-foreground))"
+												formatter={(value: number) =>
+													formatCompactCurrency(
+														value,
+														preferences.currency,
+														locale,
+													)
+												}
+											/>
 											{categorySpending
 												.slice(0, CATEGORY_TOP_N)
 												.map((entry, index) => (
@@ -684,30 +739,6 @@ export function Reports() {
 										</Bar>
 									</BarChart>
 								</ChartContainer>
-								<div className="mt-4 space-y-2.5">
-									{categorySpending.slice(0, CATEGORY_TOP_N).map((entry) => (
-										<div key={entry.category} className="space-y-1">
-											<div className="flex items-center justify-between text-xs">
-												<span className="font-medium">{entry.category}</span>
-												<span className="text-muted-foreground tabular-nums">
-													{formatCurrency(entry.amount)} ·{" "}
-													{entry.percentage.toFixed(1)}%
-												</span>
-											</div>
-											<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-												<div
-													className="h-full rounded-full transition-all"
-													style={{
-														width: `${Math.min(entry.percentage, 100)}%`,
-														backgroundColor:
-															entry.color ||
-															CATEGORY_COLORS[0],
-													}}
-												/>
-											</div>
-										</div>
-									))}
-								</div>
 								{categoryOverflow > 0 && (
 									<p className="mt-3 text-xs text-muted-foreground">
 										* Showing top {CATEGORY_TOP_N} of {categorySpending.length}{" "}

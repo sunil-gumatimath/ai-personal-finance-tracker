@@ -47,6 +47,7 @@ import { ACCENT_OPTIONS, THEME_OPTIONS } from "@/components/system/themes";
 import { useAccent } from "@/components/system/theme-provider";
 import type { LucideIcon } from "lucide-react";
 import type { Preferences } from "@/types/preferences";
+import type { AccentName } from "@/components/system/themes";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -124,6 +125,17 @@ function ThemeTile({
 function ThemeSelector() {
 	const { theme, setTheme } = useTheme();
 	const { accent, setAccent } = useAccent();
+	const { savePreferences } = usePreferences();
+
+	const handleAccentSelect = (value: AccentName) => {
+		// Apply instantly (local), then sync to the DB so the choice follows
+		// the user across devices. A failed save rolls back state per the
+		// PreferencesContext contract; surface it instead of swallowing.
+		setAccent(value);
+		savePreferences({ accent: value }).catch(() => {
+			toast.error("Accent couldn't be synced to your account.");
+		});
+	};
 
 	return (
 		<div className="space-y-3">
@@ -138,15 +150,29 @@ function ThemeSelector() {
 					/>
 				))}
 			</div>
-			<div className="grid grid-cols-2 gap-2" role="group" aria-label="Accent color">
+			<div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7" role="group" aria-label="Accent color">
 				{ACCENT_OPTIONS.map(({ value, label, icon }) => (
 					<ThemeTile
 						key={value}
 						selected={accent === value}
-						onClick={() => setAccent(value)}
+						onClick={() => handleAccentSelect(value)}
 						icon={icon}
 						label={label}
-						swatch={value === "emerald" ? "#10b981" : undefined}
+						swatch={
+							value === "emerald"
+								? "#10b981"
+								: value === "navy"
+									? "#1e3a8a"
+									: value === "violet"
+										? "#8b5cf6"
+										: value === "cyan"
+											? "#06b6d4"
+											: value === "rose"
+												? "#f43f5e"
+												: value === "amber"
+													? "#f59e0b"
+													: undefined
+						}
 					/>
 				))}
 			</div>

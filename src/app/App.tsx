@@ -9,6 +9,7 @@ import {
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PreferencesProvider } from "@/contexts/PreferencesContext";
 import { ThemeProvider } from "@/components/system/theme-provider";
+import { AccentSync } from "@/components/system/accent-sync";
 import { ErrorBoundary } from "@/components/system/ErrorBoundary";
 import { FullScreenLoader } from "@/components/system/FullScreenLoader";
 import { MainLayout } from "@/components/layout";
@@ -30,6 +31,7 @@ import {
 	Calendar,
 	SystemLogs,
 	Reports,
+	Digest,
 } from "@/pages";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -82,6 +84,7 @@ function DocumentTitle() {
 /** Path → lazily-loaded page, protected by MainLayout. */
 const PROTECTED_ROUTES: Array<[string, React.ComponentType]> = [
 	["/", Dashboard],
+	["/digest", Digest],
 	["/transactions", Transactions],
 	["/reports", Reports],
 	["/calendar", Calendar],
@@ -165,6 +168,7 @@ function App() {
 					<PreferencesProvider>
 						<div className="min-h-screen font-sans antialiased">
 							<AppRoutes />
+							<AccentSync />
 							<Toaster />
 						</div>
 					</PreferencesProvider>

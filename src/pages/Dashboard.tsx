@@ -8,7 +8,6 @@ import {
 	BudgetOverview,
 	AICoach,
 	FinancialHealthScore,
-	WeeklyDigestCard,
 } from "@/components/dashboard";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -585,11 +584,6 @@ export function Dashboard() {
 							error={insightsError}
 							onRetry={retryInsights}
 						/>
-					</div>
-
-					{/* Weekly AI Digest */}
-					<div className="motion-safe:animate-fade-in-up">
-						<WeeklyDigestCard />
 					</div>
 				</>
 			)}

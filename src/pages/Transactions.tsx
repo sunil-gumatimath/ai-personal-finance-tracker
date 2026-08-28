@@ -441,6 +441,7 @@ export function Transactions() {
 							placeholder="Try: paid $45 for groceries yesterday, or salary of $2,000 on the 1st"
 							value={aiPrompt}
 							onChange={(e) => setAiPrompt(e.target.value)}
+							disabled={aiLoading}
 							onKeyDown={(e) => {
 								if (e.key === "Enter") {
 									e.preventDefault();
