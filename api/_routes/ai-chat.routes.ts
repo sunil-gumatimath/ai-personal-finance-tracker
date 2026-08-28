@@ -7,7 +7,6 @@ import {
 	MissingApiKeyError,
 	KiloCodeApiError,
 	isFreeModel,
-	getFreeModelIds,
 	type AIProviderPreferences,
 } from "../_services/_ai_ai-provider.js";
 import { decryptPreferences } from "../_utils/crypto.js";

@@ -1,9 +1,6 @@
 import {
 	generateWithKiloCode,
 	streamWithKiloCode,
-	KiloCodeApiError,
-	isFreeModel,
-	getFreeModelIds,
 } from "./_ai_kilocode.js";
 
 export {

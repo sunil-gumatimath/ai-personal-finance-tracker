@@ -124,7 +124,7 @@ client for 15 minutes.
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/api/ai/insights` | Active (non-dismissed) AI insights from the last 7 days |
-| POST | `/api/ai/insights` | Generate insights (`forceRefresh: true` bypasses reuse of recent ones) |
+| POST | `/api/ai/insights` | Generate insights (`forceRefresh: true` bypasses reuse of recent ones); rule-based fallback when no AI key is set, so no key is required |
 | PATCH | `/api/ai/insights?id=…` | Dismiss an insight |
 | POST | `/api/ai/chat` | Chat message (`message` ≤ 4000 chars, optional `aiPreferences.aiProvider`, optional `history`) |
 | POST | `/api/ai/chat` (streaming) | Same body with `Accept: text/event-stream` — reply streams as newline-delimited JSON events: `{"type":"delta","text":"…"}` per token, then `{"type":"done"}`, or `{"type":"error","message":"…"}` on any failure (including 401/400, which are in-band once the stream has started). Falls back to buffered JSON when the header is absent |
@@ -132,10 +132,12 @@ client for 15 minutes.
 | GET | `/api/ai/digest` | Latest stored weekly AI digest |
 | POST | `/api/ai/digest` | Generate (or regenerate) this week's AI digest from the last 7 days of data |
 
-AI routes require a KiloCode API key (stored in preferences or
-`KILOCODE_API_KEY` env); missing keys return 400. Only free models are allowed;
-a disallowed saved model falls back to the server default instead of erroring.
-All four AI endpoints are rate limited to 20 req/min per IP.
+AI chat, parse-transaction, and digest require a KiloCode API key (stored in
+preferences or `KILOCODE_API_KEY` env); missing keys return 400. The **insights**
+endpoint is the exception: when no key is configured it falls back to rule-based
+anomaly/coaching detection and returns 200 instead of erroring. Only free models are
+allowed; a disallowed saved model falls back to the server default instead of erroring.
+All four AI endpoints are rate limited to 20 req/min per IP (per distinct AI path).
 
 ## Transactions (recurring)
 

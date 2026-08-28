@@ -33,6 +33,14 @@ const OVERRIDES: Array<{ domain: string; ips: string[] }> = [
     domain: "ep-odd-block-a13wgvy0-pooler.ap-southeast-1.aws.neon.tech",
     ips: [],
   },
+  {
+    domain: "ep-odd-block-a13wgvy0.ap-southeast-1.aws.neon.tech",
+    ips: [],
+  },
+  {
+    domain: "api.ap-southeast-1.aws.neon.tech",
+    ips: [],
+  },
 ];
 
 const FALLBACK_IPS: Record<string, string[]> = {
@@ -42,6 +50,16 @@ const FALLBACK_IPS: Record<string, string[]> = {
     "13.228.33.46",
   ],
   "ep-odd-block-a13wgvy0-pooler.ap-southeast-1.aws.neon.tech": [
+    "52.220.170.93",
+    "13.228.184.177",
+    "13.228.46.236",
+  ],
+  "ep-odd-block-a13wgvy0.ap-southeast-1.aws.neon.tech": [
+    "52.220.170.93",
+    "13.228.184.177",
+    "13.228.46.236",
+  ],
+  "api.ap-southeast-1.aws.neon.tech": [
     "52.220.170.93",
     "13.228.184.177",
     "13.228.46.236",

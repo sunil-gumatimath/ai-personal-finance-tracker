@@ -33,8 +33,13 @@ interface SystemLogEntry {
 	metadata: Record<string, unknown>;
 }
 
+export interface LogWsClient {
+	data?: { userId?: string };
+	send: (data: string) => void;
+}
+
 // Global active WebSocket client list
-export const activeWsClients = new Set<any>();
+export const activeWsClients = new Set<LogWsClient>();
 
 let isTableChecked = false;
 
@@ -112,7 +117,7 @@ export async function logEvent(
 		}
 
 		// Stringify oldValue and newValue if they are objects
-		const stringifyVal = (val: any): string | null => {
+		const stringifyVal = (val: unknown): string | null => {
 			if (val == null) return null;
 			if (typeof val === "object") return JSON.stringify(val);
 			return String(val);
@@ -362,7 +367,7 @@ function cleanOldLogFiles() {
 /**
  * Mask sensitive credentials inside strings, objects, or JSON records
  */
-function maskSensitiveData(value: any): any {
+function maskSensitiveData(value: unknown): unknown {
 	if (value == null) return value;
 
 	if (typeof value === "string") {
@@ -386,13 +391,13 @@ function maskSensitiveData(value: any): any {
 	return value;
 }
 
-function maskObject(obj: any): any {
+function maskObject(obj: unknown): unknown {
 	if (!obj || typeof obj !== "object") return obj;
 	if (Array.isArray(obj)) {
 		return obj.map(maskSensitiveData);
 	}
 
-	const masked: any = {};
+	const masked: Record<string, unknown> = {};
 	const sensitiveKeys = [
 		"password",
 		"encrypted_password",
@@ -405,7 +410,7 @@ function maskObject(obj: any): any {
 		"authorization",
 	];
 
-	for (const [k, v] of Object.entries(obj)) {
+	for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
 		const isSensitive = sensitiveKeys.some((key) =>
 			k.toLowerCase().includes(key),
 		);

@@ -1,5 +1,5 @@
 import { query } from "../_repositories/db.js";
-import { generateWithProvider, MissingApiKeyError } from "./_ai_ai-provider.js";
+import { generateWithProvider, KiloCodeApiError } from "./_ai_ai-provider.js";
 import { resolveAiPreferences } from "./ai-preferences.service.js";
 import {
 	parseDigestJson,
@@ -7,7 +7,6 @@ import {
 	type DigestProse,
 	type DigestStats,
 } from "../_domain/ai-digest.js";
-import { KiloCodeApiError } from "./_ai_ai-provider.js";
 import { formatCurrency } from "../_utils/format.js";
 
 interface DigestContextRow {
