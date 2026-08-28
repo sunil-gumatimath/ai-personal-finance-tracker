@@ -38,33 +38,15 @@ if (process.env.NODE_ENV !== "production") {
 
 export const authClient = createAuthClient(authUrl || "");
 
-export function getAuthOrigin(req?: {
+export function getAuthOrigin(_req?: {
   headers?: Record<string, string | string[] | undefined>;
 }): string {
-  if (req?.headers) {
-    const host = req.headers["host"];
-    const proto = req.headers["x-forwarded-proto"] || "https";
-
-    if (host && typeof host === "string") {
-      const cleanHost = host.trim().replace(/\/$/, "").toLowerCase();
-
-      if (cleanHost.includes("localhost") || cleanHost.includes("127.0.0.1")) {
-        const origin = "http://localhost:5173";
-        return origin;
-      }
-
-      const origin = `${proto}://${cleanHost}`;
-      return origin;
-    }
+  if (process.env.NEON_AUTH_ORIGIN) {
+    return process.env.NEON_AUTH_ORIGIN.trim().replace(/\/$/, "");
   }
 
-  if (process.env.VITE_APP_URL) {
-    return process.env.VITE_APP_URL.trim().replace(/\/$/, "");
-  }
-
-  // Env-derived fallback (ALLOWED_ORIGINS → VERCEL_PROJECT_PRODUCTION_URL →
-  // localhost) instead of a stale hardcoded production URL.
-  return getAuthOriginFallback();
+  // Neon Managed Better-Auth always allows localhost:5173 out-of-the-box
+  return "http://localhost:5173";
 }
 
 /**
