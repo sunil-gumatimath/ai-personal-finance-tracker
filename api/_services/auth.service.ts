@@ -45,8 +45,25 @@ export function getAuthOrigin(_req?: {
     return process.env.NEON_AUTH_ORIGIN.trim().replace(/\/$/, "");
   }
 
-  // Neon Managed Better-Auth always allows localhost:5173 out-of-the-box
-  return "http://localhost:5173";
+  // Prefer the caller's real origin in production (Vercel sends the app's
+  // https origin). The old code always returned localhost, which makes Neon
+  // Auth reject login/signup with an origin error on deployed URLs.
+  const rawOrigin = _req?.headers?.["origin"];
+  const originHeader = Array.isArray(rawOrigin) ? rawOrigin[0] : rawOrigin;
+  if (typeof originHeader === "string" && originHeader.startsWith("http")) {
+    return originHeader.split(",")[0].trim().replace(/\/$/, "");
+  }
+  const rawReferer = _req?.headers?.["referer"];
+  const refererHeader = Array.isArray(rawReferer) ? rawReferer[0] : rawReferer;
+  if (typeof refererHeader === "string" && refererHeader.startsWith("http")) {
+    try {
+      return new URL(refererHeader).origin;
+    } catch {
+      // fall through to fallback
+    }
+  }
+
+  return getAuthOriginFallback();
 }
 
 /**
@@ -130,7 +147,10 @@ export function buildSessionCookie(
     `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Strict",
+    // Lax (not Strict): still blocks cross-site POST CSRF, but allows the
+    // session to survive top-level GET redirects (email verification,
+    // Neon Auth callbacks) which Strict would drop in production.
+    "SameSite=Lax",
   ];
 
   if (requestUsesHttps(req)) attributes.push("Secure");
@@ -144,7 +164,7 @@ export function buildClearedSessionCookie(req?: {
     `${SESSION_COOKIE_NAME}=`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Strict",
+    "SameSite=Lax",
     "Max-Age=0",
     "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
   ];

@@ -16,14 +16,36 @@ export const config = { maxDuration: 60 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
 	const url = new URL(req.url!, `https://${req.headers.host || "localhost"}`);
-	const pathname = url.pathname;
+	let pathname = url.pathname;
 
-	if (!pathname.startsWith("/api/")) {
-		res.status(404).json({ error: "Not Found" });
-		return;
+	// Vercel rewrites /api/:path* -> /api/handler?path=:path* (see vercel.json).
+	// After the rewrite pathname is /api/handler, so the real route lives in
+	// query.path. Prefer it when present; fall back to the raw pathname for
+	// direct invocations and local emulation.
+	const rawPathQuery = (req.query as Record<string, unknown> | undefined)?.path;
+	let apiPath: string;
+	if (typeof rawPathQuery === "string" && rawPathQuery.length > 0) {
+		apiPath = rawPathQuery.replace(/^\/api\//, "").replace(/^\//, "");
+		pathname = `/api/${apiPath}`;
+	} else if (Array.isArray(rawPathQuery) && rawPathQuery.length > 0) {
+		apiPath = String(rawPathQuery.join("/")).replace(/^\/api\//, "").replace(/^\//, "");
+		pathname = `/api/${apiPath}`;
+	} else {
+		if (!pathname.startsWith("/api/")) {
+			res.status(404).json({ error: "Not Found" });
+			return;
+		}
+		apiPath = pathname.replace(/^\/api\//, "");
 	}
-
-	const apiPath = pathname.replace(/^\/api\//, "");
+	// Strip the /api/handler self-reference if routing ever lands here directly.
+	if (apiPath === "handler" || apiPath.startsWith("handler/")) {
+		apiPath = apiPath.replace(/^handler\/?/, "");
+		if (!apiPath) {
+			res.status(404).json({ error: "Route /api/handler not found" });
+			return;
+		}
+		pathname = `/api/${apiPath}`;
+	}
 	const routeHandler = resolveRoute(apiPath);
 
 	if (!routeHandler) {
@@ -68,7 +90,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 	}
 
 	let body: Record<string, unknown> = {};
-	if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
+	if (typeof req.body === "string" && req.body.length > 0) {
+		try {
+			const parsed: unknown = JSON.parse(req.body);
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				body = parsed as Record<string, unknown>;
+			}
+		} catch {
+			// non-JSON raw body — leave as empty object so routes return 400, not 500
+		}
+	} else if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
 		body = req.body as Record<string, unknown>;
 	}
 
@@ -83,10 +114,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 			]),
 		) as ApiRequest["headers"],
 		query: Object.fromEntries(
-			Object.entries(req.query).map(([k, v]) => [
-				k,
-				Array.isArray(v) ? v[0] : v || "",
-			]),
+			Object.entries(req.query)
+				.filter(([k]) => k !== "path")
+				.map(([k, v]) => [
+					k,
+					Array.isArray(v) ? v[0] : v || "",
+				]),
 		) as ApiRequest["query"],
 	};
 

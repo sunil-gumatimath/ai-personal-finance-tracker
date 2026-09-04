@@ -51,9 +51,11 @@ const ROUTES: Record<string, RouteHandler> = {
 export function resolveRoute(apiPath: string): RouteHandler | null {
 	if (ROUTES[apiPath]) return ROUTES[apiPath];
 
+	// Walk up the path segments so deeply-nested dynamic routes
+	// (e.g. /api/accounts/123/extra) still resolve to their parent handler.
 	const parts = apiPath.split("/");
-	if (parts.length > 1) {
-		const parent = parts.slice(0, -1).join("/");
+	for (let len = parts.length - 1; len >= 1; len--) {
+		const parent = parts.slice(0, len).join("/");
 		if (ROUTES[parent]) return ROUTES[parent];
 	}
 

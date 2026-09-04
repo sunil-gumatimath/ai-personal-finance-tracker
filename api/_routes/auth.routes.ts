@@ -33,9 +33,10 @@ function getErrorMessage(error: unknown): string {
 }
 
 function getClientId(req: ApiRequest): string {
-	return (
-		req.headers?.["x-forwarded-for"] || req.headers?.["x-real-ip"] || "unknown"
-	);
+	const raw = req.headers?.["x-forwarded-for"] || req.headers?.["x-real-ip"] || "unknown";
+	// x-forwarded-for can chain proxies ("client, proxy1, proxy2") — key on the
+	// leftmost (original client) entry so the key can't be rotated by spoofing.
+	return raw.split(",")[0]?.trim() || "unknown";
 }
 
 async function tryEnsureDefaultCategories(userId: string): Promise<void> {

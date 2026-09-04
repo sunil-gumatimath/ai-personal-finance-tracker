@@ -111,15 +111,23 @@ export function useSystemLogs() {
 	const connectWebSocket = useCallback(() => {
 		if (disposedRef.current) return;
 
+		// Production (Vercel serverless) has no WebSocket support — /api/ws-logs
+		// would just 404 and reconnect-forever. Skip WS entirely outside dev;
+		// the page still works via the initial fetch + manual refresh.
+		const isDev =
+			window.location.hostname === "localhost" ||
+			window.location.hostname === "127.0.0.1";
+		if (!isDev) {
+			setWsStatus("disconnected");
+			return;
+		}
+
 		if (wsRef.current) {
 			wsRef.current.close();
 		}
 
 		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-		const isDev =
-			window.location.hostname === "localhost" ||
-			window.location.hostname === "127.0.0.1";
-		const wsHost = isDev ? "localhost:3001" : window.location.host;
+		const wsHost = "localhost:3001";
 		const wsUrl = `${protocol}//${wsHost}/api/ws-logs`;
 		setWsStatus("reconnecting");
 
