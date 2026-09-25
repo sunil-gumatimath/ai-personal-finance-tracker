@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, User, BotMessageSquare, X, Sparkles, Square } from "lucide-react";
+import { Send, User, BotMessageSquare, X, Sparkles, Square, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +53,19 @@ export function AIAgentChat() {
 	// Screen-reader announcement: only updated on completion/error so the
 	// per-token stream isn't read aloud (M5).
 	const [announcement, setAnnouncement] = useState("");
+	// Re-render clock for the cooldown countdown. The previous implementation
+	// called Date.now() during render, which is not reactive — the Send button
+	// could stay disabled for an extra frame (or indefinitely, if nothing else
+	// changed state) after the cooldown had actually elapsed.
+	const [nowTick, setNowTick] = useState(() => Date.now());
+	useEffect(() => {
+		if (cooldownUntil <= Date.now()) return;
+		const id = window.setInterval(
+			() => setNowTick(Date.now()),
+			Math.max(250, cooldownUntil - Date.now()),
+		);
+		return () => window.clearInterval(id);
+	}, [cooldownUntil]);
 	const lastApiCallRef = useRef(0);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	// Remembers the last question so the error bubble can offer a Retry (M8).
@@ -119,7 +132,10 @@ export function AIAgentChat() {
 	}, [messages, user]);
 
 	// Clear the cooldown flag once it expires so the button re-enables and
-	// the inline hint disappears.
+	// the inline hint disappears. This is also the ONLY thing that made the
+	// button recover: the disabled/title props read `Date.now()` during render,
+	// which is not reactive. Ticking `cooldownUntil` to 0 drives the re-render
+	// deterministically instead of relying on an unrelated state change.
 	useEffect(() => {
 		if (cooldownUntil <= Date.now()) return;
 		const timer = setTimeout(() => {
@@ -128,6 +144,17 @@ export function AIAgentChat() {
 		}, cooldownUntil - Date.now());
 		return () => clearTimeout(timer);
 	}, [cooldownUntil]);
+
+	/** Seconds left on the UI cooldown, for the inline hint. */
+	const cooldownSeconds = Math.max(
+		0,
+		Math.ceil(
+			(Math.max(cooldownUntil, lastApiCallRef.current + API_COOLDOWN_MS) -
+				nowTick) /
+				1000,
+		),
+	);
+	const isCoolingDown = cooldownSeconds > 0;
 
 	// Listen for open-ai-chat event (with optional initialPrompt)
 	useEffect(() => {
@@ -161,7 +188,9 @@ export function AIAgentChat() {
 		el.style.height = `${Math.min(el.scrollHeight, INPUT_MAX_HEIGHT_PX)}px`;
 	}, [input, isOpen]);
 
-	const isCoolingDown = Date.now() < cooldownUntil || Date.now() - lastApiCallRef.current < API_COOLDOWN_MS;
+	// A key must exist before the assistant can answer. Previously the widget
+	// showed an unconditional green "online" dot and only failed on first send.
+	const aiConfigured = preferences.kilocodeApiKeyConfigured;
 
 	// Abort controller for the in-flight chat request; aborted when the
 	// component unmounts (or is closed) so a slow generation doesn't outlive
@@ -187,6 +216,22 @@ export function AIAgentChat() {
 	// Accumulates the streamed text so it can be announced to screen readers as
 	// a single completed reply (M5), not per-token.
 	const streamingContentRef = useRef("");
+
+	// Escape closes the panel, and focus moves into it on open so keyboard
+	// users aren't left behind on the launcher button.
+	const panelRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (!isOpen) return;
+		panelRef.current?.focus();
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				setIsOpen(false);
+			}
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [isOpen]);
 
 	// Append one streamed delta, lazily creating the assistant bubble on the
 	// first token so the typing dots stay visible until generation starts.
@@ -344,7 +389,9 @@ export function AIAgentChat() {
 
 	if (!isOpen) {
 		return (
-			<div className="fixed bottom-5 right-5 z-50">
+			<div
+				className="fixed right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-50"
+			>
 				<Button
 					onClick={() => setIsOpen(true)}
 					size="icon"
@@ -359,8 +406,19 @@ export function AIAgentChat() {
 	}
 
 	return (
-		<div className="fixed bottom-5 right-5 z-50 w-[calc(100vw-2.5rem)] max-w-[380px]">
-			<Card className="flex h-[min(520px,calc(100dvh-5rem))] w-full flex-col shadow-xl border-border/50 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200 ease-out origin-bottom-right">
+		<div
+			// Safe-area insets: the FAB/panel is fixed-positioned, so without these
+			// it sat under the iOS home indicator while the rest of the app
+			// (header, main layout) already accounted for them.
+			className="fixed right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-50 w-[calc(100vw-2.5rem)] max-w-[380px]"
+			role="dialog"
+			aria-label="AI financial assistant"
+		>
+			<Card
+				ref={panelRef}
+				tabIndex={-1}
+				className="flex h-[min(520px,calc(100dvh-5rem))] w-full flex-col shadow-xl border-border/50 outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200 ease-out origin-bottom-right"
+			>
 				{/* Header - Compact */}
 				<CardHeader className="flex flex-row items-center justify-between gap-2 px-3 py-2 border-b shrink-0">
 					<div className="flex items-center gap-2 min-w-0">
@@ -371,11 +429,23 @@ export function AIAgentChat() {
 						</Avatar>
 						<div className="flex items-center gap-2 min-w-0">
 							<p className="text-sm font-medium truncate">AI Assistant</p>
+							{/* Honest status: green only when a key is configured and
+							    something can actually answer. */}
 							<span
-								className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+								className={cn(
+									"h-1.5 w-1.5 shrink-0 rounded-full",
+									aiConfigured
+										? "bg-[var(--success)]"
+										: "bg-[var(--warning)]",
+								)}
 								aria-hidden="true"
 							/>
 						</div>
+						{!aiConfigured && (
+							<p className="text-[10px] leading-tight text-[var(--warning)]">
+								No API key
+							</p>
+						)}
 					</div>
 					<div className="flex items-center shrink-0">
 						<AlertDialog>
@@ -455,7 +525,11 @@ export function AIAgentChat() {
 											? "bg-primary text-primary-foreground"
 											: m.isError
 												? "bg-destructive/10 text-destructive"
-												: "bg-muted prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:font-semibold prose-table:block prose-table:overflow-x-auto prose-table:text-xs prose-th:px-2 prose-th:py-0.5 prose-td:px-2 prose-td:py-0.5 prose-table:border-collapse break-words",
+												// Tailwind Typography hardcodes its own --tw-prose-* palette, so
+												// `prose`/`dark:prose-invert` made AI replies ignore both the
+												// light/dark theme and all 7 accents. `prose-neutral` +
+												// explicit token colours keeps them on-theme.
+												: "bg-muted prose prose-sm prose-neutral max-w-none text-foreground prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-a:text-primary prose-li:text-muted-foreground prose-th:text-foreground prose-td:text-muted-foreground prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:font-semibold prose-table:block prose-table:overflow-x-auto prose-table:text-xs prose-th:px-2 prose-th:py-0.5 prose-td:px-2 prose-td:py-0.5 prose-table:border-collapse break-words",
 									)}
 								>
 									{m.role === "assistant" && !m.isError ? (
@@ -518,6 +592,25 @@ export function AIAgentChat() {
 
 				{/* Input Section */}
 				<div className="px-3 py-2 border-t shrink-0">
+					{/* No key configured is a setup problem, not a request failure —
+					    send the user straight to the fix instead of a dead end. */}
+					{!aiConfigured && (
+						<div className="mb-2 flex items-start gap-2 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-2.5 py-2">
+							<Settings
+								className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--warning)]"
+								aria-hidden="true"
+							/>
+							<p className="text-[11px] leading-snug text-foreground">
+								Add a Kilo Gateway API key to use the assistant.{" "}
+								<a
+									href="/settings"
+									className="font-medium underline underline-offset-2"
+								>
+									Open Settings
+								</a>
+							</p>
+						</div>
+					)}
 					{/* Query Examples - Above Input */}
 					{messages.length <= 1 && !isLoading && (
 						<div className="pb-2">
@@ -528,6 +621,8 @@ export function AIAgentChat() {
 								</span>
 							</div>
 							<div className="flex flex-wrap gap-1">
+								{/* Show the first 3 but say how many more exist — a silent
+								    slice(0, 3) made the list look exhaustive. */}
 								{QUERY_EXAMPLES.slice(0, 3).map((example, index) => (
 									<Button
 										key={index}
@@ -539,6 +634,11 @@ export function AIAgentChat() {
 										<span className="truncate">{example}</span>
 									</Button>
 								))}
+								{QUERY_EXAMPLES.length > 3 && (
+									<span className="self-center text-[10px] text-muted-foreground">
+										+{QUERY_EXAMPLES.length - 3} more
+									</span>
+								)}
 							</div>
 						</div>
 					)}
@@ -578,16 +678,13 @@ export function AIAgentChat() {
 							type="submit"
 							size="icon"
 							aria-label="Send message"
-							disabled={
-								isLoading ||
-								!input.trim() ||
-								Date.now() < cooldownUntil ||
-								Date.now() - lastApiCallRef.current < API_COOLDOWN_MS
-							}
+							disabled={!aiConfigured || isCoolingDown || !input.trim()}
 							title={
-								Date.now() < cooldownUntil
-									? "Please wait a moment between messages"
-									: "Send"
+								!aiConfigured
+									? "Add an API key in Settings first"
+								: isCoolingDown
+									? `Please wait ${cooldownSeconds}s between messages`
+								: "Send"
 							}
 							className="h-9 w-9 shrink-0 active:scale-[0.98]"
 						>
@@ -598,7 +695,7 @@ export function AIAgentChat() {
 					{/* Inline cooldown feedback — the disabled button alone isn't enough */}
 					{cooldownHintVisible && isCoolingDown && (
 						<p role="status" className="pt-1 text-[10px] text-muted-foreground">
-							Easy there — please wait a moment between messages.
+							Easy there - wait {cooldownSeconds}s between messages.
 						</p>
 					)}
 				</div>
