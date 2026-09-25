@@ -103,6 +103,7 @@ Desktop.ini
 
 # Agent-local files
 .agents/
+.delta/
 skills.md
 skills-lock.json
 

@@ -50,9 +50,13 @@ export default defineConfig({
         ws: true,
       },
       '/neon-auth': {
-        // Env override keeps the real endpoint out of source control;
-        // the literal is only a fallback (must match src/lib/auth.ts).
-        target: process.env.VITE_NEON_AUTH_URL ?? 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth',
+        // Upstream target must be the REAL Neon Auth endpoint.
+        // Do NOT use VITE_NEON_AUTH_URL here: that is the *client* base URL
+        // (a same-origin /neon-auth path), so pointing the proxy at it makes
+        // Vite proxy to itself and sign-in/out requests fail.
+        // Env override keeps the real endpoint out of source control; the
+        // literal is only a fallback (must match src/lib/auth.ts).
+        target: process.env.NEON_AUTH_UPSTREAM_URL ?? 'https://ep-odd-block-a13wgvy0.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/neon-auth\/auth/, ''),
