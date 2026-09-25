@@ -6,6 +6,7 @@ import {
 	FileEdit,
 	FileText,
 	Filter,
+	Info,
 	Plus,
 	RefreshCw,
 	ScrollText,
@@ -38,6 +39,7 @@ import { LogDetailDrawer, LogTimeline } from "@/features/system-logs";
 import { useSystemLogs } from "@/hooks/useSystemLogs";
 import { buildLogExport, downloadLogFile } from "@/lib/log-export";
 import { formatAction, generateHumanDescription, type FormatOptions } from "@/lib/log-formatter";
+import { ROUTE_TITLES } from "@/pages";
 import type { LogEntry } from "@/types/api";
 
 export type { LogEntry } from "@/types/api";
@@ -47,54 +49,43 @@ const STAT_CARDS = [
 		label: "Total Events",
 		key: "total",
 		icon: ScrollText,
-		color: "text-foreground",
-		accent: "from-violet-500/10 to-indigo-500/10",
-		iconColor: "text-violet-500",
+		accent: "from-[var(--info)]/12 to-transparent",
 	},
 	{
 		label: "Txns Created",
 		key: "created",
 		icon: Plus,
-		color: "text-emerald-600",
-		accent: "from-emerald-500/10 to-green-500/10",
-		iconColor: "text-emerald-500",
+		accent: "from-[var(--success)]/12 to-transparent",
 	},
 	{
 		label: "Txns Edited",
 		key: "edited",
 		icon: FileEdit,
-		color: "text-blue-600",
-		accent: "from-blue-500/10 to-cyan-500/10",
-		iconColor: "text-blue-500",
+		accent: "from-[var(--info)]/12 to-transparent",
 	},
 	{
 		label: "Txns Deleted",
 		key: "deleted",
 		icon: Trash2,
-		color: "text-rose-600",
-		accent: "from-rose-500/10 to-pink-500/10",
-		iconColor: "text-rose-500",
+		accent: "from-destructive/12 to-transparent",
 	},
 	{
 		label: "Today",
 		key: "today",
 		icon: Zap,
-		color: "text-amber-600",
-		accent: "from-amber-500/10 to-orange-500/10",
-		iconColor: "text-amber-500",
+		accent: "from-[var(--warning)]/12 to-transparent",
 	},
 	{
-		label: "This Week",
+		label: "Last 7 Days",
 		key: "thisWeek",
 		icon: Calendar,
-		color: "text-sky-600",
-		accent: "from-sky-500/10 to-blue-500/10",
-		iconColor: "text-sky-500",
+		accent: "from-[var(--info)]/12 to-transparent",
 	},
 ] as const;
 
 export function SystemLogs() {
-	const { logs, loading, stats, wsStatus, error, refresh } = useSystemLogs();
+	const { logs, loading, stats, wsStatus, liveSupported, error, refresh } =
+		useSystemLogs();
 	const { preferences } = usePreferences();
 
 	const [searchQuery, setSearchQuery] = useState("");
@@ -217,29 +208,36 @@ export function SystemLogs() {
 				<div>
 					<div className="flex items-center gap-3">
 						<h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-							Activity Logs
+							{ROUTE_TITLES["/system-logs"]}
 						</h1>
+						{/* Three honest states: live, reconnecting, and "this
+						    platform has no socket" — never a red OFFLINE on a
+						    supported deployment. */}
 						<div
-							className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-200 ${
+							className={cn(
+								"flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors duration-200",
 								wsStatus === "connected"
-									? "bg-emerald-500/10 border-emerald-500/25 text-emerald-600"
+									? "border-[var(--success)]/30 bg-[var(--success)]/10 text-[var(--success)]"
 									: wsStatus === "reconnecting"
-										? "bg-amber-500/10 border-amber-500/25 text-amber-600"
-										: "bg-rose-500/10 border-rose-500/25 text-rose-600"
-							}`}
+										? "border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)]"
+										: liveSupported
+											? "border-destructive/30 bg-destructive/10 text-destructive"
+											: "border-border bg-muted/60 text-muted-foreground",
+							)}
 						>
 							<span className="relative flex h-2 w-2">
 								{wsStatus === "connected" && (
-									<span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+									<span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75"></span>
 								)}
 								<span
-									className={`relative inline-flex rounded-full h-2 w-2 ${
-										wsStatus === "connected"
-											? "bg-emerald-500"
-											: wsStatus === "reconnecting"
-												? "bg-amber-500 motion-safe:animate-pulse"
-												: "bg-rose-500"
-									}`}
+									className={cn(
+										"relative inline-flex rounded-full h-2 w-2",
+										wsStatus === "connected" && "bg-[var(--success)]",
+										wsStatus === "reconnecting" &&
+											"bg-[var(--warning)] motion-safe:animate-pulse",
+										wsStatus === "disconnected" &&
+											(liveSupported ? "bg-destructive" : "bg-muted-foreground/50"),
+									)}
 								></span>
 							</span>
 							<span className="text-xs font-semibold uppercase tracking-wider">
@@ -247,7 +245,9 @@ export function SystemLogs() {
 									? "Live"
 									: wsStatus === "reconnecting"
 										? "Reconnecting"
-										: "Offline"}
+										: liveSupported
+											? "Disconnected"
+											: "Manual refresh"}
 							</span>
 						</div>
 					</div>
@@ -255,6 +255,12 @@ export function SystemLogs() {
 						Track and audit every change across your finances — transactions,
 						accounts, sign-ins, recurring runs, and system errors.
 					</p>
+					{!liveSupported && (
+						<p className="mt-1 text-xs text-muted-foreground">
+							Live streaming is available in local development only; use
+							Refresh to pull the latest entries.
+						</p>
+					)}
 				</div>
 
 				<div className="flex items-center gap-2">
@@ -311,22 +317,24 @@ export function SystemLogs() {
 									<p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
 										{stat.label}
 									</p>
-									<p
-										className={`text-2xl font-bold mt-1 tabular-nums ${stat.color}`}
-									>
+									<p className="text-2xl font-bold mt-1 tabular-nums text-foreground">
 										{stats[stat.key]}
 									</p>
 								</div>
-								<div
-									className={`h-9 w-9 rounded-xl flex items-center justify-center ${stat.iconColor} bg-muted/50 group-hover:bg-background/60 transition-colors duration-300`}
-								>
-									<stat.icon className="h-4 w-4" />
+								<div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground transition-colors duration-300 group-hover:bg-background/60">
+									<stat.icon className="h-4 w-4" aria-hidden="true" />
 								</div>
 							</div>
 						</CardContent>
 					</Card>
 				))}
 			</div>
+			<p className="-mt-3 text-xs text-muted-foreground">
+				<Info className="mr-1 inline h-3 w-3 align-[-2px]" aria-hidden="true" />
+				&quot;Total Events&quot; is the server-side count for your account. The other
+				tiles count only the {logs.length} most recent{" "}
+				{logs.length === 1 ? "entry" : "entries"} loaded on this page.
+			</p>
 
 			{/* Filters */}
 			<Card className="py-0 gap-0">

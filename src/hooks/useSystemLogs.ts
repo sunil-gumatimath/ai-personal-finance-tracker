@@ -24,20 +24,34 @@ const EMPTY_STATS: LogStats = {
 	thisWeek: 0,
 };
 
+/**
+ * WebSocket live updates only exist behind the local Bun server
+ * (`api/_server.ts` serves /api/ws-logs). Vercel serverless has no
+ * long-lived socket support, so the feed is unavailable in production and the
+ * page must present that as a supported mode — not as a broken connection.
+ */
+export function isLiveFeedSupported(): boolean {
+	if (typeof window === "undefined") return false;
+	const { hostname } = window.location;
+	return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
 function computeStats(
 	currentLogs: LogEntry[],
 	totalOverride?: number,
 ): LogStats {
 	const now = new Date();
 	const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	// "Last 7 days", matching the date-range filter label — NOT calendar weeks.
 	const weekStart = new Date(todayStart);
 	weekStart.setDate(weekStart.getDate() - 7);
 
 	return currentLogs.reduce<LogStats>(
 		(acc, curr) => {
-			// The server reports the full matched count before its limit is
-			// applied; fall back to the in-window count when unavailable.
-			acc.total = Math.max(acc.total + 1, totalOverride ?? 0);
+			// `total` is the server's pre-limit match count for the user's scope;
+			// every other counter is derived from the loaded window. The page
+			// states this explicitly so the two scopes are never confused.
+			acc.total = Math.max(acc.total, totalOverride ?? 0);
 			if (curr.action === "TRANSACTION_CREATED") acc.created++;
 			if (curr.action === "TRANSACTION_EDITED") acc.edited++;
 			if (curr.action === "TRANSACTION_DELETED") acc.deleted++;
@@ -62,6 +76,7 @@ export function useSystemLogs() {
 	const [stats, setStats] = useState<LogStats>(EMPTY_STATS);
 	const [wsStatus, setWsStatus] = useState<WsStatus>("disconnected");
 	const [error, setError] = useState<string | null>(null);
+	const [liveSupported, setLiveSupported] = useState(false);
 
 	const wsRef = useRef<WebSocket | null>(null);
 	const reconnectTimeoutRef = useRef<number | null>(null);
@@ -113,11 +128,10 @@ export function useSystemLogs() {
 
 		// Production (Vercel serverless) has no WebSocket support — /api/ws-logs
 		// would just 404 and reconnect-forever. Skip WS entirely outside dev;
-		// the page still works via the initial fetch + manual refresh.
-		const isDev =
-			window.location.hostname === "localhost" ||
-			window.location.hostname === "127.0.0.1";
-		if (!isDev) {
+		// `liveSupported` lets the page show a neutral "manual refresh" pill
+		// instead of a red OFFLINE one. The page still works via the initial
+		// fetch + manual refresh.
+		if (!liveSupported) {
 			setWsStatus("disconnected");
 			return;
 		}
@@ -127,8 +141,11 @@ export function useSystemLogs() {
 		}
 
 		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-		const wsHost = "localhost:3001";
-		const wsUrl = `${protocol}//${wsHost}/api/ws-logs`;
+		// Derive the API origin from the page so dev over LAN / a custom dev
+		// domain still reaches the socket instead of a hardcoded localhost.
+		const apiOrigin =
+			import.meta.env.VITE_API_ORIGIN?.trim() || "http://localhost:3001";
+		const wsUrl = `${protocol}//${apiOrigin.replace(/^https?:/, "")}/api/ws-logs`;
 		setWsStatus("reconnecting");
 
 		const socket = new WebSocket(wsUrl);
@@ -205,10 +222,11 @@ export function useSystemLogs() {
 		socket.onerror = () => {
 			socket.close();
 		};
-	}, [updateStats]);
+	}, [updateStats, liveSupported]);
 
 	useEffect(() => {
 		disposedRef.current = false;
+		setLiveSupported(isLiveFeedSupported());
 		fetchInitialData();
 		connectWebSocket();
 
@@ -228,5 +246,5 @@ export function useSystemLogs() {
 		};
 	}, [fetchInitialData, connectWebSocket]);
 
-	return { logs, loading, stats, wsStatus, error, refresh: fetchInitialData };
+	return { logs, loading, stats, wsStatus, liveSupported, error, refresh: fetchInitialData };
 }
