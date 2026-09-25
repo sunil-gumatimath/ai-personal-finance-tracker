@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
 	User,
-	Bell,
 	Shield,
 	Palette,
 	LogOut,
@@ -35,8 +34,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/initials";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
+import { PageHeading } from "@/components/layout";
 import {
 	FREE_AI_MODELS,
 	DEFAULT_AI_MODEL,
@@ -72,7 +73,7 @@ function SavedIndicator({ visible }: { visible: boolean }) {
 		<span
 			aria-live="polite"
 			className={cn(
-				"inline-flex items-center gap-1 text-xs font-medium text-emerald-600 transition-opacity duration-200 ease-out",
+				"inline-flex items-center gap-1 text-xs font-medium text-[var(--success)] transition-opacity duration-200 ease-out",
 				visible ? "opacity-100" : "opacity-0",
 			)}
 		>
@@ -125,6 +126,21 @@ function ThemeTile({
 	);
 }
 
+/**
+ * Representative swatch per accent. Declared as a map keyed by the accent's
+ * internal id so it can never fall out of sync when a new accent is added —
+ * the old inline ternary chain silently rendered no swatch for new values.
+ */
+const ACCENT_SWATCHES: Record<AccentName, string | undefined> = {
+	default: undefined,
+	emerald: "#10b981",
+	navy: "#1e3a8a",
+	violet: "#8b5cf6",
+	cyan: "#06b6d4",
+	rose: "#f43f5e",
+	amber: "#f59e0b",
+};
+
 function ThemeSelector() {
 	const { theme, setTheme } = useTheme();
 	const { accent, setAccent } = useAccent();
@@ -161,26 +177,13 @@ function ThemeSelector() {
 						onClick={() => handleAccentSelect(value)}
 						icon={icon}
 						label={label}
-						swatch={
-							value === "emerald"
-								? "#10b981"
-								: value === "navy"
-									? "#1e3a8a"
-									: value === "violet"
-										? "#8b5cf6"
-										: value === "cyan"
-											? "#06b6d4"
-											: value === "rose"
-												? "#f43f5e"
-												: value === "amber"
-													? "#f59e0b"
-													: undefined
-						}
+						swatch={ACCENT_SWATCHES[value]}
 					/>
 				))}
 			</div>
 			<p className="text-xs text-muted-foreground">
-				Accent works with both light and dark mode.
+				Accent works with both light and dark mode. You can also change this
+				from the appearance button in the header.
 			</p>
 		</div>
 	);
@@ -197,22 +200,16 @@ export function Settings() {
 	const [aiSaving, setAiSaving] = useState(false);
 	const [showKey, setShowKey] = useState(false);
 	// Section whose instant-applied changes just saved ("Saved ✓" feedback).
-	const [savedSection, setSavedSection] = useState<
-		"interface" | "notifications" | null
-	>(null);
+	const [savedSection, setSavedSection] = useState<"interface" | null>(null);
 	const savedTimeoutRef = useRef<number | null>(null);
 	const [profileData, setProfileData] = useState({
 		fullName: user?.user_metadata?.full_name || "",
 		email: user?.email || "",
 	});
 
-	const getInitials = () => {
-		const fullName = user?.user_metadata?.full_name || user?.email || "";
-		const parts = fullName.trim().split(/\s+/).filter(Boolean);
-		if (parts.length === 0) return "U";
-		if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-		return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-	};
+	// Shared helper — this page used to carry its own copy that produced
+	// different initials than the sidebar/header for the same user.
+	const initials = getInitials(user?.user_metadata?.full_name || user?.email);
 
 	useEffect(() => {
 		setProfileData({
@@ -257,7 +254,7 @@ export function Settings() {
 	 * "Saved ✓" beside the section header on success, a toast on failure.
 	 */
 	const handleInstantPreferenceSave = async (
-		section: "interface" | "notifications",
+		section: "interface",
 		patch: Partial<Preferences>,
 	) => {
 		try {
@@ -351,12 +348,7 @@ export function Settings() {
 	return (
 		<div className="max-w-3xl space-y-5">
 			{/* Header */}
-			<div>
-				<h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-				<p className="text-sm text-muted-foreground">
-					Manage your account and preferences
-				</p>
-			</div>
+			<PageHeading path="/settings" />
 
 			<Tabs defaultValue="profile" className="space-y-4">
 				<TabsList className="max-w-full min-h-9 overflow-x-auto rounded-lg bg-muted/50 p-1">
@@ -373,12 +365,6 @@ export function Settings() {
 						<Palette className="h-3.5 w-3.5" /> Preferences
 					</TabsTrigger>
 					<TabsTrigger
-						value="notifications"
-						className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
-					>
-						<Bell className="h-3.5 w-3.5" /> Alerts
-					</TabsTrigger>
-					<TabsTrigger
 						value="security"
 						className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium gap-1.5 cursor-pointer"
 					>
@@ -388,7 +374,7 @@ export function Settings() {
 
 				{/* Profile Tab */}
 				<TabsContent value="profile" className="space-y-4">
-					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+					<div className="group surface surface-hover backdrop-blur-sm">
 						<div className="px-4 py-3 border-b border-border/50">
 							<h2 className="text-sm font-medium">Account Details</h2>
 						</div>
@@ -396,7 +382,7 @@ export function Settings() {
 							<div className="flex items-center gap-4 mb-4">
 								<Avatar className="h-16 w-16">
 									<AvatarFallback className="bg-primary/10 text-primary text-lg font-medium">
-										{getInitials()}
+										{initials}
 									</AvatarFallback>
 								</Avatar>
 								<div>
@@ -459,7 +445,7 @@ export function Settings() {
 				{/* Preferences Tab */}
 				<TabsContent value="preferences" className="space-y-4">
 					{/* Interface */}
-					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+					<div className="group surface surface-hover backdrop-blur-sm">
 						<div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/50">
 							<h2 className="text-sm font-medium">Interface</h2>
 							<SavedIndicator visible={savedSection === "interface"} />
@@ -520,13 +506,44 @@ export function Settings() {
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="MM/dd/yyyy">MM/DD/YYYY</SelectItem>
-											<SelectItem value="dd/MM/yyyy">DD/MM/YYYY</SelectItem>
-											<SelectItem value="yyyy-MM-dd">YYYY-MM-DD</SelectItem>
+											{/* Sample date per option: "DD/MM/YYYY" alone is indistinguishable
+											    from "MM/DD/YYYY" at a glance. */}
+											<SelectItem value="MM/dd/yyyy">MM/DD/YYYY — 12/31/2026</SelectItem>
+											<SelectItem value="dd/MM/yyyy">DD/MM/YYYY — 31/12/2026</SelectItem>
+											<SelectItem value="yyyy-MM-dd">YYYY-MM-DD — 2026-12-31</SelectItem>
 										</SelectContent>
 									</Select>
+									<p className="text-[11px] text-muted-foreground">
+										Applies everywhere dates are shown: transactions, reports, digests,
+										and goal deadlines.
+									</p>
 								</div>
 							</div>
+						<div className="space-y-1.5">
+							<Label className="text-xs" htmlFor="hide-balances-toggle">
+								Privacy
+							</Label>
+							<div className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3">
+								<div className="space-y-0.5">
+									<Label htmlFor="hide-balances-toggle" className="text-sm cursor-pointer">
+										Hide balances
+									</Label>
+									<p className="text-xs text-muted-foreground">
+										Mask every monetary figure app-wide. Useful when sharing your screen.
+									</p>
+								</div>
+								<Switch
+									id="hide-balances-toggle"
+									checked={preferences.hideBalances}
+									onCheckedChange={(checked) =>
+										void handleInstantPreferenceSave("interface", {
+											hideBalances: checked,
+										})
+									}
+									className="cursor-pointer"
+								/>
+							</div>
+						</div>
 						</div>
 					</div>
 
@@ -672,72 +689,9 @@ export function Settings() {
 					</div>
 				</TabsContent>
 
-				{/* Notifications Tab */}
-				<TabsContent value="notifications" className="space-y-4">
-					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-						<div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/50">
-							<h2 className="text-sm font-medium">
-								Notification Preferences
-							</h2>
-							<SavedIndicator visible={savedSection === "notifications"} />
-						</div>
-						<div>
-							{[
-								{
-									id: "notifications",
-									label: "Push Notifications",
-									desc: "Real-time alerts for important events",
-								},
-								{
-									id: "emailAlerts",
-									label: "Email Summaries",
-									desc: "Weekly digest emails",
-								},
-								{
-									id: "budgetAlerts",
-									label: "Budget Alerts",
-									desc: "Alerts when spending exceeds limits",
-								},
-							].map((item, i, arr) => (
-								<div
-									key={item.id}
-									className={cn(
-										"flex items-center justify-between px-4 py-3",
-										i !== arr.length - 1 && "border-b border-border/30",
-									)}
-								>
-									<div className="space-y-0.5">
-										<Label
-											htmlFor={`switch-${item.id}`}
-											className="text-sm cursor-pointer"
-										>
-											{item.label}
-										</Label>
-										<p className="text-xs text-muted-foreground">{item.desc}</p>
-									</div>
-									<Switch
-										id={`switch-${item.id}`}
-										checked={
-											preferences[
-												item.id as keyof typeof preferences
-											] as boolean
-										}
-										onCheckedChange={(checked) =>
-											void handleInstantPreferenceSave("notifications", {
-												[item.id]: checked,
-											})
-										}
-										className="cursor-pointer"
-									/>
-								</div>
-							))}
-						</div>
-					</div>
-				</TabsContent>
-
 				{/* Security Tab */}
 				<TabsContent value="security" className="space-y-4">
-					<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+					<div className="group surface surface-hover backdrop-blur-sm">
 						<div className="px-4 py-3 border-b border-border/50">
 							<h2 className="text-sm font-medium">Password</h2>
 						</div>

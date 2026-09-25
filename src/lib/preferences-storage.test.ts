@@ -42,4 +42,24 @@ describe("preferences storage sanitization", () => {
     const result = normalizePreferences({ currency: "USD" });
     expect(result.accent).toBeUndefined();
   });
+
+  test("persists hideBalances and defaults it to false", () => {
+    expect(normalizePreferences({ hideBalances: true }).hideBalances).toBe(true);
+    expect(normalizePreferences({}).hideBalances).toBe(false);
+  });
+
+  test("drops the retired notification flags rather than persisting them", () => {
+    // The Alerts tab wrote these but nothing ever read them. Keeping them in the
+    // allow-list would silently re-persist dead settings from old DB rows.
+    const result = sanitizePreferences({
+      notifications: true,
+      emailAlerts: true,
+      budgetAlerts: true,
+    });
+    expect(result).toEqual({});
+  });
+
+  test("defaults to a day-first date format to match the default INR currency", () => {
+    expect(normalizePreferences({}).dateFormat).toBe("dd/MM/yyyy");
+  });
 });

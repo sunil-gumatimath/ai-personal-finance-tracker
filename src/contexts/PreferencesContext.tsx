@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api-client";
 import { normalizePreferences } from "@/lib/preferences-storage";
+import { getCurrencySymbol as getCurrencySymbolFor } from "@/lib/number";
 import type { ProviderApiKeyUpdate } from "@/types/api";
 
 interface PreferencesContextType {
@@ -159,7 +160,13 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   // Get currency symbol
   const getCurrencySymbol = useCallback(() => {
-    return currencySymbols[preferences.currency] || "$";
+    // Derive from the active currency rather than falling back to "$" — an
+    // unrecognised code used to render as dollars, which is wrong for any
+    // non-USD user whose preference slipped through validation.
+    return (
+      currencySymbols[preferences.currency] ||
+      getCurrencySymbolFor(preferences.currency)
+    );
   }, [preferences.currency]);
 
   const contextValue = useMemo(

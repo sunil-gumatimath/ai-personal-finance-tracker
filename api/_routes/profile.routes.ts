@@ -44,7 +44,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
       // Validate currency if provided
       if (currency !== undefined) {
-        const validCurrencies = ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD', 'CNY']
+        const validCurrencies = ['USD', 'EUR', 'GBP', 'INR', 'JPY']
         if (!validCurrencies.includes(currency)) {
           res.status(400).json({ error: 'Invalid currency code' })
           return

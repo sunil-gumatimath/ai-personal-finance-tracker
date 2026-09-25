@@ -3,6 +3,7 @@
  * Uses existing database types from ./database.ts where possible.
  */
 
+import type { AccentName } from "@/components/system/themes";
 import type {
 	Account,
 	Transaction,
@@ -11,7 +12,6 @@ import type {
 	Goal,
 	Debt,
 	DebtPayment,
-	Profile,
 } from "./database";
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -41,12 +41,17 @@ export interface LogoutResponse {
 export interface UserPreferences {
 	currency?: string;
 	dateFormat?: string;
-	notifications?: boolean;
-	emailAlerts?: boolean;
-	budgetAlerts?: boolean;
+	hideBalances?: boolean;
 	aiProvider?: string;
 	kilocodeApiKeyConfigured?: boolean;
 	kilocodeModel?: string;
+	/**
+	 * Accent id (see `ACCENT_OPTIONS`). Previously missing here, so
+	 * `savePreferences({ accent })` type-checked only because excess-property
+	 * checks don't apply to non-literal objects — the field was being sent
+	 * without the type contract documenting it.
+	 */
+	accent?: AccentName;
 }
 
 export interface ProviderApiKeyUpdate {
@@ -285,36 +290,6 @@ export interface AiDigestResponse {
 	history?: AiDigest[];
 }
 
-// ─── Notifications ───────────────────────────────────────────────────────────
-
-export interface BudgetAlert {
-	id: string;
-	type: "budget";
-	category: string;
-	color: string;
-	spent: number;
-	limit: number;
-	percentage: number;
-	status: "ok" | "warning" | "over";
-	message: string | null;
-}
-
-export interface NotificationData {
-	preferences: {
-		notifications: boolean;
-		emailAlerts: boolean;
-		budgetAlerts: boolean;
-	};
-	budgetAlerts: BudgetAlert[];
-	recentActivity: Record<string, unknown>[];
-	unreadCount: number;
-}
-
-export interface NotificationActionResponse {
-	success: boolean;
-	message: string;
-}
-
 // ─── Generic ─────────────────────────────────────────────────────────────────
 
 export interface OkResponse {
@@ -353,5 +328,4 @@ export type {
 	Goal,
 	Debt,
 	DebtPayment,
-	Profile,
 };

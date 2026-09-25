@@ -2,12 +2,10 @@ import { defaultPreferences, type Preferences } from "@/types/preferences";
 import { ACCENT_OPTIONS, type AccentName } from "@/components/system/themes";
 
 const STRING_FIELDS = ["currency", "dateFormat", "kilocodeModel"] as const;
-const BOOLEAN_FIELDS = [
-  "notifications",
-  "emailAlerts",
-  "budgetAlerts",
-  "kilocodeApiKeyConfigured",
-] as const;
+// `notifications` / `emailAlerts` / `budgetAlerts` were removed: nothing in the
+// app read them (no push service, no mail sender, no client call to
+// /api/notifications), so the Alerts tab only wrote unread booleans to the DB.
+const BOOLEAN_FIELDS = ["hideBalances", "kilocodeApiKeyConfigured"] as const;
 
 const ACCENT_VALUES = new Set<string>(ACCENT_OPTIONS.map(({ value }) => value));
 

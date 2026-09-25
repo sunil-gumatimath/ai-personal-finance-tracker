@@ -3,17 +3,28 @@ import type { AccentName } from "@/components/system/themes";
 
 export interface Preferences {
 	currency: string;
+	/**
+	 * Display order for dates, consumed exclusively by `@/lib/format-date`.
+	 * Kept as the raw pattern string so existing saved values stay valid.
+	 */
 	dateFormat: string;
-	notifications: boolean;
-	emailAlerts: boolean;
-	budgetAlerts: boolean;
+	/**
+	 * Hide monetary figures across the app until explicitly revealed. Persisted
+	 * (and synced) because a per-page React `useState` was reset by the route
+	 * remount in MainLayout, silently un-hiding balances on every navigation.
+	 */
+	hideBalances: boolean;
 	aiProvider?: "kilocode";
 	kilocodeApiKeyConfigured: boolean;
 	kilocodeModel?: string;
 	/**
-	 * UI accent (Default/Emerald/Navy/Gold). Optional + absent until the user
-	 * picks one, so devices that have never chosen an accent keep their local
-	 * choice instead of being reset to "default" on sync.
+	 * UI accent. Optional + absent until the user picks one, so devices that
+	 * have never chosen an accent keep their local choice instead of being
+	 * reset to "default" on sync.
+	 *
+	 * The values are the internal ids from `ACCENT_OPTIONS` — note `amber` is
+	 * labelled "Sunset" in the UI. Read the label from ACCENT_OPTIONS rather
+	 * than inferring a colour name from this value.
 	 */
 	accent?: AccentName;
 }
@@ -22,10 +33,11 @@ export const PREFERENCES_KEY = "financetrack_preferences";
 
 export const defaultPreferences: Preferences = {
 	currency: "INR",
-	dateFormat: "MM/dd/yyyy",
-	notifications: true,
-	emailAlerts: true,
-	budgetAlerts: true,
+	// INR is the default currency and en-IN uses day-first ordering, so the
+	// default date format follows suit. Previously this was MM/dd/yyyy, which
+	// shipped US ordering to every new user.
+	dateFormat: "dd/MM/yyyy",
+	hideBalances: false,
 	aiProvider: "kilocode",
 	kilocodeApiKeyConfigured: false,
 	kilocodeModel: DEFAULT_AI_MODEL,
