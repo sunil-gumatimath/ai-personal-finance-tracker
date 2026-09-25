@@ -6,17 +6,6 @@
 // column below is therefore typed `number | string`. Use the shared
 // `toNumber()` helper before doing arithmetic on these values.
 
-export interface UserRow {
-	id: string;
-	email: string;
-	encrypted_password: string | null;
-	full_name: string | null;
-	avatar_url: string | null;
-	created_at: string;
-	updated_at: string;
-	last_sign_in_at: string | null;
-}
-
 export interface Profile {
 	id: string;
 	user_id: string;
@@ -105,19 +94,6 @@ export interface Goal {
 	updated_at: string;
 }
 
-export interface AiInsight {
-	id: string;
-	user_id: string;
-	type: "anomaly" | "coaching" | "kudo";
-	title: string;
-	description: string | null;
-	category: string | null;
-	amount: number | string | null; // DECIMAL(15, 2) — arrives as string from pg
-	date: string | null;
-	is_dismissed: boolean;
-	created_at: string;
-}
-
 // Stats types
 export interface DashboardStats {
 	totalBalance: number;
@@ -182,32 +158,3 @@ export interface DebtPayment {
 	debt?: Debt;
 }
 
-export interface AiDigest {
-	id: string;
-	user_id: string;
-	week_start: string; // Monday-based week (DATE)
-	content: string;
-	created_at: string;
-}
-
-export interface SystemLog {
-	id: string;
-	timestamp: string;
-	action: string;
-	resource: string;
-	old_value: string | null;
-	new_value: string | null;
-	user_id: string | null;
-	user_email: string | null;
-	severity: "info" | "warning" | "error" | "critical";
-	status: "success" | "failure";
-	metadata: Record<string, unknown>; // JSONB (parsed object)
-}
-
-export interface RateLimit {
-	key: string;
-	count: number;
-	window_start: string;
-	blocked_until: string | null;
-	updated_at: string;
-}

@@ -24,14 +24,6 @@ describe("parseTransactionDate", () => {
 		expect(d3.getMonth()).toBe(2);
 	});
 
-	it("round-trips local YYYY-MM-DD formatting", () => {
-		const d = parseTransactionDate("2026-12-25");
-		const y = d.getFullYear();
-		const m = String(d.getMonth() + 1).padStart(2, "0");
-		const day = String(d.getDate()).padStart(2, "0");
-		expect(`${y}-${m}-${day}`).toBe("2026-12-25");
-	});
-
 	it("returns the same Date instance when given a Date", () => {
 		const original = new Date(2026, 4, 17, 13, 45);
 		expect(parseTransactionDate(original)).toBe(original);

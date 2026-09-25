@@ -2,9 +2,9 @@
  * Centralized API error handling for the frontend.
  *
  * Use `ApiError.fromResponse(...)` to convert any failed fetch into a typed
- * error with status + message. The `apiFetch` helper in `lib/api.ts` uses
- * this; callers can `instanceof ApiError` to distinguish HTTP failures from
- * network/runtime errors.
+ * error with status + message. The `apiFetch` helper in `lib/api-client.ts`
+ * uses this; callers can `instanceof ApiError` to distinguish HTTP failures
+ * from network/runtime errors.
  */
 
 export type ApiErrorOptions = {
@@ -29,16 +29,6 @@ export class ApiError extends Error {
   /** True for 401/403 — caller should redirect to login or clear session. */
   get isAuthError(): boolean {
     return this.status === 401 || this.status === 403
-  }
-
-  /** True for 429 — caller should respect retryAfter if present. */
-  get isRateLimited(): boolean {
-    return this.status === 429
-  }
-
-  /** True for network failures or 5xx — safe to retry with backoff. */
-  get isRetryable(): boolean {
-    return this.status === 0 || (this.status >= 500 && this.status <= 599)
   }
 
   static async fromResponse(res: Response, fallback?: string): Promise<ApiError> {

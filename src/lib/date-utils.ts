@@ -18,10 +18,3 @@ export function parseTransactionDate(val: unknown): Date {
 	return new Date(NaN);
 }
 
-/** Local YYYY-MM-DD string for a Date (avoids UTC off-by-one when persisting). */
-export function toLocalDateString(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, "0");
-	const day = String(date.getDate()).padStart(2, "0");
-	return `${year}-${month}-${day}`;
-}

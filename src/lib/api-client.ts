@@ -29,12 +29,9 @@ import type {
 	DebtPaymentResponse,
 	DebtPaymentPayload,
 	AiInsightsResponse,
-	AiChatResponse,
 	AiParseResponse,
 	AiDigestResponse,
 	ProcessRecurringResponse,
-	NotificationData,
-	NotificationActionResponse,
 	OkResponse,
 	SystemLogsResponse,
 } from "@/types";
@@ -59,7 +56,7 @@ async function apiFetch<T>(
 	} catch {
 		// fetch() rejects on network failures (offline, server down, DNS
 		// issues) with a raw TypeError. Convert it to a typed ApiError so
-		// callers get a friendly message and isRetryable() works.
+		// callers get a friendly message and a status they can branch on.
 		throw new ApiError("Network error — please check your connection and try again.", {
 			status: 0,
 			code: "NETWORK_ERROR",
@@ -102,11 +99,6 @@ export const api = {
 			apiFetch<AuthResponse>("/api/auth?action=signup", {
 				method: "POST",
 				body: JSON.stringify({ email, password, fullName }),
-			}),
-		sync: (fullName: string) =>
-			apiFetch<OkResponse>("/api/auth?action=sync", {
-				method: "POST",
-				body: JSON.stringify({ fullName }),
 			}),
 		logout: () =>
 			apiFetch<LogoutResponse>("/api/auth?action=logout", { method: "POST" }),
@@ -277,24 +269,12 @@ export const api = {
 					method: "PATCH",
 				}),
 		},
-		chat: (
-			message: string,
-			aiPreferences?: {
-				aiProvider?: string;
-				kilocodeModel?: string;
-			},
-			history?: Array<{ role: "user" | "assistant"; content: string }>,
-		) =>
-			apiFetch<AiChatResponse>("/api/ai/chat", {
-				method: "POST",
-				body: JSON.stringify({ message, aiPreferences, history }),
-			}),
 		/**
-		 * Streaming variant of chat(): the reply arrives as newline-delimited
-		 * JSON events over a chunked response, so onDelta fires as tokens are
-		 * generated instead of after the full wait. Resolves with the complete
-		 * reply text; throws ApiError on any failure (including error events
-		 * sent mid-stream). Pass an AbortSignal to cancel.
+		 * Streaming chat: the reply arrives as newline-delimited JSON events
+		 * over a chunked response, so onDelta fires as tokens are generated
+		 * instead of after the full wait. Resolves with the complete reply
+		 * text; throws ApiError on any failure (including error events sent
+		 * mid-stream). Pass an AbortSignal to cancel.
 		 */
 		chatStream: async (
 			message: string,
@@ -437,29 +417,6 @@ export const api = {
 					body: options ? JSON.stringify(options) : undefined,
 				}),
 		},
-	},
-	notifications: {
-		list: () => apiFetch<NotificationData>("/api/notifications"),
-		createBudgetAlert: (
-			categoryId: string,
-			message: string,
-			severity: "low" | "medium" | "high",
-		) =>
-			apiFetch<NotificationActionResponse>("/api/notifications", {
-				method: "POST",
-				body: JSON.stringify({
-					type: "budget_alert",
-					data: { categoryId, message, severity },
-				}),
-			}),
-		updatePushSubscription: (subscription: PushSubscription) =>
-			apiFetch<NotificationActionResponse>("/api/notifications", {
-				method: "POST",
-				body: JSON.stringify({
-					type: "push_notification",
-					data: { subscription },
-				}),
-			}),
 	},
 	systemLogs: {
 		list: () => apiFetch<SystemLogsResponse>("/api/system-logs"),
