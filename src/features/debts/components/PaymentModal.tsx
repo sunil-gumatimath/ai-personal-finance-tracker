@@ -88,7 +88,7 @@ export function PaymentModal({
                                 required
                             />
                             {overpays && (
-                                <p className="text-xs font-medium text-amber-500">
+                                <p className="text-xs font-medium text-[var(--warning)]">
                                     This amount is larger than the remaining balance.
                                 </p>
                             )}

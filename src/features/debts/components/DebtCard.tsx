@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { useState } from "react";
 import {
   CreditCard,
@@ -17,6 +16,7 @@ import {
   CheckCircle2,
   Plus,
   Loader2,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,19 +38,28 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { parseTransactionDate } from "@/lib/date-utils";
+import { formatUserDate } from "@/lib/format-date";
+import { usePreferences } from "@/hooks/usePreferences";
+import { DEBT_TYPES } from "@/hooks/useDebts";
 import { toNumber } from "@/lib/number";
 import { cn } from "@/lib/utils";
 import type { Debt, DebtPayment } from "@/types";
 
-const debtTypes = [
-  { value: "mortgage", label: "Mortgage", icon: Home },
-  { value: "car_loan", label: "Car Loan", icon: Car },
-  { value: "student_loan", label: "Student Loan", icon: GraduationCap },
-  { value: "personal_loan", label: "Personal Loan", icon: Banknote },
-  { value: "credit_card", label: "Credit Card", icon: CreditCard },
-  { value: "medical", label: "Medical", icon: Heart },
-  { value: "other", label: "Other", icon: Building2 },
-];
+/**
+ * Icon per debt type. The value/label pairs are NOT repeated here — they come
+ * from the single `debtTypes` list in @/hooks/useDebts, which the DebtModal
+ * form also uses. This map previously duplicated the whole list, so a new debt
+ * type could appear in the picker but render no icon (or vice versa).
+ */
+const DEBT_TYPE_ICONS: Record<string, LucideIcon> = {
+  mortgage: Home,
+  car_loan: Car,
+  student_loan: GraduationCap,
+  personal_loan: Banknote,
+  credit_card: CreditCard,
+  medical: Heart,
+  other: Building2,
+};
 
 interface DebtCardProps {
   debt: Debt;
@@ -105,9 +114,9 @@ export function DebtCard({
 }: DebtCardProps) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { preferences } = usePreferences();
 
-  const DebtIcon =
-    debtTypes.find((t) => t.value === debt.type)?.icon || CreditCard;
+  const DebtIcon = DEBT_TYPE_ICONS[debt.type] ?? CreditCard;
   // Defensive in-card scope: even if the parent hands us a wider array, only
   // THIS debt's payments may render here.
   const debtPayments = payments.filter((p) => p.debt_id === debt.id);
@@ -155,14 +164,14 @@ export function DebtCard({
                   {debt.name}
                 </h3>
                 {isPaidOff && (
-                  <Badge className="bg-green-500/10 text-green-500 border border-green-500/20 shrink-0">
+                  <Badge className="bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20 shrink-0">
                     Paid Off
                   </Badge>
                 )}
               </div>
               <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-0.5">
                 <span>
-                  {debtTypes.find((t) => t.value === debt.type)?.label}
+                  {DEBT_TYPES.find((t) => t.value === debt.type)?.label}
                 </span>
                 {debt.lender && (
                   <>
@@ -173,7 +182,7 @@ export function DebtCard({
                 {toNumber(debt.interest_rate) > 0 && (
                   <>
                     <span>•</span>
-                    <span className="text-amber-500 font-semibold">
+                    <span className="text-[var(--warning)] font-semibold">
                       {apr}% APR
                     </span>
                   </>
@@ -317,7 +326,7 @@ export function DebtCard({
                 </span>
                 <span className="flex items-center gap-1.5 min-w-0">
                   {toNumber(debt.interest_rate) > 0 && (
-                    <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-500">
+                    <span className="shrink-0 rounded-full border border-[var(--warning)]/20 bg-[var(--warning)]/10 px-1.5 py-0.5 font-bold text-[var(--warning)]">
                       {apr}% APR
                     </span>
                   )}
@@ -433,9 +442,9 @@ export function DebtCard({
                             {formatCurrency(toNumber(payment.amount))}
                           </span>
                           <span className="text-xs text-muted-foreground font-medium">
-                            {format(
+                            {formatUserDate(
                               parseTransactionDate(payment.payment_date),
-                              "MMM d, yyyy",
+                              preferences,
                             )}
                           </span>
                         </div>
@@ -450,7 +459,7 @@ export function DebtCard({
                           Principal:{" "}
                           {formatCurrency(toNumber(payment.principal_amount))}
                         </span>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0 tabular-nums whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--warning)]/10 text-[var(--warning)] border border-[var(--warning)]/20 shrink-0 tabular-nums whitespace-nowrap">
                           Interest: {formatCurrency(toNumber(payment.interest_amount))}
                         </span>
                       </div>
@@ -462,11 +471,11 @@ export function DebtCard({
 
             {/* Interest projection */}
             {!isPaidOff && totalInterest > 0 && (
-              <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                <p className="text-xs text-amber-500/90 leading-relaxed font-medium">
+              <div className="p-3 rounded-xl bg-[var(--warning)]/5 border border-amber-500/10">
+                <p className="text-xs text-[var(--warning)]/90 leading-relaxed font-medium">
                   <strong>Interest Warning:</strong> At this minimum payment
                   rate, you'll pay approximately{" "}
-                  <strong className="text-amber-500">
+                  <strong className="text-[var(--warning)]">
                     {formatCurrency(totalInterest)}
                   </strong>{" "}
                   in interest over{" "}

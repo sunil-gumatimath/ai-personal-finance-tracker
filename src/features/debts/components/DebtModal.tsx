@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { SWATCHES, debtTypes } from '@/hooks/useDebts'
+import { DEBT_TYPES } from '@/hooks/useDebts'
+import { DEBT_SWATCHES } from '@/lib/palette'
 import type { Debt } from '@/types'
 
 interface DebtModalProps {
@@ -113,7 +114,7 @@ export function DebtModal({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {debtTypes.map((type) => (
+                                        {DEBT_TYPES.map((type) => (
                                             <SelectItem key={type.value} value={type.value}>
                                                 {type.label}
                                             </SelectItem>
@@ -241,7 +242,7 @@ export function DebtModal({
                         <div className="space-y-2">
                             <Label>Card Color Accent</Label>
                             <div className="flex flex-wrap gap-2">
-                                {SWATCHES.map((color) => (
+                                {DEBT_SWATCHES.map((color) => (
                                     <button
                                         key={color.value}
                                         type="button"
@@ -253,8 +254,8 @@ export function DebtModal({
                                         )}
                                         style={{ backgroundColor: color.value }}
                                         onClick={() => setFormData({ ...formData, color: color.value })}
-                                        title={color.label}
-                                        aria-label={`${color.label} accent`}
+                                        title={color.name}
+                                        aria-label={`${color.name} accent`}
                                         aria-pressed={formData.color === color.value}
                                     />
                                 ))}

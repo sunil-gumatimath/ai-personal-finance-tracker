@@ -14,7 +14,12 @@ import {
 } from "@/lib/debt-calculations";
 import type { Debt, DebtPayment } from "@/types";
 
-export const debtTypes = [
+/**
+ * Canonical debt-type vocabulary. Lives here (not in DebtCard) because both the
+ * DebtModal picker and the DebtCard renderer need it — a second copy is how
+ * they drifted apart before. Icons stay with the renderer; add new types here.
+ */
+export const DEBT_TYPES = [
 	{ value: "mortgage", label: "Mortgage" },
 	{ value: "car_loan", label: "Car Loan" },
 	{ value: "student_loan", label: "Student Loan" },
@@ -22,20 +27,13 @@ export const debtTypes = [
 	{ value: "credit_card", label: "Credit Card" },
 	{ value: "medical", label: "Medical" },
 	{ value: "other", label: "Other" },
-];
+] as const satisfies ReadonlyArray<{ value: Debt["type"]; label: string }>;
 
-// Selectable accent swatches. Green (#22c55e) is deliberately excluded — it's
-// the reserved "Paid Off" signal color, and a selectable green swatch would
-// collide with that status.
-export const SWATCHES = [
-	{ value: "#ef4444", label: "Red" },
-	{ value: "#f97316", label: "Orange" },
-	{ value: "#eab308", label: "Yellow" },
-	{ value: "#3b82f6", label: "Blue" },
-	{ value: "#8b5cf6", label: "Purple" },
-	{ value: "#ec4899", label: "Pink" },
-	{ value: "#64748b", label: "Slate" },
-];
+// Selectable swatches come from the ONE shared palette (@/lib/palette) so the
+// Debts picker can never drift from Categories/Accounts. A local copy used to
+// live here, which is how `#eab308`/`#64748b` ended up selectable on debts but
+// nowhere else. Green is intentionally omitted from the debt subset: it's the
+// reserved "Paid Off" status color and a selectable green would collide.
 
 // Pure debt math (payoff time, strategies, simulations) lives in
 // @/lib/debt-calculations; this hook owns state, fetching, and actions.
@@ -56,6 +54,9 @@ export function useDebts() {
 	const { formatCurrency } = usePreferences();
 	const [loading, setLoading] = useState(true);
 	const [debts, setDebts] = useState<Debt[]>([]);
+	// Set when the debts fetch fails, so the page can render a retryable error
+	// rather than a misleading "no debts yet" empty state.
+	const [loadError, setLoadError] = useState<string | null>(null);
 	// Payment history is fetched per expanded debt and keyed by debt id so one
 	// card's history can never render under another card.
 	const [paymentsByDebt, setPaymentsByDebt] = useState<
@@ -102,14 +103,24 @@ export function useDebts() {
 			setLoading(false);
 			return;
 		}
-
+		setLoading(true);
 		try {
 			const res = await api.debts.list();
 			const rows = (res.debts || []) as Debt[];
 
 			setDebts(rows.map(normalizeDebtRow));
+			setLoadError(null);
 		} catch (error) {
+			// Previously this only fired a transient toast, so the page then
+			// rendered its "No debts yet" empty state — a failed fetch was
+			// indistinguishable from genuinely having no debts. Expose the
+			// failure so the page can render a retryable ErrorState instead.
 			console.error("Error fetching debts:", error);
+			setLoadError(
+				error instanceof Error
+					? error.message
+					: "We couldn't reach your debts. Check your connection and try again.",
+			);
 			toast.error("Failed to load debts");
 		} finally {
 			setLoading(false);
@@ -372,6 +383,8 @@ export function useDebts() {
 
 	return {
 		loading,
+		loadError,
+		retryLoad: fetchDebts,
 		debts,
 		paymentsByDebt,
 		loadingPaymentsId,

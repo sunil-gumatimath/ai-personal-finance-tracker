@@ -184,13 +184,13 @@ export function StrategyDialog({
             </div>
 
             {/* Snowball Card */}
-            <div className="relative overflow-hidden rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-              <div className="absolute top-0 right-0 bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-bl-lg text-xs font-semibold uppercase tracking-wider">
+            <div className="relative overflow-hidden rounded-xl border border-[var(--info)]/20 bg-[var(--info)]/5 p-4">
+              <div className="absolute top-0 right-0 bg-[var(--info)]/10 text-[var(--info)] px-2 py-0.5 rounded-bl-lg text-xs font-semibold uppercase tracking-wider">
                 Momentum
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <Snowflake className="h-4 w-4 text-blue-500" aria-hidden="true" />
-                <span className="text-sm font-semibold text-blue-500">
+                <Snowflake className="h-4 w-4 text-[var(--info)]" aria-hidden="true" />
+                <span className="text-sm font-semibold text-[var(--info)]">
                   Snowball Strategy
                 </span>
               </div>
@@ -200,7 +200,7 @@ export function StrategyDialog({
                 </p>
                 <p className="text-xs text-muted-foreground font-medium">
                   Interest:{" "}
-                  <span className="text-amber-500 font-semibold tabular-nums">
+                  <span className="text-[var(--warning)] font-semibold tabular-nums">
                     {formatCurrency(simulations.snowball.totalInterest)}
                   </span>
                 </p>
@@ -213,7 +213,7 @@ export function StrategyDialog({
                 {!neverPaysOff &&
                   simulations.minimums.months >
                     simulations.snowball.months && (
-                  <p className="text-xs text-emerald-500 font-bold mt-1 leading-normal">
+                  <p className="text-xs text-[var(--success)] font-bold mt-1 leading-normal">
                     Saved{" "}
                     {simulations.minimums.months -
                       simulations.snowball.months}{" "}
@@ -233,12 +233,12 @@ export function StrategyDialog({
 
             {/* Avalanche Card */}
             <div className="relative overflow-hidden rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
-              <div className="absolute top-0 right-0 bg-purple-500/10 text-purple-500 px-2 py-0.5 rounded-bl-lg text-xs font-semibold uppercase tracking-wider">
+              <div className="absolute top-0 right-0 bg-[var(--info)]/10 text-[var(--info)] px-2 py-0.5 rounded-bl-lg text-xs font-semibold uppercase tracking-wider">
                 Max Savings
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <Zap className="h-4 w-4 text-purple-500" aria-hidden="true" />
-                <span className="text-sm font-semibold text-purple-500">
+                <Zap className="h-4 w-4 text-[var(--info)]" aria-hidden="true" />
+                <span className="text-sm font-semibold text-[var(--info)]">
                   Avalanche Strategy
                 </span>
               </div>
@@ -248,7 +248,7 @@ export function StrategyDialog({
                 </p>
                 <p className="text-xs text-muted-foreground font-medium">
                   Interest:{" "}
-                  <span className="text-amber-500 font-semibold tabular-nums">
+                  <span className="text-[var(--warning)] font-semibold tabular-nums">
                     {formatCurrency(simulations.avalanche.totalInterest)}
                   </span>
                 </p>
@@ -261,7 +261,7 @@ export function StrategyDialog({
                 {!neverPaysOff &&
                   simulations.minimums.months >
                     simulations.avalanche.months && (
-                  <p className="text-xs text-emerald-500 font-bold mt-1 leading-normal">
+                  <p className="text-xs text-[var(--success)] font-bold mt-1 leading-normal">
                     Saved{" "}
                     {simulations.minimums.months -
                       simulations.avalanche.months}{" "}
@@ -497,7 +497,7 @@ export function StrategyDialog({
                     <span className="font-semibold">{debt.name}</span>
                   </div>
                   <div className="flex items-center gap-4 text-xs font-semibold">
-                    <span className="shrink-0 text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 tabular-nums">
+                    <span className="shrink-0 text-[var(--warning)] bg-[var(--warning)]/10 px-2 py-0.5 rounded-full border border-[var(--warning)]/20 tabular-nums">
                       {toNumber(debt.interest_rate).toFixed(2)}% APR
                     </span>
                     <span className="text-muted-foreground tabular-nums">
@@ -528,7 +528,7 @@ export function StrategyDialog({
                     <span className="font-semibold">{debt.name}</span>
                   </div>
                   <div className="flex items-center gap-4 text-xs font-semibold">
-                    <span className="shrink-0 text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 tabular-nums">
+                    <span className="shrink-0 text-[var(--warning)] bg-[var(--warning)]/10 px-2 py-0.5 rounded-full border border-[var(--warning)]/20 tabular-nums">
                       {toNumber(debt.interest_rate).toFixed(2)}% APR
                     </span>
                     <span className="text-muted-foreground tabular-nums">
@@ -588,7 +588,7 @@ export function StrategyDialog({
                   </>
                 )}
                 {extraPayment === 0 && (
-                  <span className="block mt-2 font-semibold text-amber-500">
+                  <span className="block mt-2 font-semibold text-[var(--warning)]">
                     Tip: Try moving the slider to see how even a small extra
                     payment each month can collapse your payoff timeline by
                     years!
