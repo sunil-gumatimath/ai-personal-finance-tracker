@@ -16,88 +16,93 @@ interface FreeModel {
 
 /**
  * Snapshot of the Kilo Gateway's $0-priced ("free") models, from Kilo's live
- * free-models catalog (kilo.ai/landing/free-models). The catalog changes over
- * time — when it does, update this list or set the KILOCODE_FREE_MODELS env
- * var (comma-separated model IDs) to override it without code changes.
+ * free-models catalog (https://api.kilo.ai/api/gateway/v1/models, entries with
+ * `isFree: true`). The catalog changes over time — when it does, update this
+ * list or set the KILOCODE_FREE_MODELS env var (comma-separated model IDs) to
+ * override it without code changes.
  *
- * Ordered by recommended usage: fast models first (chat feels instant),
- * deep-reasoning models after for users who prefer quality over speed.
+ * Excluded from the catalog on purpose:
+ * - `nvidia/nemotron-3.5-content-safety:free` — a guardrail/moderation model,
+ *   not a general-purpose assistant.
+ * - `stealth/*` — anonymous third-party re-serves, a needless privacy downgrade
+ *   for a financial app.
+ *
+ * Ordered by recommended usage: fast, finance-tuned models first (chat feels
+ * instant), deep-reasoning models after for users who prefer quality over speed.
  */
 const FREE_MODELS: FreeModel[] = [
 	{
-		id: "inclusionai/ling-3.0-flash:free",
-		label: "Ling 3.0 Flash (Recommended Default)",
+		id: "inclusionai/ling-3.0-flash-fin:free",
+		label: "Ling 3.0 Flash Fin (Recommended Default)",
 		context: "262K",
 		description:
-			"Token-efficient MoE — lightning-fast responses & structured JSON formatting.",
+			"Finance-tuned MoE (5.1B active / 124B) — built for real-world investment and money analysis.",
+	},
+	{
+		id: "inclusionai/ling-3.0-flash-sante:free",
+		label: "Ling 3.0 Flash Sante (Free)",
+		context: "262K",
+		description:
+			"Health & medicine-tuned MoE — fast general chat, not finance-specialised.",
 	},
 	{
 		id: "kilo-auto/free",
-		label: "Kilo Auto (Free Smart Router)",
-		context: "128K",
+		label: "Auto Free (Smart Router)",
+		context: "256K",
 		description:
-			"Automatically routes requests to the best available free model dynamically.",
+			"Rotates through the available free models — no credits required, capability varies.",
 	},
 	{
-		id: "deepseek/deepseek-r1:free",
-		label: "DeepSeek R1 (Free)",
-		context: "128K",
-		description: "Open reasoning flagship with deep financial analysis & chain-of-thought.",
+		id: "openrouter/free",
+		label: "OpenRouter Free Router (Free)",
+		context: "200K",
+		description:
+			"OpenRouter's free router — smart-filters OpenRouter's free model pool per request.",
 	},
 	{
-		id: "meta-llama/llama-3.3-70b-instruct:free",
-		label: "Llama 3.3 70B Instruct (Free)",
-		context: "128K",
-		description: "Meta's flagship 70B open-weights model with excellent conversational polish.",
+		id: "liquid/lfm-2.5-2.6b:free",
+		label: "LFM2.5 2.6B (Free)",
+		context: "64K",
+		description: "Compact Liquid AI model — great for data extraction and RAG.",
 	},
 	{
-		id: "qwen/qwen-2.5-72b-instruct:free",
-		label: "Qwen 2.5 72B Instruct (Free)",
-		context: "128K",
-		description: "Alibaba Cloud flagship model with top-tier mathematics and structured parsing.",
+		id: "qwen/qwen3.8-27b:free",
+		label: "Qwen3.8 27B (Free)",
+		context: "262K",
+		description:
+			"Open-weight vision-language model for coding, research and professional workflows.",
 	},
 	{
-		id: "mistralai/mistral-small-24b-instruct-2501:free",
-		label: "Mistral Small 24B (Free)",
-		context: "32K",
-		description: "Mistral fast and precise instruction-following model.",
+		id: "dots-studio/dots-3-note-preview:free",
+		label: "Dots3-Note Preview (Free)",
+		context: "512K",
+		description: "Dots Studio MoE (16B active / 280B) — long-context note and doc work.",
 	},
 	{
-		id: "google/gemma-2-9b-it:free",
-		label: "Google Gemma 2 9B (Free)",
-		context: "8K",
-		description: "Compact and fast instruction model by Google.",
+		id: "thinkingmachines/inkling-small:free",
+		label: "Inkling Small (Free)",
+		context: "1M",
+		description: "Thinking Machines Lab multimodal MoE (12B active / 276B) with 1M context.",
 	},
 	{
-		id: "nvidia/nemotron-3-ultra-550b-a55b:free",
-		label: "Nemotron 3 Ultra (Free)",
+		id: "nvidia/nemotron-3.5-lightning:free",
+		label: "Nemotron 3.5 Lightning (Free)",
 		context: "1M",
 		description:
-			"NVIDIA 550B flagship reasoning model — deepest quality, higher latency.",
-	},
-	{
-		id: "nvidia/nemotron-3-super-120b-a12b:free",
-		label: "Nemotron 3 Super (Free)",
-		context: "262K",
-		description: "NVIDIA hybrid MoE reasoning model.",
-	},
-	{
-		id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-		label: "Nemotron 3 Nano Omni (Free)",
-		context: "256K",
-		description: "Fast NVIDIA compact reasoning model.",
+			"NVIDIA MoE (3B active / 30B) — high-throughput agentic workloads, 1M context.",
 	},
 	{
 		id: "stepfun/step-3.7-flash:free",
 		label: "Step 3.7 Flash (Free)",
 		context: "262K",
-		description: "StepFun high-throughput chat model.",
+		description:
+			"StepFun multimodal MoE with selectable reasoning levels (high/medium/low).",
 	},
 	{
 		id: "cohere/north-mini-code:free",
 		label: "North Mini Code (Free)",
 		context: "256K",
-		description: "Cohere compact structured output model.",
+		description: "Cohere compact structured-output model.",
 	},
 	{
 		id: "poolside/laguna-s-2.1:free",
@@ -112,38 +117,51 @@ const FREE_MODELS: FreeModel[] = [
 		description: "Lightweight Poolside model.",
 	},
 	{
-		id: "tencent/hy3:free",
-		label: "Hy3 (Free)",
+		id: "nvidia/nemotron-3-super-120b-a12b:free",
+		label: "Nemotron 3 Super (Free)",
 		context: "262K",
-		description: "Tencent high-speed chat model.",
+		description: "NVIDIA hybrid MoE reasoning model.",
 	},
 	{
-		id: "z-ai/glm-5:free",
-		label: "Z-AI GLM 5 (Free)",
-		context: "128K",
-		description: "Z-AI multilingual conversational model.",
+		id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+		label: "Nemotron 3 Nano Omni (Free)",
+		context: "256K",
+		description: "Fast NVIDIA compact reasoning model (text, image, audio, video in).",
+	},
+	{
+		id: "nvidia/nemotron-3-ultra-550b-a55b:free",
+		label: "Nemotron 3 Ultra (Free)",
+		context: "1M",
+		description:
+			"NVIDIA 550B flagship reasoning model — deepest quality, higher latency.",
 	},
 ];
 
 /**
- * Fast default: chat answers feel instant. Users who want deeper reasoning
- * can still pick Nemotron Ultra in Settings (it stays on the allowlist).
+ * Fast, finance-tuned default: chat answers feel instant and the model was
+ * trained for money/investment tasks. Users who want deeper reasoning can
+ * still pick Nemotron Ultra in Settings (it stays on the allowlist).
  */
-const DEFAULT_MODEL = "inclusionai/ling-3.0-flash:free";
+const DEFAULT_MODEL = "inclusionai/ling-3.0-flash-fin:free";
 
 /**
- * Model id that shipped as the app default before Ling 3.0 Flash. Profiles
- * that still store it (saved before the switch) resolve to the current
- * default instead of pinning everyone to the slow flagship forever.
+ * Model ids that previously shipped as the app default. Profiles that still
+ * store one (saved before a switch) resolve to the current default instead of
+ * being pinned to a retired model.
  */
-const LEGACY_DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
+const LEGACY_DEFAULT_MODELS = [
+	// Default before Ling 3.0 Flash Fin.
+	"inclusionai/ling-3.0-flash:free",
+	// Default before Ling 3.0 Flash — retired from the free catalog.
+	"nvidia/nemotron-3-ultra-550b-a55b:free",
+];
 
 /** Resolves a saved model id to the model actually called: unset, unknown or legacy-default falls back to DEFAULT_MODEL. */
 export function resolveKiloModel(modelName?: string | null): string {
 	const trimmed = modelName?.trim();
 	if (
 		!trimmed ||
-		trimmed.toLowerCase() === LEGACY_DEFAULT_MODEL.toLowerCase()
+		LEGACY_DEFAULT_MODELS.some((m) => m.toLowerCase() === trimmed.toLowerCase())
 	) {
 		return DEFAULT_MODEL;
 	}

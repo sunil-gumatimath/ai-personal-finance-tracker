@@ -1,6 +1,6 @@
 /**
  * Shared server config and types used by both the local Bun dev server
- * (`api/server.ts`) and the Vercel entry point (`api/handler.ts`).
+ * (`api/_server.ts`) and the Vercel entry point (`api/handler.ts`).
  *
  * Keeping this in one place prevents CORS / security-header / rate-limit
  * logic from drifting between the two runtimes.
