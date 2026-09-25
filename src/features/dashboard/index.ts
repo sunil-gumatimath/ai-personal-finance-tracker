@@ -5,4 +5,3 @@ export { FinancialHealthScore } from "./components/FinancialHealthScore";
 export { RecentTransactions } from "./components/RecentTransactions";
 export { SpendingChart } from "./components/SpendingChart";
 export { StatCard } from "./components/StatCard";
-export { WeeklyDigestCard } from "./components/WeeklyDigestCard";
