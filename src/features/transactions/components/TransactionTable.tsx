@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import {
 	ArrowDownLeft,
+	ArrowLeftRight,
 	ArrowUpDown,
 	ArrowUpRight,
 	ChevronDown,
@@ -63,6 +63,8 @@ interface TransactionTableProps {
 	onEdit: (transaction: Transaction) => void;
 	onDelete: (id: string) => void | Promise<unknown>;
 	onAdd: () => void;
+	/** Locale-aware date output so the table honours the Date Format preference. */
+	formatDate: (date: Date) => string;
 }
 
 type SortField = "date" | "amount" | "description" | "category";
@@ -77,11 +79,11 @@ function amountColorClass(type: Transaction["type"]): string {
 	return "text-foreground";
 }
 
-/** One glyph convention everywhere: + income, - expense, none for transfers. */
+/** One glyph convention everywhere: + income, − expense, ⇄ transfer. */
 function amountPrefix(type: Transaction["type"]): string {
 	if (type === "income") return "+";
-	if (type === "expense") return "-";
-	return "";
+	if (type === "expense") return "−";
+	return "⇄";
 }
 
 function TypeBadgeClasses({ type }: { type: Transaction["type"] }) {
@@ -135,6 +137,11 @@ function CategoryBadge({ category }: { category: Category }) {
 	);
 }
 
+/**
+ * Income / expense / transfer each get their own glyph. Previously this
+ * returned ArrowUpRight for anything that wasn't income, so a transfer row
+ * displayed the expense "money out" arrow next to a neutral amount.
+ */
 function TypeIcon({
 	type,
 	className,
@@ -142,11 +149,9 @@ function TypeIcon({
 	type: Transaction["type"];
 	className?: string;
 }) {
-	return type === "income" ? (
-		<ArrowDownLeft className={className} />
-	) : (
-		<ArrowUpRight className={className} />
-	);
+	if (type === "income") return <ArrowDownLeft className={className} />;
+	if (type === "expense") return <ArrowUpRight className={className} />;
+	return <ArrowLeftRight className={className} />;
 }
 
 function RowActions({
@@ -242,11 +247,13 @@ function SortableHead({
 function MobileCards({
 	transactions,
 	formatCurrency,
+	formatDate,
 	onEdit,
 	onRequestDelete,
 }: {
 	transactions: Transaction[];
 	formatCurrency: (amount: number) => string;
+	formatDate: (date: Date) => string;
 	onEdit: (t: Transaction) => void;
 	onRequestDelete: (t: Transaction) => void;
 }) {
@@ -271,9 +278,7 @@ function MobileCards({
 								{transaction.description || "No description"}
 							</p>
 							<div className="flex items-center gap-2 text-xs text-muted-foreground">
-								<span>
-									{format(parseTransactionDate(transaction.date), "MMM d")}
-								</span>
+								<span>{formatDate(parseTransactionDate(transaction.date))}</span>
 								{transaction.category && (
 									<>
 										<span>•</span>
@@ -318,6 +323,7 @@ function DesktopTable({
 	onEdit,
 	onRequestDelete,
 	formatCurrency,
+	formatDate,
 }: {
 	rows: Transaction[];
 	sortField: SortField;
@@ -326,11 +332,14 @@ function DesktopTable({
 	onEdit: (t: Transaction) => void;
 	onRequestDelete: (t: Transaction) => void;
 	formatCurrency: (amount: number) => string;
+	formatDate: (date: Date) => string;
 }) {
 	return (
 		<div className="hidden md:block">
 			<Table>
-				<TableHeader className="sticky top-0 z-10 bg-background">
+				{/* Sticky header must match the translucent card it sits in —
+				    bg-background painted an opaque band over the glass surface. */}
+				<TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm supports-[backdrop-filter]:bg-card/80">
 					<TableRow>
 						<TableHead className="w-[60px]">Type</TableHead>
 						<SortableHead
@@ -407,7 +416,7 @@ function DesktopTable({
 							</TableCell>
 							<TableCell>{transaction.account?.name || "—"}</TableCell>
 							<TableCell className="tabular-nums">
-								{format(parseTransactionDate(transaction.date), "MMM d, yyyy")}
+								{formatDate(parseTransactionDate(transaction.date))}
 							</TableCell>
 							<TableCell className="text-right">
 								<AmountCell
@@ -430,6 +439,68 @@ function DesktopTable({
 	);
 }
 
+/**
+ * Sort control for narrow viewports. `DesktopTable`'s `SortableHead` is inside
+ * a `hidden md:block` wrapper, so before this existed mobile users had no way
+ * to change the sort order at all.
+ */
+function MobileSortBar({
+	sortField,
+	sortDir,
+	onSort,
+	className,
+}: {
+	sortField: SortField;
+	sortDir: SortDir;
+	onSort: (field: SortField) => void;
+	className?: string;
+}) {
+	const fields: Array<{ field: SortField; label: string }> = [
+		{ field: "date", label: "Date" },
+		{ field: "amount", label: "Amount" },
+		{ field: "description", label: "Description" },
+		{ field: "category", label: "Category" },
+	];
+
+	return (
+		<div
+			className={cn("flex items-center gap-2 md:hidden", className)}
+			role="group"
+			aria-label="Sort transactions"
+		>
+			<span className="shrink-0 text-xs text-muted-foreground">Sort</span>
+			<div className="flex flex-1 gap-1 overflow-x-auto scrollbar-hide">
+				{fields.map(({ field, label }) => {
+					const active = field === sortField;
+					return (
+						<button
+							key={field}
+							type="button"
+							onClick={() => onSort(field)}
+							aria-pressed={active}
+							aria-label={`Sort by ${label}`}
+							className={cn(
+								"inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors",
+								active
+									? "border-primary/40 bg-primary/10 text-primary"
+									: "border-border/60 text-muted-foreground hover:bg-muted/60",
+							)}
+						>
+							{label}
+							{active &&
+								(sortDir === "asc" ? (
+									<ChevronUp className="h-3 w-3" aria-hidden="true" />
+								) : (
+									<ChevronDown className="h-3 w-3" aria-hidden="true" />
+								))}
+						</button>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
 /** Transactions list: empty state, mobile card layout, and desktop table. */
 export function TransactionTable({
 	transactions,
@@ -439,6 +510,7 @@ export function TransactionTable({
 	onEdit,
 	onDelete,
 	onAdd,
+	formatDate,
 }: TransactionTableProps) {
 	const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -538,10 +610,18 @@ export function TransactionTable({
 
 	return (
 		<>
+			{/* Mobile sort control — desktop gets it from the table headers. */}
+			<MobileSortBar
+				sortField={sortField}
+				sortDir={sortDir}
+				onSort={handleSort}
+				className="mb-3"
+			/>
 			{/* Mobile Card Layout */}
 			<MobileCards
 				transactions={visibleTransactions}
 				formatCurrency={formatCurrency}
+				formatDate={formatDate}
 				onEdit={onEdit}
 				onRequestDelete={setPendingDelete}
 			/>
@@ -549,6 +629,7 @@ export function TransactionTable({
 			<DesktopTable
 				rows={visibleTransactions}
 				formatCurrency={formatCurrency}
+				formatDate={formatDate}
 				sortField={sortField}
 				sortDir={sortDir}
 				onSort={handleSort}
@@ -556,7 +637,8 @@ export function TransactionTable({
 				onRequestDelete={setPendingDelete}
 			/>
 
-			{/* Pagination */}
+			{/* Pagination — also the single source of truth for the result count,
+			    so the page doesn't render a second, contradictory "Showing X of Y". */}
 			<div className="mt-4 flex flex-col items-center justify-between gap-3 border-t border-border/50 pt-4 sm:flex-row">
 				<p
 					className="text-sm text-muted-foreground tabular-nums"

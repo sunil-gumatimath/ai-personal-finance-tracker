@@ -5,7 +5,7 @@ import {
 	Download,
 	Filter,
 	Plus,
-	RefreshCw,
+	Repeat,
 	Search,
 	Sparkles,
 } from "lucide-react";
@@ -28,10 +28,14 @@ import {
 import { TransactionTable } from "@/features/transactions/components/TransactionTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
+import { PageHeading } from "@/components/layout";
+import { cn } from "@/lib/utils";
 import { api } from "@/lib/api-client";
 import { ApiError } from "@/lib/errors";
 import { downloadTransactionsCsv } from "@/lib/transaction-csv";
 import { toNumber } from "@/lib/number";
+import { formatUserDate } from "@/lib/format-date";
+import { parseTransactionDate } from "@/lib/date-utils";
 import type {
 	Account,
 	Category,
@@ -54,7 +58,12 @@ const EMPTY_FORM: TransactionFormData = {
 
 export function Transactions() {
 	const { user } = useAuth();
-	const { formatCurrency } = usePreferences();
+	const { formatCurrency, getCurrencySymbol, preferences } = usePreferences();
+	const symbol = getCurrencySymbol();
+	const formatDate = useCallback(
+		(date: Date) => formatUserDate(date, preferences),
+		[preferences],
+	);
 	const [loading, setLoading] = useState(true);
 	const [fetchError, setFetchError] = useState(false);
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -258,6 +267,19 @@ export function Transactions() {
 		}
 	};
 
+	/**
+	 * `<input type="date">` only accepts `yyyy-MM-dd`. The API can hand back a
+	 * full timestamp, which made the native control render blank and would have
+	 * written an empty date on save — so normalise through the shared parser
+	 * (which also keeps the value in LOCAL time, avoiding off-by-one days).
+	 */
+	const toDateInputValue = (value: string | null | undefined): string => {
+		if (!value) return "";
+		const parsed = parseTransactionDate(value);
+		if (Number.isNaN(parsed.getTime())) return "";
+		return format(parsed, "yyyy-MM-dd");
+	};
+
 	const handleEdit = (transaction: Transaction) => {
 		setEditingTransaction(transaction);
 		setFormData({
@@ -267,10 +289,10 @@ export function Transactions() {
 			category_id: transaction.category_id || "",
 			account_id: transaction.account_id,
 			to_account_id: transaction.to_account_id || "",
-			date: transaction.date,
+			date: toDateInputValue(transaction.date),
 			is_recurring: transaction.is_recurring || false,
 			recurring_frequency: transaction.recurring_frequency || "",
-			recurring_end_date: transaction.recurring_end_date || "",
+			recurring_end_date: toDateInputValue(transaction.recurring_end_date),
 		});
 		setFormError(null);
 		setIsDialogOpen(true);
@@ -386,51 +408,47 @@ export function Transactions() {
 	return (
 		<div className="space-y-6">
 			{/* Header */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-						Transactions
-					</h1>
-					<p className="text-sm sm:text-base text-muted-foreground">
-						Manage and track all your financial transactions
-					</p>
-				</div>
-				<div className="flex gap-2">
-					<Button
-						variant="outline"
-						onClick={handleProcessRecurring}
-						disabled={processingRecurring}
-						title="Create occurrences for due recurring transactions"
-						className="flex-1 sm:flex-none"
-					>
-						<RefreshCw
-							className={`mr-2 h-4 w-4 ${
-								processingRecurring ? "motion-safe:animate-spin" : ""
-							}`}
-						/>
-						<span className="hidden sm:inline">Process Recurring</span>
-						<span className="sm:hidden">Recurring</span>
-					</Button>
-					<Button
-						variant="outline"
-						onClick={() => downloadTransactionsCsv(filteredTransactions)}
-						className="flex-1 sm:flex-none"
-					>
-						<Download className="mr-2 h-4 w-4" />
-						<span className="hidden sm:inline">Export CSV</span>
-						<span className="sm:hidden">Export</span>
-					</Button>
-					<Button onClick={openAddDialog} className="flex-1 sm:flex-none">
-						<Plus className="mr-2 h-4 w-4" />
-						<span className="hidden sm:inline">Add Transaction</span>
-						<span className="sm:hidden">Add</span>
-					</Button>
-				</div>
-			</div>
+			<PageHeading
+				path="/transactions"
+				actions={
+					<>
+						<Button
+							variant="outline"
+							onClick={handleProcessRecurring}
+							disabled={processingRecurring}
+							title="Create occurrences for due recurring transactions"
+							className="flex-1 sm:flex-none"
+						>
+							<Repeat
+								className={cn(
+									"mr-2 h-4 w-4",
+									processingRecurring && "motion-safe:animate-spin",
+								)}
+							/>
+							<span className="hidden sm:inline">Process Recurring</span>
+							<span className="sm:hidden">Recurring</span>
+						</Button>
+						<Button
+							variant="outline"
+							onClick={() => downloadTransactionsCsv(filteredTransactions)}
+							className="flex-1 sm:flex-none"
+						>
+							<Download className="mr-2 h-4 w-4" />
+							<span className="hidden sm:inline">Export CSV</span>
+							<span className="sm:hidden">Export</span>
+						</Button>
+						<Button onClick={openAddDialog} className="flex-1 sm:flex-none">
+							<Plus className="mr-2 h-4 w-4" />
+							<span className="hidden sm:inline">Add Transaction</span>
+							<span className="sm:hidden">Add</span>
+						</Button>
+					</>
+				}
+			/>
 
 			{/* AI Quick Add */}
-			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
-				<div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+			<div className="group surface surface-hover backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
+				<div className="surface-sheen absolute inset-0 pointer-events-none" />
 				<div className="relative flex flex-col gap-3">
 					<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 						<Sparkles className="h-4 w-4 text-primary" />
@@ -438,7 +456,7 @@ export function Transactions() {
 					</div>
 					<div className="flex flex-col gap-2 sm:flex-row">
 						<Input
-							placeholder="Try: paid $45 for groceries yesterday, or salary of $2,000 on the 1st"
+							placeholder={`Try: paid ${symbol}45 for groceries yesterday, or salary of ${symbol}2,000 on the 1st`}
 							value={aiPrompt}
 							onChange={(e) => setAiPrompt(e.target.value)}
 							disabled={aiLoading}
@@ -467,8 +485,8 @@ export function Transactions() {
 			</div>
 
 			{/* Filters */}
-			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
-				<div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+			<div className="group surface surface-hover backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
+				<div className="surface-sheen absolute inset-0 pointer-events-none" />
 				<div className="relative flex flex-col gap-4 sm:flex-row">
 					<div className="relative flex-1">
 						<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -498,21 +516,19 @@ export function Transactions() {
 			</div>
 
 			{/* Transactions Table */}
-			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
-				<div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-				<div className="relative flex items-center justify-between px-6 pb-2 pt-6">
+			<div className="group surface surface-hover backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
+				<div className="surface-sheen absolute inset-0 pointer-events-none" />
+				{/* Count lives in the table's own pagination bar (which knows about
+				    sorting + paging) — a second "Showing X of Y" here reported a
+				    different number for the same data. */}
+				<div className="relative px-6 pt-6">
 					<h3 className="text-base font-semibold">All Transactions</h3>
-					<p
-						className="text-sm tabular-nums text-muted-foreground"
-						aria-live="polite"
-					>
-						Showing {filteredTransactions.length} of {transactions.length}
-					</p>
 				</div>
 				<div className="relative px-6 pb-6">
 					<TransactionTable
 						transactions={filteredTransactions}
 						formatCurrency={formatCurrency}
+						formatDate={formatDate}
 						hasActiveFilters={hasActiveFilters}
 						onClearFilters={clearFilters}
 						onEdit={handleEdit}
