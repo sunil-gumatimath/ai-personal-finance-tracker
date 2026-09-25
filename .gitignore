@@ -107,11 +107,6 @@ Desktop.ini
 skills.md
 skills-lock.json
 
-# Local scratch/test directories
-api/tests/
-database/scripts/
-src/tests/
-
 # Editor local history and merge artifacts
 .history/
 *.orig
