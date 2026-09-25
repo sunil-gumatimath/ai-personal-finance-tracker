@@ -37,6 +37,10 @@ export function StatCard({
     trendDescription,
     subtitle,
 }: StatCardProps) {
+    // `neutral` gets no arrow at all. A card like "Total Balance" has no
+    // time series behind it, so decorating it with TrendingUp implied a trend
+    // that isn't measured. Reserve the arrows for cards that pass a real delta.
+    const showTrendIcon = changeType !== 'neutral'
     const TrendIcon = changeType === 'positive'
         ? TrendingUp
         : changeType === 'negative'
@@ -44,7 +48,10 @@ export function StatCard({
             : Minus
 
     return (
-        <Card className="relative gap-0 overflow-hidden rounded-2xl border-border bg-card py-0">
+        // `surface`, not an opaque bg-card at rounded-2xl: every other panel in
+        // the app is a translucent `.surface` at rounded-xl, so these four cards
+        // used to read as a different component entirely.
+        <Card className="surface gap-0 py-0 backdrop-blur-sm">
             <CardContent className="p-5">
                 {/* Header with title and percentage badge */}
                 <div className="flex items-center justify-between mb-3">
@@ -58,7 +65,7 @@ export function StatCard({
                             changeType === 'negative' && SEMANTIC_BADGE.negative,
                             changeType === 'neutral' && "bg-muted/50 text-muted-foreground border-border/30"
                         )}>
-                            <TrendIcon className="h-3 w-3" />
+                            {showTrendIcon && <TrendIcon className="h-3 w-3" />}
                             <span>{percentageChange}</span>
                         </div>
                     )}
@@ -83,7 +90,7 @@ export function StatCard({
                         changeType === 'neutral' && "text-muted-foreground"
                     )}>
                         <span>{trendDescription}</span>
-                        <TrendIcon className="h-3.5 w-3.5" />
+                        {showTrendIcon && <TrendIcon className="h-3.5 w-3.5" />}
                     </div>
                 )}
 

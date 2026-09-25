@@ -205,10 +205,10 @@ export function FinancialHealthScore({ data, loading, error, onRetry }: Financia
     }
 
     const getScoreColor = (s: number) => {
-        if (s >= 80) return 'text-emerald-500'
-        if (s >= 60) return 'text-blue-500'
-        if (s >= 40) return 'text-amber-500'
-        return 'text-rose-500'
+        if (s >= 80) return 'text-[var(--success)]'
+        if (s >= 60) return 'text-[var(--info)]'
+        if (s >= 40) return 'text-[var(--warning)]'
+        return 'text-destructive'
     }
 
     const getGaugeFillColor = (s: number) => {
@@ -233,10 +233,10 @@ export function FinancialHealthScore({ data, loading, error, onRetry }: Financia
     }
 
     const getScoreBadgeStyle = (s: number) => {
-        if (s >= 80) return 'bg-emerald-500/10 border-emerald-500/30'
-        if (s >= 60) return 'bg-blue-500/10 border-blue-500/30'
-        if (s >= 40) return 'bg-amber-500/10 border-amber-500/30'
-        return 'bg-rose-500/10 border-rose-500/30'
+        if (s >= 80) return 'bg-[var(--success)]/10 border-emerald-500/30'
+        if (s >= 60) return 'bg-[var(--info)]/10 border-blue-500/30'
+        if (s >= 40) return 'bg-[var(--warning)]/10 border-amber-500/30'
+        return 'bg-destructive/10 border-rose-500/30'
     }
 
     const getScoreEmoji = (s: number) => {
@@ -292,7 +292,7 @@ export function FinancialHealthScore({ data, loading, error, onRetry }: Financia
                         <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                             <div className={cn(
                                 "p-1.5 rounded-lg border",
-                                score >= 60 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-destructive/10 border-destructive/20"
+                                score >= 60 ? "bg-[var(--success)]/10 border-[var(--success)]/20" : "bg-destructive/10 border-destructive/20"
                             )}>
                                 <Activity className={cn("h-4 w-4", getScoreColor(score))} />
                             </div>
@@ -392,8 +392,8 @@ export function FinancialHealthScore({ data, loading, error, onRetry }: Financia
                                     <div className={cn(
                                         "flex items-center gap-0.5 mt-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full border",
                                         score >= 60
-                                            ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
-                                            : "text-amber-500 bg-amber-500/10 border-amber-500/20"
+                                            ? "text-[var(--success)] bg-[var(--success)]/10 border-[var(--success)]/20"
+                                            : "text-[var(--warning)] bg-[var(--warning)]/10 border-[var(--warning)]/20"
                                     )}>
                                         {score >= 60 ? (
                                             <ArrowUpRight className="h-2.5 w-2.5" />
@@ -472,7 +472,7 @@ export function FinancialHealthScore({ data, loading, error, onRetry }: Financia
                         <DialogTitle className="flex items-center gap-2">
                             <div className={cn(
                                 "p-1.5 rounded-lg",
-                                score >= 60 ? "bg-emerald-500/10" : "bg-amber-500/10"
+                                score >= 60 ? "bg-[var(--success)]/10" : "bg-[var(--warning)]/10"
                             )}>
                                 <Activity className={cn("h-5 w-5", getScoreColor(score))} />
                             </div>
@@ -574,10 +574,10 @@ interface EnhancedMetricBarProps {
 }
 
 function getMetricColor(value: number) {
-    if (value >= 80) return { bar: 'bg-emerald-500', icon: 'text-emerald-400', text: 'text-emerald-400' }
-    if (value >= 50) return { bar: 'bg-blue-500', icon: 'text-blue-400', text: 'text-blue-400' }
-    if (value >= 25) return { bar: 'bg-amber-500', icon: 'text-amber-400', text: 'text-amber-400' }
-    return { bar: 'bg-rose-500', icon: 'text-rose-400', text: 'text-rose-400' }
+    if (value >= 80) return { bar: 'bg-[var(--success)]', icon: 'text-[var(--success)]', text: 'text-[var(--success)]' }
+    if (value >= 50) return { bar: 'bg-[var(--info)]', icon: 'text-[var(--info)]', text: 'text-[var(--info)]' }
+    if (value >= 25) return { bar: 'bg-[var(--warning)]', icon: 'text-[var(--warning)]', text: 'text-[var(--warning)]' }
+    return { bar: 'bg-destructive', icon: 'text-destructive', text: 'text-destructive' }
 }
 
 function EnhancedMetricBar({ icon: Icon, label, value, weight, description, detail }: EnhancedMetricBarProps) {

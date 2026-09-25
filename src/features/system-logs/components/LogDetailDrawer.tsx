@@ -72,7 +72,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 			aria-label={`Copy ${label}`}
 		>
 			{copied ? (
-				<Check className="h-3 w-3 text-emerald-500" aria-hidden="true" />
+				<Check className="h-3 w-3 text-[var(--success)]" aria-hidden="true" />
 			) : (
 				<Copy className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
 			)}
@@ -151,9 +151,9 @@ export function LogDetailDrawer({
 											</span>
 											<div className="flex items-center gap-1.5">
 												{log.status === "success" ? (
-													<CheckCircle2 className="h-4 w-4 text-emerald-500" />
+													<CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
 												) : (
-													<XCircle className="h-4 w-4 text-rose-500" />
+													<XCircle className="h-4 w-4 text-destructive" />
 												)}
 												<span className="text-sm font-medium capitalize">
 													{log.status}
@@ -241,7 +241,7 @@ export function LogDetailDrawer({
 																	<span className="text-muted-foreground">
 																		{formatFieldName(key)}
 																	</span>
-																	<span className="font-mono text-sm bg-rose-500/8 text-rose-600 px-2 py-0.5 rounded line-through decoration-rose-400/50">
+																	<span className="font-mono text-sm bg-destructive/10 text-destructive px-2 py-0.5 rounded line-through decoration-destructive/50">
 																		{formatFieldValue(key, value, formatOptions)}
 																	</span>
 																</div>
@@ -263,7 +263,7 @@ export function LogDetailDrawer({
 																	<span className="text-muted-foreground">
 																		{formatFieldName(key)}
 																	</span>
-																	<span className="font-mono text-sm bg-emerald-500/8 text-emerald-600 px-2 py-0.5 rounded">
+																	<span className="font-mono text-sm bg-[var(--success)]/10 text-[var(--success)] px-2 py-0.5 rounded">
 																		{formatFieldValue(key, value, formatOptions)}
 																	</span>
 																</div>
@@ -283,8 +283,8 @@ export function LogDetailDrawer({
 															{formatFieldName(change.field)}
 														</span>
 														<div className="grid grid-cols-2 gap-3 text-sm">
-															<div className="px-3 py-2 rounded-lg bg-rose-500/8 border border-rose-500/15 font-mono text-rose-600 break-words">
-																<span className="text-[10px] font-semibold uppercase tracking-wider text-rose-500/70 block mb-1">
+															<div className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20 font-mono text-destructive break-words">
+																<span className="text-[10px] font-semibold uppercase tracking-wider text-destructive/70 block mb-1">
 																	Before
 																</span>
 																{formatFieldValue(
@@ -293,8 +293,8 @@ export function LogDetailDrawer({
 																	formatOptions,
 																)}
 															</div>
-															<div className="px-3 py-2 rounded-lg bg-emerald-500/8 border border-emerald-500/15 font-mono text-emerald-600 break-words">
-																<span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500/70 block mb-1">
+															<div className="px-3 py-2 rounded-lg bg-[var(--success)]/10 border border-emerald-500/15 font-mono text-[var(--success)] break-words">
+																<span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]/70 block mb-1">
 																	After
 																</span>
 																{formatFieldValue(

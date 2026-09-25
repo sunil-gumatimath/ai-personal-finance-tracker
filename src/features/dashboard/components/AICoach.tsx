@@ -7,7 +7,9 @@ import {
 	Trophy,
 	X,
 	RefreshCw,
+	Settings,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +29,8 @@ interface AICoachProps {
 	/** Set when insight loading failed — renders a slim retry row instead of vanishing. */
 	error?: string | null;
 	onRetry?: () => void;
+	/** No provider key saved — offer the setup path, not a retry that can't help. */
+	aiConfigured?: boolean;
 }
 
 const ROTATION_INTERVAL_MS = 8000;
@@ -37,6 +41,7 @@ export function AICoach({
 	dismissInsight,
 	error,
 	onRetry,
+	aiConfigured = true,
 }: AICoachProps) {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [paused, setPaused] = useState(false);
@@ -58,7 +63,7 @@ export function AICoach({
 	// Loading skeleton
 	if (isLoading) {
 		return (
-			<Card className="border-border/50 bg-card/50">
+			<Card className="surface backdrop-blur-sm">
 				<CardContent className="p-4">
 					<div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 						<Skeleton className="h-10 w-10 rounded-lg shrink-0" />
@@ -69,6 +74,33 @@ export function AICoach({
 						</div>
 						<Skeleton className="h-8 w-20 rounded-md" />
 					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	// No API key: the request can't succeed, so don't dress a setup gap up as
+	// a transient network failure with a Retry button.
+	if (!aiConfigured) {
+		return (
+			<Card className="border-[var(--warning)]/30 bg-[var(--warning)]/5">
+				<CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+					<div className="flex min-w-0 items-center gap-3">
+						<Brain className="h-4 w-4 shrink-0 text-[var(--warning)]" />
+						<div className="min-w-0">
+							<p className="text-sm font-medium">AI Coach needs an API key</p>
+							<p className="text-xs text-muted-foreground">
+								Add a Kilo Gateway key to get personalized coaching and
+								anomaly alerts.
+							</p>
+						</div>
+					</div>
+					<Button asChild variant="outline" size="sm" className="h-8 shrink-0">
+						<Link to="/settings">
+							<Settings className="mr-1.5 h-3.5 w-3.5" />
+							Open Settings
+						</Link>
+					</Button>
 				</CardContent>
 			</Card>
 		);
@@ -117,9 +149,9 @@ export function AICoach({
 			case "kudo":
 				return <Trophy className="h-4 w-4 text-[var(--income)]" />;
 			case "coaching":
-				return <Brain className="h-4 w-4 text-blue-500" />;
+				return <Brain className="h-4 w-4 text-[var(--info)]" />;
 			default:
-				return <Sparkles className="h-4 w-4 text-amber-500" />;
+				return <Sparkles className="h-4 w-4 text-[var(--warning)]" />;
 		}
 	};
 
@@ -130,9 +162,9 @@ export function AICoach({
 			case "kudo":
 				return "bg-[var(--income)]/10 text-[var(--income)] border-[var(--income)]/25";
 			case "coaching":
-				return "bg-blue-500/10 text-blue-500 border-blue-500/25 dark:bg-blue-500/15";
+				return "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/25 dark:bg-[var(--info)]/15";
 			default:
-				return "bg-amber-500/10 text-amber-500 border-amber-500/25 dark:bg-amber-500/15";
+				return "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/25";
 		}
 	};
 
@@ -150,8 +182,7 @@ export function AICoach({
 	};
 
 	return (
-		<Card
-			className="relative overflow-hidden border border-border bg-card"
+		<Card className="surface backdrop-blur-sm"
 			onMouseEnter={() => setPaused(true)}
 			onMouseLeave={() => setPaused(false)}
 			onFocus={() => setPaused(true)}

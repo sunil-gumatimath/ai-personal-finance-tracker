@@ -9,6 +9,10 @@ export interface ColorSwatch {
 }
 
 export const SWATCHES: readonly ColorSwatch[] = [
+	// Neutral first: accounts, categories and debts all need a "no strong
+	// colour" option, and hardcoding `#3b82f6` as the default meant every new
+	// record was born blue.
+	{ value: "#64748b", name: "Slate", gradient: "from-slate-500 to-slate-600" },
 	{ value: "#3b82f6", name: "Blue", gradient: "from-blue-500 to-blue-600" },
 	{ value: "#22c55e", name: "Green", gradient: "from-emerald-500 to-emerald-600" },
 	{ value: "#8b5cf6", name: "Purple", gradient: "from-purple-500 to-violet-600" },
@@ -19,7 +23,17 @@ export const SWATCHES: readonly ColorSwatch[] = [
 	{ value: "#84cc16", name: "Lime", gradient: "from-lime-500 to-green-500" },
 	{ value: "#f97316", name: "Orange", gradient: "from-orange-500 to-red-500" },
 	{ value: "#6366f1", name: "Indigo", gradient: "from-indigo-500 to-purple-600" },
+	{ value: "#eab308", name: "Yellow", gradient: "from-yellow-500 to-amber-500" },
 ] as const;
 
 /** Plain hex list, same order as SWATCHES (for compact pickers). */
 export const SWATCH_HEXES: readonly string[] = SWATCHES.map((s) => s.value);
+
+/**
+ * Debt-specific subset: identical to the shared palette minus Green, which is
+ * the reserved "Paid Off" status color. Kept as a derived view so it can never
+ * diverge from {@link SWATCHES}.
+ */
+export const DEBT_SWATCHES: readonly ColorSwatch[] = SWATCHES.filter(
+	(s) => s.value !== "#22c55e",
+);
