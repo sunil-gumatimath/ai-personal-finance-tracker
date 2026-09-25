@@ -114,6 +114,12 @@ client for 15 minutes.
 
 ## Notifications
 
+> **Not wired to the UI.** These endpoints exist but no client code calls them:
+> there is no push service, no mail sender, and the `notifications` /
+> `emailAlerts` / `budgetAlerts` preference flags were removed from the client
+> because nothing read them. The Settings **Alerts** tab was deleted rather than
+> left saving unread booleans. Use these endpoints if delivery is implemented.
+
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/api/notifications` | Preferences, active budget alerts (warning at ≥80%, over at ≥100%), recent activity |

@@ -9,7 +9,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 - **AI Financial Coach**: Personalized coaching cards, spending alerts, kudos, and anomaly detection with currency-aware thresholds.
 - **AI Assistant Chat**: Natural-language conversations about balances, budgets, goals, debt, categories, trends, and spending questions.
 - **KiloCode AI**: Configure the Kilo Gateway API key in Settings.
-- **Free Model Selection**: Choose from a curated allowlist of free KiloCode models (with context sizes and descriptions), default `inclusionai/ling-3.0-flash:free`.
+- **Free Model Selection**: Choose from a curated allowlist of free KiloCode models (with context sizes and descriptions), default `inclusionai/ling-3.0-flash-fin:free`.
 - **Persisted Insights**: AI insights are stored in the database, can be dismissed per-card, and are reused to avoid unnecessary regeneration.
 - **Chat Cooldown**: UI-level cooldown between AI requests to prevent spam.
 - **Privacy Notice**: Settings explicitly warns that financial data is sent to the KiloCode API.
@@ -31,6 +31,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 - **Natural-language quick entry**: type *"paid $45 for groceries yesterday"* on the Transactions page and the AI extracts the fields into the add-transaction form for review.
 - **Reports page with PDF/CSV export**: month or trailing-12-month summaries — income vs. expenses, savings rate, category breakdowns, account balances, and transactions — downloadable as a formatted PDF or CSV.
 - **Weekly AI digest**: a generated summary of the week (spending, budgets, goals, debts) on the dedicated **Digest** page, with week/month/year/custom periods, one-click (re)generation, an archive of past digests, and an "Ask AI" drill-in.
+- **Hide balances**: a single app-wide privacy switch (Settings → Preferences → Privacy) that masks every monetary figure and persists across devices and navigation.
 - Recurring transaction metadata and CSV export.
 - Category-based budgets with visual threshold states.
 - Savings goals with contribution tracking.
@@ -42,12 +43,12 @@ A premium, AI-powered personal finance management platform for tracking transact
 ### Premium User Experience
 
 - Responsive design for desktop and mobile.
-- Light, dark, and system themes with seven accent colors (Default, Emerald, Navy, Violet, Cyan, Rose, Sunset).
+- Light, dark, and system themes with seven accent colors (Default, Emerald, Navy, Violet, Cyan, Rose, Sunset). Appearance is controlled from one dropdown in the header (and on the auth screens) as well as from Settings.
 - Progressive Web App support through Vite PWA.
 - Multi-currency support: USD, INR, EUR, GBP, and JPY.
-- Regional date-format preferences.
+- Regional date-format preferences (MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD) applied through a single formatter (`src/lib/format-date.ts`).
 - Security-focused API defaults, including auth rate limiting, security headers, strict CORS handling, and sanitized error responses.
-- System logs page with real-time WebSocket streaming, severity/action/date-range filtering, search, and a per-entry detail drawer for monitoring audit events.
+- System logs page with severity/action/date-range filtering, search, and a per-entry detail drawer for monitoring audit events. Live WebSocket streaming is available in local development only; deployed environments show a "Manual refresh" indicator and rely on the Refresh action (Vercel serverless has no long-lived socket support).
 
 ## Tech Stack
 
@@ -218,8 +219,8 @@ Notes:
 ├── src/
 │   ├── app/                   # Frontend entrypoint and root router (main.tsx, App.tsx)
 │   ├── components/
-│   │   ├── layout/            # App shell: sidebar, header, main layout wrapper
-│   │   ├── system/            # App-level components: ErrorBoundary, Logo, theme provider/toggle
+│   │   ├── layout/            # App shell: sidebar, header, main layout, shared PageHeading
+│   │   ├── system/            # App-level components: ErrorBoundary, Logo, theme provider/toggle, balance toggle
 │   │   └── ui/                # Shadcn/Radix primitives (button, card, dialog, table, etc.)
 │   ├── contexts/              # React contexts: authentication (HttpOnly cookie) and global preferences
 │   ├── features/              # Feature modules with colocated components and public entrypoints
@@ -233,7 +234,8 @@ Notes:
 │   │   ├── api-client.ts      # Typed API client (throws ApiError on HTTP failures)
 │   │   ├── auth.ts            # Neon Auth client setup
 │   │   ├── debt-calculations.ts # Payoff projections and snowball/avalanche comparisons
-│   │   ├── errors.ts          # ApiError class with isAuthError/isRateLimited/isRetryable
+│   │   ├── errors.ts          # ApiError class with isAuthError
+│   │   ├── format-date.ts     # Single consumer of the Date Format preference
 │   │   ├── initials.ts        # Avatar-fallback initials from name/email
 │   │   ├── log-export.ts      # System log CSV export
 │   │   ├── log-formatter.ts   # System log display formatting
@@ -244,7 +246,7 @@ Notes:
 │   │   └── utils.ts           # cn() and shared helpers
 │   ├── pages/                 # Route pages: dashboard, transactions, budgets, goals, debts, reports, etc.
 │   ├── types/                 # TypeScript type definitions: API, database, preferences
-│   └── index.css              # Global styles and Tailwind directives
+│   └── index.css              # Global styles, design tokens, and the shared .surface component
 ├── api/                       # Bun & Vercel API backend (single deployed function)
 │   ├── _config/               # Runtime configuration, CORS allowlist, security headers
 │   ├── _domain/               # Pure domain rules and finance validation
