@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { Logo } from '@/components/system/Logo'
+import { ThemeToggle } from '@/components/system/theme-toggle'
 
 type CredentialField = 'email' | 'password'
 
@@ -26,6 +27,9 @@ export function Signup() {
     const { signUp } = useAuth()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
+    // Password had a reveal toggle but Confirm Password didn't — same form,
+    // same field type, two different affordances.
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [validationError, setValidationError] = useState<string | null>(null)
     const [formError, setFormError] = useState<string | null>(null)
     const [errorField, setErrorField] = useState<CredentialField | null>(null)
@@ -102,7 +106,13 @@ export function Signup() {
             : undefined
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+        <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+            {/* Appearance control on the auth screens too — ThemeToggle only lived
+                in the authenticated header, so a user stuck on a dark-mode login
+                page had no way to change it until after signing in. */}
+            <div className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))]">
+                <ThemeToggle />
+            </div>
             <div className="w-full max-w-md space-y-8">
                 {/* Logo */}
                 <div className="flex flex-col items-center">
@@ -199,7 +209,7 @@ export function Signup() {
                                         {passwordRequirements.map((req) => (
                                             <li
                                                 key={req.text}
-                                                className={`flex items-center gap-2 text-xs ${req.met ? 'text-green-500' : 'text-muted-foreground'}`}
+                                                className={`flex items-center gap-2 text-xs ${req.met ? 'text-[var(--success)]' : 'text-muted-foreground'}`}
                                             >
                                                 <Check
                                                     className={`h-3 w-3 ${req.met ? 'opacity-100' : 'opacity-30'}`}
@@ -212,10 +222,22 @@ export function Signup() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowConfirmPassword((c) => !c)}
+                                        aria-pressed={showConfirmPassword}
+                                        className="h-6 px-1.5 text-xs text-muted-foreground cursor-pointer"
+                                    >
+                                        {showConfirmPassword ? 'Hide' : 'Show'}
+                                    </Button>
+                                </div>
                                 <Input
                                     id="confirmPassword"
-                                    type="password"
+                                    type={showConfirmPassword ? 'text' : 'password'}
                                     placeholder="••••••••"
                                     value={formData.confirmPassword}
                                     onChange={(e) =>

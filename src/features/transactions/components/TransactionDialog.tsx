@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { usePreferences } from "@/hooks/usePreferences";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -28,7 +30,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import type { Account, Category, Transaction } from "@/types";
 
 export type TransactionFormData = {
@@ -101,6 +102,8 @@ export function TransactionDialog({
 }: TransactionDialogProps) {
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 	const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+	const { getCurrencySymbol } = usePreferences();
+	const currencySymbol = getCurrencySymbol();
 
 	// Snapshot of the form as it looked when the dialog opened — the baseline
 	// for dirty detection when Escape/backdrop/X try to close it.
@@ -216,34 +219,45 @@ export function TransactionDialog({
 
 						<div className="space-y-2">
 							<Label htmlFor="amount">Amount</Label>
-							<Input
-								id="amount"
-								type="number"
-								min="0.01"
-								step="0.01"
-								inputMode="decimal"
-								placeholder="0.00"
-								autoFocus
-								value={formData.amount}
-								onChange={(e) => {
-									setFormData({ ...formData, amount: e.target.value });
-									if (fieldErrors.amount)
-										setFieldErrors((prev) => ({ ...prev, amount: undefined }));
-								}}
-								onBlur={() => {
-									// Blur-time validation, but never scold a pristine field.
-									if (!formData.amount.trim() && !fieldErrors.amount) return;
-									setFieldErrors((prev) => ({
-										...prev,
-										amount: validateAmount(),
-									}));
-								}}
-								required
-								aria-invalid={Boolean(fieldErrors.amount) || undefined}
-								aria-describedby={
-									fieldErrors.amount ? "amount-error" : undefined
-								}
-							/>
+							{/* Show the active currency symbol — a bare "0.00" placeholder
+							    gave no clue which currency the amount is in. */}
+							<div className="relative">
+								<span
+									aria-hidden="true"
+									className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm tabular-nums text-muted-foreground"
+								>
+									{currencySymbol}
+								</span>
+								<Input
+									id="amount"
+									type="number"
+									min="0.01"
+									step="0.01"
+									inputMode="decimal"
+									placeholder="0.00"
+									className="pl-7 tabular-nums"
+									autoFocus
+									value={formData.amount}
+									onChange={(e) => {
+										setFormData({ ...formData, amount: e.target.value });
+										if (fieldErrors.amount)
+											setFieldErrors((prev) => ({ ...prev, amount: undefined }));
+									}}
+									onBlur={() => {
+										// Blur-time validation, but never scold a pristine field.
+										if (!formData.amount.trim() && !fieldErrors.amount) return;
+										setFieldErrors((prev) => ({
+											...prev,
+											amount: validateAmount(),
+										}));
+									}}
+									required
+									aria-invalid={Boolean(fieldErrors.amount) || undefined}
+									aria-describedby={
+										fieldErrors.amount ? "amount-error" : undefined
+									}
+								/>
+							</div>
 							<FieldError
 								id="amount-error"
 								message={fieldErrors.amount}
@@ -262,6 +276,9 @@ export function TransactionDialog({
 							/>
 						</div>
 
+						{/* Transfers never carry a category (see handleTypeChange), so
+						    the control is hidden rather than shown-but-ignored. */}
+						{formData.type !== "transfer" && (
 						<div className="space-y-2">
 							<Label htmlFor="tx-category">
 								Category{" "}
@@ -280,11 +297,7 @@ export function TransactionDialog({
 								</SelectTrigger>
 								<SelectContent>
 									{categories
-										.filter(
-											(c) =>
-												c.type === formData.type ||
-												formData.type === "transfer",
-										)
+										.filter((c) => c.type === formData.type)
 										.map((category) => (
 											<SelectItem key={category.id} value={category.id}>
 												<span className="flex items-center gap-2">
@@ -296,6 +309,7 @@ export function TransactionDialog({
 								</SelectContent>
 							</Select>
 						</div>
+						)}
 
 						<div className="space-y-2">
 							<Label htmlFor="tx-from-account">
@@ -392,36 +406,24 @@ export function TransactionDialog({
 										Automatically repeat this transaction
 									</p>
 								</div>
-								<button
-									type="button"
-									role="switch"
+								{/* Shared Switch primitive, not a hand-rolled role="switch"
+								    button: the custom one had no focus ring at all, so
+								    keyboard users got no visible focus indicator. */}
+								<Switch
 									id="recurring-toggle"
-									aria-checked={formData.is_recurring}
-									aria-label="Toggle recurring transaction"
-									onClick={() =>
+									checked={formData.is_recurring}
+									onCheckedChange={(checked) =>
 										setFormData((prev) => ({
 											...prev,
-											is_recurring: !prev.is_recurring,
+											is_recurring: checked,
 											// Keep the previously chosen frequency across
 											// off/on toggles; only default when empty.
 											recurring_frequency:
 												prev.recurring_frequency || "monthly",
 										}))
 									}
-									className={cn(
-										"relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-150",
-										formData.is_recurring ? "bg-primary" : "bg-muted",
-									)}
-								>
-									<span
-										className={cn(
-											"pointer-events-none block h-4 w-4 rounded-full bg-background shadow-sm transition-transform duration-150",
-											formData.is_recurring
-												? "translate-x-4"
-												: "translate-x-0.5",
-										)}
-									/>
-								</button>
+									className="cursor-pointer"
+								/>
 							</div>
 							{formData.is_recurring && (
 								<div className="space-y-2">
@@ -463,9 +465,14 @@ export function TransactionDialog({
 													recurring_end_date: e.target.value,
 												})
 											}
-											placeholder="No end date (repeats forever)"
+											aria-describedby="recurring-end-date-hint"
 										/>
-										<p className="text-xs text-muted-foreground">
+										{/* A `placeholder` on <input type="date"> is never rendered
+										    by browsers, so this hint is what the user actually sees. */}
+										<p
+											id="recurring-end-date-hint"
+											className="text-xs text-muted-foreground"
+										>
 											Leave empty to repeat indefinitely.
 										</p>
 									</div>
