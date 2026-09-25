@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { format, differenceInDays } from 'date-fns'
+import { differenceInDays } from 'date-fns'
 import {
     Plus,
     Target,
@@ -53,6 +53,8 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
+import { formatUserDate } from '@/lib/format-date'
+import { PageHeading } from '@/components/layout'
 import { toNumber } from '@/lib/number'
 import { cn } from '@/lib/utils'
 import type { Goal } from '@/types'
@@ -76,7 +78,7 @@ const goalColors = [
 
 export function Goals() {
     const { user } = useAuth()
-    const { formatCurrency } = usePreferences()
+    const { formatCurrency, preferences } = usePreferences()
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(false)
     const [goals, setGoals] = useState<Goal[]>([])
@@ -295,24 +297,22 @@ export function Goals() {
     if (error) {
         return (
             <div className="space-y-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Financial Goals</h1>
-                        <p className="text-sm sm:text-base text-muted-foreground">
-                            Track your savings goals and celebrate achievements
-                        </p>
-                    </div>
-                    <Button
-                        onClick={() => {
-                            resetForm()
-                            setIsDialogOpen(true)
-                        }}
-                        className="w-full sm:w-auto"
-                    >
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Goal
-                    </Button>
-                </div>
+                {/* Header */}
+                <PageHeading
+                    path="/goals"
+                    actions={
+                        <Button
+                            onClick={() => {
+                                resetForm()
+                                setIsDialogOpen(true)
+                            }}
+                            className="w-full sm:w-auto"
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            New Goal
+                        </Button>
+                    }
+                />
                 <ErrorState
                     title="Couldn't load your goals"
                     message="We couldn't reach your savings goals. Check your connection and try again."
@@ -325,28 +325,25 @@ export function Goals() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Financial Goals</h1>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                        Track your savings goals and celebrate achievements
-                    </p>
-                </div>
-                <Button
-                    onClick={() => {
-                        resetForm()
-                        setIsDialogOpen(true)
-                    }}
-                    className="w-full sm:w-auto"
-                >
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Goal
-                </Button>
-            </div>
+                <PageHeading
+                    path="/goals"
+                    actions={
+                        <Button
+                            onClick={() => {
+                                resetForm()
+                                setIsDialogOpen(true)
+                            }}
+                            className="w-full sm:w-auto"
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            New Goal
+                        </Button>
+                    }
+                />
 
             {/* Stats Cards */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                <div className="group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
                     <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Active Goals</span>
@@ -367,11 +364,11 @@ export function Goals() {
                     <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                <div className="group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
                     <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Completed</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-emerald-400">
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--success)]">
                             <Trophy className="h-3 w-3" />
                         </div>
                     </div>
@@ -380,19 +377,19 @@ export function Goals() {
                             {completedGoals}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-400">
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-[var(--success)]">
                         <span>Goals achieved</span>
                         <Trophy className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-xs text-muted-foreground/70">Congratulations!</p>
-                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-emerald-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[var(--success)] opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                <div className="group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
                     <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Total Saved</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-blue-400">
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--info)]">
                             <TrendingUp className="h-3 w-3" />
                         </div>
                     </div>
@@ -401,19 +398,19 @@ export function Goals() {
                             {formatCurrency(totalSaved)}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-blue-400">
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-[var(--info)]">
                         <span>Saved towards goals</span>
                         <TrendingUp className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-xs text-muted-foreground/70">Across all goals</p>
-                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-blue-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[var(--info)] opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+                <div className="group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
                     <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Overall Progress</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-purple-400">
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--info)]">
                             <Sparkles className="h-3 w-3" />
                         </div>
                     </div>
@@ -422,12 +419,12 @@ export function Goals() {
                             {totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0}%
                         </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-purple-400">
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-[var(--info)]">
                         <span>Towards all goals</span>
                         <Sparkles className="h-3.5 w-3.5" />
                     </div>
                     <p className="text-xs text-muted-foreground/70">Keep it up!</p>
-                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-purple-500 opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
+                    <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[var(--info)] opacity-10 blur-2xl transition-opacity group-hover:opacity-20" />
                 </div>
             </div>
 
@@ -471,13 +468,13 @@ export function Goals() {
                                 key={goal.id}
                                 style={{ animationDelay: `${i * 40}ms` }}
                                 className={cn(
-                                    'group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80 motion-safe:animate-fade-in-up',
-                                    isCompleted && 'ring-2 ring-green-500/50'
+                                    'group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80 motion-safe:animate-fade-in-up',
+                                    isCompleted && 'ring-2 ring-[var(--success)]/50'
                                 )}
                             >
                                 {isCompleted && (
                                     <div className="absolute right-3 top-3">
-                                        <Badge className="bg-green-500 text-white">
+                                        <Badge className="bg-[var(--success)] text-[var(--success-foreground)]">
                                             <Trophy className="mr-1 h-3 w-3" />
                                             Completed!
                                         </Badge>
@@ -505,16 +502,16 @@ export function Goals() {
                                                             daysRemaining < 0
                                                                 ? 'text-destructive'
                                                                 : daysRemaining <= 7
-                                                                    ? 'text-amber-500'
+                                                                    ? 'text-[var(--warning)]'
                                                                     : 'text-muted-foreground',
                                                         )}
                                                     >
                                                         <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
                                                         {daysRemaining < 0
-                                                            ? `Overdue · ${format(new Date(goal.deadline), 'MMM d, yyyy')}`
+                                                            ? `Overdue · ${formatUserDate(new Date(goal.deadline), preferences)}`
                                                             : daysRemaining <= 7
-                                                                ? `Due soon · ${daysRemaining === 0 ? 'today' : `${daysRemaining}d left`} · ${format(new Date(goal.deadline), 'MMM d, yyyy')}`
-                                                                : `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left · ${format(new Date(goal.deadline), 'MMM d, yyyy')}`}
+                                                                ? `Due soon · ${daysRemaining === 0 ? 'today' : `${daysRemaining}d left`} · ${formatUserDate(new Date(goal.deadline), preferences)}`
+                                                                : `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left · ${formatUserDate(new Date(goal.deadline), preferences)}`}
                                                     </p>
                                                 )}
                                             </div>
@@ -655,7 +652,7 @@ export function Goals() {
                             />
                             {formData.deadline &&
                              differenceInDays(new Date(formData.deadline), new Date()) < 0 && (
-                                <p className="text-xs font-medium text-amber-500">
+                                <p className="text-xs font-medium text-[var(--warning)]">
                                     This date is in the past — the goal will show as overdue.
                                 </p>
                             )}

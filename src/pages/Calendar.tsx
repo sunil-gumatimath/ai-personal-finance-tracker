@@ -17,6 +17,7 @@ import {
     ArrowUpRight,
     ArrowDownLeft,
     ArrowLeftRight,
+    Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,12 +30,15 @@ import {
     DialogDescription,
 } from '@/components/ui/dialog'
 import { ErrorState } from '@/components/system/ErrorState'
+import { PageHeading } from '@/components/layout'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { cn } from '@/lib/utils'
 import { parseTransactionDate } from '@/lib/date-utils'
 import { formatCompactCurrency, toNumber } from '@/lib/number'
+import { formatUserDate } from '@/lib/format-date'
+import { currencyLocales } from '@/types/preferences'
 import type { Transaction } from '@/types'
 
 /** Mirrors Reports — the API caps results; beyond this we'd silently truncate. */
@@ -43,10 +47,19 @@ const CALENDAR_TX_LIMIT = 1000
 export function Calendar() {
     const { user } = useAuth()
     const { formatCurrency, preferences } = usePreferences()
+    // Compact amounts are locale-sensitive (EUR groups as 1.234 in de-DE), so
+    // the locale has to be threaded through — omitting it fell back to en-US
+    // and made the same cell format differently above/below the sm breakpoint.
+    const locale = currencyLocales[preferences.currency] || 'en-US'
+    const formatDate = useCallback(
+        (date: Date) => formatUserDate(date, preferences),
+        [preferences],
+    )
     const [currentDate, setCurrentDate] = useState(new Date())
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(false)
+    const [truncated, setTruncated] = useState(false)
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
 
@@ -78,6 +91,9 @@ export function Calendar() {
             const endStr = formatDateStr(end)
             const filtered = rows.filter(t => String(t.date).split('T')[0] <= endStr)
             setTransactions(filtered)
+            // The API caps results, so a busy month could render partial data
+            // with no indication. Reports surfaces this; the calendar must too.
+            setTruncated(rows.length >= CALENDAR_TX_LIMIT)
         } catch (err) {
             console.error('Error fetching transactions:', err)
             // A silent failure used to render an empty-looking month.
@@ -168,41 +184,42 @@ export function Calendar() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Calendar</h1>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                        Visualize your income and expenses over time
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Previous month"
-                        onClick={prevMonth}
-                        className="h-11 w-11"
-                    >
-                        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                    {/* Announced when month navigation changes it */}
-                    <div className="min-w-[140px] text-center font-medium" aria-live="polite">
-                        {format(currentDate, 'MMMM yyyy')}
-                    </div>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Next month"
-                        onClick={nextMonth}
-                        className="h-11 w-11"
-                    >
-                        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                    <Button variant="secondary" onClick={resetToToday} className="ml-2 active:scale-[0.98] transition-transform duration-150 ease-out">
-                        Today
-                    </Button>
-                </div>
-            </div>
+            <PageHeading
+                    path="/calendar"
+                    actions={
+                        <>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                aria-label="Previous month"
+                                onClick={prevMonth}
+                                className="h-11 w-11"
+                            >
+                                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                            {/* Announced when month navigation changes it */}
+                            <div className="min-w-[140px] text-center font-medium" aria-live="polite">
+                                {format(currentDate, 'MMMM yyyy')}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                aria-label="Next month"
+                                onClick={nextMonth}
+                                className="h-11 w-11"
+                            >
+                                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={resetToToday}
+                                className="ml-2 active:scale-[0.98] transition-transform duration-150 ease-out"
+                            >
+                                Today
+                            </Button>
+                        </>
+                    }
+            />
 
             {error && (
                 <ErrorState
@@ -212,7 +229,15 @@ export function Calendar() {
                 />
             )}
 
-            <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-border hover:bg-card/80">
+            {!error && truncated && (
+                <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+                    <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Showing the {CALENDAR_TX_LIMIT.toLocaleString(locale)} most recent
+                    transactions — earlier days in this month may be incomplete.
+                </div>
+            )}
+
+            <div className="group surface surface-hover backdrop-blur-sm transition-all duration-300 hover:border-border hover:bg-card/80">
                 <div className="grid grid-cols-7 border-b bg-muted/50 text-center text-xs font-semibold leading-6 text-muted-foreground lg:text-sm">
                     <div className="py-2">Sun</div>
                     <div className="py-2">Mon</div>
@@ -233,7 +258,7 @@ export function Calendar() {
                                     ? {
                                           role: 'button' as const,
                                           tabIndex: 0,
-                                          'aria-label': `View transactions for ${format(day.date, 'MMMM d, yyyy')}`,
+                                          'aria-label': `View transactions for ${formatUserDate(day.date, preferences)}`,
                                           onClick: () => handleDayClick(day),
                                           onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
                                               if (e.key === 'Enter' || e.key === ' ') {
@@ -264,7 +289,7 @@ export function Calendar() {
                                         <ArrowDownLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {/* Compact below sm so wide amounts stop clipping */}
                                         <span className="sm:hidden tabular-nums">
-                                            {formatCompactCurrency(day.summary.income, preferences.currency)}
+                                            {formatCompactCurrency(day.summary.income, preferences.currency, locale)}
                                         </span>
                                         <span className="hidden sm:inline tabular-nums">
                                             {formatCurrency(day.summary.income)}
@@ -275,7 +300,7 @@ export function Calendar() {
                                     <div className="flex items-center gap-1 rounded bg-[var(--expense)]/10 px-1 py-0.5 text-[10px] text-[var(--expense)]">
                                         <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden="true" />
                                         <span className="sm:hidden tabular-nums">
-                                            {formatCompactCurrency(day.summary.expense, preferences.currency)}
+                                            {formatCompactCurrency(day.summary.expense, preferences.currency, locale)}
                                         </span>
                                         <span className="hidden sm:inline tabular-nums">
                                             {formatCurrency(day.summary.expense)}
@@ -293,7 +318,7 @@ export function Calendar() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Transactions for {selectedDate && format(selectedDate, 'MMM d, yyyy')}
+                            Transactions for {selectedDate && formatDate(selectedDate)}
                         </DialogTitle>
                         <DialogDescription>
                             {selectedDayData?.transactions.length || 0} transactions found

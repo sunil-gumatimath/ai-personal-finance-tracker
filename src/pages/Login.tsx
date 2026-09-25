@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { Logo } from '@/components/system/Logo'
+import { ThemeToggle } from '@/components/system/theme-toggle'
 
 type CredentialField = 'email' | 'password'
 
@@ -70,7 +71,13 @@ export function Login() {
             : undefined
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+        <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+            {/* Appearance control on the auth screens too — ThemeToggle only lived
+                in the authenticated header, so a user stuck on a dark-mode login
+                page had no way to change it until after signing in. */}
+            <div className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))]">
+                <ThemeToggle />
+            </div>
             <div className="w-full max-w-md space-y-8">
                 {/* Logo */}
                 <div className="flex flex-col items-center">
@@ -196,7 +203,8 @@ export function Login() {
                 {/* Demo Note */}
                 {import.meta.env.VITE_DEMO_MODE === 'true' && (
                     <p className="text-center text-sm text-muted-foreground">
-                        Running in demo mode? Data persistence requires database setup.
+                        Demo mode is on. Your data is stored in memory and will be
+                        lost when the server restarts.
                     </p>
                 )}
             </div>

@@ -133,6 +133,31 @@ export const ROUTE_TITLES: Record<string, string> = {
 	"/settings": "Settings",
 };
 
+/**
+ * Per-route page subtitle. Kept beside ROUTE_TITLES so the heading block
+ * (H1 + one-line description) can never drift between routes — the same
+ * vocabulary rule the sidebar, breadcrumbs and document titles follow.
+ */
+export const ROUTE_SUBTITLES: Record<string, string> = {
+	"/": "Welcome back! Here's your financial overview.",
+	"/digest": "Data-driven synthesis of your spending, budgets, goals, and multi-period progress.",
+	"/transactions": "Manage and track all your financial transactions",
+	"/reports": "Monthly and yearly financial summaries, exportable to PDF and CSV",
+	"/calendar": "Visualize your income and expenses over time",
+	"/budgets": "Set spending limits and track your progress",
+	"/goals": "Track your savings goals and celebrate achievements",
+	"/debts": "Track and accelerate your debt-free journey.",
+	"/accounts": "Manage your financial accounts",
+	"/categories": "Organise your income and spending categories",
+	"/system-logs":
+		"Track and audit every change across your finances — transactions, accounts, sign-ins, recurring runs, and system errors.",
+	"/settings": "Manage your account and preferences",
+};
+
+// NOTE: the shared page heading component lives in
+// @/components/layout/PageHeading — it consumes ROUTE_TITLES/ROUTE_SUBTITLES so
+// every route renders an identical H1 block.
+
 /** Brand suffix for document titles, e.g. "Dashboard · FinanceTrack". */
 export const APP_BRAND = "FinanceTrack";
 

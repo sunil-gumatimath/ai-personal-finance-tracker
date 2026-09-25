@@ -15,16 +15,17 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
     { value: "system", label: "System", icon: Monitor },
 ]
 
-export const COLOR_THEMES = THEME_OPTIONS
-    .filter(({ value }) => value !== "system")
-    .map(({ value }) => value)
-
 export interface AccentOption {
     value: AccentName
     label: string
     icon: LucideIcon
 }
 
+/**
+ * The persisted `value` is an internal id, not a colour name — `amber` is
+ * labelled "Sunset" in the UI. Read the label from here rather than inferring a
+ * colour name from the value.
+ */
 export const ACCENT_OPTIONS: readonly AccentOption[] = [
     { value: "default", label: "Default", icon: Palette },
     { value: "emerald", label: "Emerald", icon: Leaf },

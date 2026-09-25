@@ -14,8 +14,6 @@ import {
   ArrowDownRight,
   Banknote,
   LineChart,
-  Eye,
-  EyeOff,
   Sparkles,
   Search,
   Filter,
@@ -56,6 +54,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/system/ErrorState";
+import { BalanceVisibilityToggle } from "@/components/system/BalanceVisibilityToggle";
+import { PageHeading } from "@/components/layout";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { toNumber } from "@/lib/number";
@@ -116,12 +116,13 @@ const SORT_OPTIONS: ReadonlyArray<{ value: SortOption; label: string }> = [
 export function Accounts() {
   const { user } = useAuth();
   const { formatCurrency, preferences } = usePreferences();
+// Single app-wide source of truth for balance masking (persisted + synced).
+const showBalances = !preferences.hideBalances;
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [showBalances, setShowBalances] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Search/filter/sort live in the URL so views are shareable/refreshable.
@@ -372,51 +373,35 @@ export function Accounts() {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header with Quick Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Accounts
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Manage your financial accounts · {accounts.length}{" "}
-            {accounts.length === 1 ? "account" : "accounts"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowBalances(!showBalances)}
-            aria-label={showBalances ? "Hide balances" : "Show balances"}
-          >
-            {showBalances ? (
-              <Eye className="h-5 w-5" />
-            ) : (
-              <EyeOff className="h-5 w-5" />
-            )}
-          </Button>
-          <Button
-            onClick={() => {
-              resetForm();
-              setIsDialogOpen(true);
-            }}
-            className="w-full sm:w-auto"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Account
-          </Button>
-        </div>
-      </div>
+      <PageHeading
+          path="/accounts"
+          subtitle={`Manage your financial accounts · ${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}`}
+          actions={
+            <>
+              <BalanceVisibilityToggle />
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsDialogOpen(true);
+                }}
+                className="w-full sm:w-auto"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Account
+              </Button>
+            </>
+          }
+      />
 
       {/* Financial Overview Cards */}
       <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-xl shadow-2xl sm:col-span-2 group border-primary/20">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
+        <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm shadow-sm sm:col-span-2 group border-primary/20">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/12 to-transparent pointer-events-none" />
           <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-[80px] group-hover:bg-primary/20 transition-colors duration-300" />
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-400" />
+                <Sparkles className="h-4 w-4 text-[var(--warning)]" />
                 <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
                   Total Net Worth
                 </CardTitle>
@@ -624,7 +609,7 @@ export function Accounts() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 opacity-60 hover:opacity-100 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                          className="h-8 w-8 opacity-60 hover:opacity-100 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={() => initiateDelete(account)}
                           title="Delete account"
                           aria-label={`Delete ${account.name}`}
@@ -728,7 +713,7 @@ export function Accounts() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
                           onClick={() => initiateDelete(account)}
                           title="Delete account"
                           aria-label={`Delete ${account.name}`}

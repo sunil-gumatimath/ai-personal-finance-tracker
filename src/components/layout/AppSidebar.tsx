@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/system/Logo";
 import { getInitials } from "@/lib/initials";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Canonical short labels — mirrored by ROUTE_TITLES (src/pages/index.ts)
 // so sidebar, breadcrumbs and document titles always agree.
@@ -65,11 +66,12 @@ const NAV_GROUPS = [
 export function AppSidebar() {
 	const location = useLocation();
 	const { user } = useAuth();
+	const isMobile = useIsMobile();
 
 	return (
 		<Sidebar className="border-r border-border/50">
-			<SidebarHeader className="border-b border-border/50 p-4">
-				<div className="px-2">
+			<SidebarHeader className="border-b border-border/50">
+				<div className="px-2 py-1">
 					<Logo size="md" showText={true} />
 				</div>
 			</SidebarHeader>
@@ -100,32 +102,33 @@ export function AppSidebar() {
 			</SidebarContent>
 
 			{/* Slim account entry point — full identity + sign-out controls live
-			    in the header user menu; this just links to settings. */}
-			<SidebarFooter className="border-t border-border/50 p-2">
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							asChild
-							tooltip="Account settings"
-							isActive={location.pathname === "/settings"}
-						>
-							<Link to="/settings" aria-label="Open account settings">
-								<Avatar className="size-6">
-									<AvatarImage
-										src={user?.user_metadata?.avatar_url || undefined}
-									/>
-									<AvatarFallback className="bg-primary/10 text-primary text-[10px]">
-										{getInitials(
-											user?.user_metadata?.full_name || user?.email,
-										)}
-									</AvatarFallback>
-								</Avatar>
-								<span>Account settings</span>
-							</Link>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
-			</SidebarFooter>
+			    in the header user menu; this just links to settings. It is only
+			    rendered on mobile, where the "Manage" group's Settings row lives
+			    inside the same off-canvas sheet and would otherwise duplicate
+			    this entry (and light up two active rows at once). */}
+			{isMobile && (
+				<SidebarFooter className="border-t border-border/50 p-2 md:hidden">
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton asChild isActive={false}>
+								<Link to="/settings" aria-label="Open account settings">
+									<Avatar className="size-6">
+										<AvatarImage
+											src={user?.user_metadata?.avatar_url || undefined}
+										/>
+										<AvatarFallback className="bg-primary/10 text-primary text-[10px]">
+											{getInitials(
+												user?.user_metadata?.full_name || user?.email,
+											)}
+										</AvatarFallback>
+									</Avatar>
+									<span>Account settings</span>
+								</Link>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarFooter>
+			)}
 		</Sidebar>
 	);
 }

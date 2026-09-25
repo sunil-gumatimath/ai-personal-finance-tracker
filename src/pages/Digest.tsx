@@ -27,6 +27,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client";
 import { ApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
+import { usePreferences } from "@/hooks/usePreferences";
+import { formatUserDateLong } from "@/lib/format-date";
+import { PageHeading } from "@/components/layout";
+import { ErrorState } from "@/components/system/ErrorState";
 import type { AiDigest } from "@/types";
 
 export function Digest() {
@@ -38,8 +42,14 @@ export function Digest() {
 	const [copied, setCopied] = useState(false);
 	const [period, setPeriod] = useState<"week" | "month" | "year" | "custom">("week");
 	const [customDays, setCustomDays] = useState<number>(14);
+	const { preferences } = usePreferences();
+	// A failed load used to be swallowed into `console.error`, so the page
+	// rendered "no digest generated yet" — indistinguishable from genuinely
+	// having no digest. Surface it as a retryable error state instead.
+	const [loadError, setLoadError] = useState<string | null>(null);
 
 	const loadDigests = useCallback(async () => {
+		setLoadError(null);
 		try {
 			const res = await api.ai.digest.get();
 			setDigest(res.digest);
@@ -50,6 +60,11 @@ export function Digest() {
 			}
 		} catch (error) {
 			console.error("Failed to load digest history:", error);
+			setLoadError(
+				error instanceof ApiError && error.message
+					? error.message
+					: "We couldn't reach your saved digests. Check your connection and try again.",
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -162,49 +177,73 @@ export function Digest() {
 	return (
 		<div className="space-y-6">
 			{/* Page Header */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<div className="flex items-center gap-2">
-						<h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-							Financial AI Digest
-						</h1>
-						<Badge variant="outline" className="border-primary/30 text-primary text-xs">
-							<Sparkles className="mr-1 h-3 w-3" />
-							AI Report
-						</Badge>
-					</div>
-					<p className="text-sm text-muted-foreground mt-0.5">
-						Data-driven synthesis of your spending, budgets, goals, and multi-period progress.
-					</p>
-				</div>
+			<PageHeading
+				path="/digest"
+				actions={
+					<>
+						{activeDigest && (
+							<>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={handleCopy}
+									className="h-9"
+								>
+									{copied ? (
+										<Check className="mr-1.5 h-4 w-4 text-[var(--success)]" />
+									) : (
+										<Copy className="mr-1.5 h-4 w-4" />
+									)}
+									{copied ? "Copied" : "Copy"}
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={handleAskAi}
+									className="h-9"
+								>
+									<MessageSquare className="mr-1.5 h-4 w-4 text-primary" />
+									Ask AI
+								</Button>
+							</>
+						)}
+					</>
+				}
+			/>
+			<div className="sr-only">
+				<Badge variant="outline" className="border-primary/30 text-primary text-xs">
+					<Sparkles className="mr-1 h-3 w-3" />
+					AI Report
+				</Badge>
+			</div>
 
-				<div className="flex flex-wrap items-center gap-2">
-					{activeDigest && (
-						<>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={handleCopy}
-								className="h-9"
-							>
-								{copied ? (
-									<Check className="mr-1.5 h-4 w-4 text-emerald-500" />
-								) : (
-									<Copy className="mr-1.5 h-4 w-4" />
-								)}
-								{copied ? "Copied" : "Copy"}
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={handleAskAi}
-								className="h-9"
-							>
-								<MessageSquare className="mr-1.5 h-4 w-4 text-primary" />
-								Ask AI
-							</Button>
-						</>
-					)}
+			<div className="flex flex-wrap items-center gap-2">
+				{activeDigest && (
+					<>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={handleCopy}
+							className="h-9"
+						>
+							{copied ? (
+								<Check className="mr-1.5 h-4 w-4 text-[var(--success)]" />
+							) : (
+								<Copy className="mr-1.5 h-4 w-4" />
+							)}
+							{copied ? "Copied" : "Copy"}
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={handleAskAi}
+							className="h-9"
+						>
+							<MessageSquare className="mr-1.5 h-4 w-4 text-primary" />
+							Ask AI
+						</Button>
+					</>
+				)}
 					<Button
 						onClick={generate}
 						disabled={generating}
@@ -217,10 +256,22 @@ export function Digest() {
 								generating && "motion-safe:animate-spin",
 							)}
 						/>
-						{generating ? "Synthesizing…" : activeDigest ? "Regenerate" : "Generate Digest"}
-					</Button>
-				</div>
+					{generating ? "Synthesizing…" : activeDigest ? "Regenerate" : "Generate Digest"}
+				</Button>
 			</div>
+
+			{/* Load failure — a missing digest and an unreachable API look identical
+			    otherwise, which is how a broken fetch became a false "no digest yet". */}
+			{loadError && (
+				<ErrorState
+					title="Couldn't load your digests"
+					message={loadError}
+					onRetry={() => {
+						setLoading(true);
+						void loadDigests();
+					}}
+				/>
+			)}
 
 			{/* Timeframe Scope Selector */}
 			<Card className="border-border/50 bg-card/40 backdrop-blur-sm p-4">
@@ -348,7 +399,8 @@ export function Digest() {
 											<CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
 											Week of {activeDigest.week_start}
 											<span className="text-muted-foreground/40">•</span>
-											Generated {format(new Date(activeDigest.created_at), "MMM d, yyyy 'at' h:mm a")}
+											Generated {formatUserDateLong(new Date(activeDigest.created_at), preferences)}{" "}
+											{format(new Date(activeDigest.created_at), "'at' h:mm a")}
 										</CardDescription>
 									)}
 								</div>
@@ -421,7 +473,7 @@ export function Digest() {
 												</div>
 												<span className="text-[11px] text-muted-foreground flex items-center gap-1">
 													<CalendarIcon className="h-3 w-3" />
-													{format(new Date(item.created_at), "MMM d, yyyy")}
+													{formatUserDateLong(new Date(item.created_at), preferences)}
 												</span>
 											</button>
 										);

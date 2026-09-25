@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, Link } from 'react-router-dom'
-import { ChevronRight, LogOut, Settings, UserRound } from 'lucide-react'
+import { ChevronRight, LogOut, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -125,13 +125,7 @@ export function Header() {
                         <DropdownMenuItem asChild>
                             <Link to="/settings">
                                 <UserRound className="mr-2 h-4 w-4" />
-                                <span>Profile</span>
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <Link to="/settings">
-                                <Settings className="mr-2 h-4 w-4" />
-                                <span>Settings</span>
+                                <span>Profile &amp; settings</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />

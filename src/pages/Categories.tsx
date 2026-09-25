@@ -51,6 +51,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/system/ErrorState'
+import { PageHeading } from '@/components/layout'
 import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { ApiError } from '@/lib/errors'
@@ -266,25 +267,22 @@ export function Categories() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Categories</h1>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                        Organize your income and expenses by categories
-                    </p>
-                </div>
-                <Button
-                    onClick={() => {
-                        resetForm()
-                        setIsDialogOpen(true)
-                    }}
-                    className="w-full sm:w-auto cursor-pointer"
-                >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Category
-                </Button>
-            </div>
+      {/* Header */}
+      <PageHeading
+        path="/categories"
+        actions={
+          <Button
+            onClick={() => {
+              resetForm()
+              setIsDialogOpen(true)
+            }}
+            className="w-full sm:w-auto cursor-pointer"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Category
+          </Button>
+        }
+      />
 
             {/* Metrics Overview */}
             <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
@@ -629,7 +627,7 @@ function CategoryTileColumn({
 }) {
     const { Icon, chipClass, blobClass } = TONE_STYLES[tone]
     return (
-        <section className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border/80 hover:bg-card/60">
+        <section className="group surface surface-hover backdrop-blur-sm p-6 transition-[border-color,background-color] duration-200 hover:border-border/80 hover:bg-card/60">
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent pointer-events-none" />
             <div className="relative mb-6 flex items-center gap-2">
                 <div className={cn('rounded-xl p-2', chipClass)}>

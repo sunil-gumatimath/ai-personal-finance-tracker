@@ -45,9 +45,11 @@ import { api } from "@/lib/api-client";
 import { downloadTransactionsCsv } from "@/lib/transaction-csv";
 import { parseTransactionDate } from "@/lib/date-utils";
 import { formatCompactCurrency, toNumber } from "@/lib/number";
+import { formatUserDate, formatUserDateLong } from "@/lib/format-date";
 import { currencyLocales } from "@/types/preferences";
 import type { Account, Transaction } from "@/types";
 import { cn } from "@/lib/utils";
+import { PageHeading } from "@/components/layout";
 
 interface CategorySpend {
 	category: string;
@@ -276,7 +278,12 @@ export function Reports() {
 	}, [transactions, last12Months]);
 
 	const periodTransactionsSorted = useMemo(
-		() => [...periodTransactions].sort((a, b) => b.date.localeCompare(a.date)),
+		() =>
+			[...periodTransactions].sort(
+				(a, b) =>
+					parseTransactionDate(b.date).getTime() -
+					parseTransactionDate(a.date).getTime(),
+			),
 		[periodTransactions],
 	);
 
@@ -321,7 +328,7 @@ export function Reports() {
 			doc.setFontSize(10);
 			doc.setTextColor(100);
 			doc.text(
-				`${periodLabel} — generated ${format(new Date(), "MMM d, yyyy HH:mm")}`,
+				`${periodLabel} — generated ${formatUserDateLong(new Date(), preferences)} ${format(new Date(), "HH:mm")}`,
 				14,
 				25,
 			);
@@ -412,9 +419,7 @@ export function Reports() {
 	if (error) {
 		return (
 			<div className="space-y-6">
-				<h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-					Reports
-				</h1>
+				<PageHeading path="/reports" />
 				<ErrorState
 					title="Couldn't load your report"
 					message="We couldn't reach your transactions and accounts. Check your connection and try again."
@@ -427,35 +432,30 @@ export function Reports() {
 	return (
 		<div className="space-y-6">
 			{/* Header */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-						Reports
-					</h1>
-					<p className="text-sm sm:text-base text-muted-foreground">
-						Monthly and yearly financial summaries, exportable to PDF and CSV
-					</p>
-				</div>
-				<div className="flex gap-2">
-					<Button
-						variant="outline"
-						onClick={() => downloadTransactionsCsv(periodTransactionsSorted)}
-						className="flex-1 sm:flex-none"
-					>
-						<Download className="mr-2 h-4 w-4" />
-						<span className="hidden sm:inline">Export CSV</span>
-						<span className="sm:hidden">CSV</span>
-					</Button>
-					<Button
-						onClick={exportPdf}
-						disabled={exporting}
-						className="flex-1 sm:flex-none"
-					>
-						<FileText className="mr-2 h-4 w-4" />
-						{exporting ? "Exporting…" : "Export PDF"}
-					</Button>
-				</div>
-			</div>
+			<PageHeading
+				path="/reports"
+				actions={
+					<>
+						<Button
+							variant="outline"
+							onClick={() => downloadTransactionsCsv(periodTransactionsSorted)}
+							className="flex-1 sm:flex-none"
+						>
+							<Download className="mr-2 h-4 w-4" />
+							<span className="hidden sm:inline">Export CSV</span>
+							<span className="sm:hidden">CSV</span>
+						</Button>
+						<Button
+							onClick={exportPdf}
+							disabled={exporting}
+							className="flex-1 sm:flex-none"
+						>
+							<FileText className="mr-2 h-4 w-4" />
+							{exporting ? "Exporting…" : "Export PDF"}
+						</Button>
+					</>
+				}
+			/>
 
 			{/* Truncation notice — the API caps the fetch size */}
 			{truncated && (
@@ -466,8 +466,8 @@ export function Reports() {
 			)}
 
 			{/* Period selector */}
-			<div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 transition-all duration-300 hover:border-border hover:bg-card/80">
-				<div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+			<div className="group surface surface-hover backdrop-blur-sm p-6 transition-all duration-300 hover:border-border hover:bg-card/80">
+				<div className="surface-sheen absolute inset-0 pointer-events-none" />
 				<div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div className="flex items-center gap-2">
 						<Button
@@ -573,7 +573,7 @@ export function Reports() {
 								savingsRate >= 20
 									? "text-[var(--income)]"
 									: savingsRate >= 0
-										? "text-amber-500"
+										? "text-[var(--warning)]"
 										: "text-[var(--expense)]",
 							)}
 						>
@@ -799,7 +799,7 @@ export function Reports() {
 												{t.description || t.category?.name || "Transaction"}
 											</p>
 											<p className="text-xs text-muted-foreground">
-												{format(parseTransactionDate(t.date), "MMM d, yyyy")} ·{" "}
+												{formatUserDate(parseTransactionDate(t.date), preferences)} ·{" "}
 											{t.category?.name || t.type}
 											</p>
 										</div>

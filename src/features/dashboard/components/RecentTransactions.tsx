@@ -1,4 +1,3 @@
-import { format } from 'date-fns'
 import { ArrowDownLeft, ArrowUpRight, ArrowRight, Receipt, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -6,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { usePreferences } from '@/hooks/usePreferences'
 import { parseTransactionDate } from '@/lib/date-utils'
+import { formatUserDate } from '@/lib/format-date'
 import { toNumber } from '@/lib/number'
 import type { Transaction } from '@/types'
 import { Link } from 'react-router-dom'
@@ -22,7 +22,7 @@ interface RecentTransactionsProps {
 const MAX_ROWS = 10
 
 export function RecentTransactions({ transactions, anomalies = [], isLoading = false }: RecentTransactionsProps) {
-    const { formatCurrency } = usePreferences()
+    const { formatCurrency, preferences } = usePreferences()
 
     // Loading skeleton mirrors the loaded rows
     if (isLoading) {
@@ -164,7 +164,7 @@ export function RecentTransactions({ transactions, anomalies = [], isLoading = f
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground truncate">
-                                        {format(parseTransactionDate(transaction.date), 'MMM d, yyyy')}
+                                        {formatUserDate(parseTransactionDate(transaction.date), preferences)}
                                     </p>
                                 </div>
                             </div>

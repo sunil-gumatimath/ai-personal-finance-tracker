@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useDebts } from "@/hooks/useDebts";
+import { PageHeading } from "@/components/layout";
+import { ErrorState } from "@/components/system/ErrorState";
 import {
   PayoffProgressRing,
   DebtCard,
@@ -26,6 +28,8 @@ const NO_PAYMENTS: DebtPayment[] = [];
 export function Debts() {
   const {
     loading,
+    loadError,
+    retryLoad,
     debts,
     paymentsByDebt,
     loadingPaymentsId,
@@ -89,41 +93,49 @@ export function Debts() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Debt Payoff</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Track and accelerate your debt-free journey.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {activeDebts.length > 1 && (
-            <Button
-              variant="outline"
-              onClick={() => setIsStrategyDialogOpen(true)}
-              className="gap-2"
-            >
-              <Calculator className="h-4 w-4" />
-              Payoff Planner
-            </Button>
-          )}
-          <Button
-            onClick={() => {
-              resetForm();
-              setIsDialogOpen(true);
-            }}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Debt
-          </Button>
-        </div>
-      </div>
+			{/* Header */}
+			<PageHeading
+				path="/debts"
+				actions={
+					<>
+						{activeDebts.length > 1 && (
+							<Button
+								variant="outline"
+								onClick={() => setIsStrategyDialogOpen(true)}
+								className="gap-2"
+							>
+								<Calculator className="h-4 w-4" />
+								Payoff Planner
+							</Button>
+						)}
+						<Button
+							onClick={() => {
+								resetForm();
+								setIsDialogOpen(true);
+							}}
+							className="gap-2"
+						>
+							<Plus className="h-4 w-4" />
+							Add Debt
+						</Button>
+					</>
+				}
+			/>
+
+			{/* A failed fetch must never render as "you have no debts". */}
+			{loadError && (
+				<ErrorState
+					title="Couldn't load your debts"
+					message={loadError}
+					onRetry={() => {
+						void retryLoad();
+					}}
+				/>
+			)}
 
       {debts.length === 0 ? (
         <div className="group relative overflow-hidden rounded-xl border-2 border-dashed border-border/50 bg-card/50 backdrop-blur-sm">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+          <div className="surface-sheen absolute inset-0 pointer-events-none" />
           <div className="relative flex flex-col items-center justify-center py-20 text-center">
             <div className="relative mb-6">
               <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
@@ -151,7 +163,7 @@ export function Debts() {
         <>
           {/* Payoff Progress Dashboard */}
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-            <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80 col-span-2 flex items-center justify-between gap-4">
+            <div className="group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80 col-span-2 flex items-center justify-between gap-4">
               <div className="space-y-2 flex-1">
                 <span className="text-sm font-medium text-muted-foreground">Total Debt Remaining</span>
                 <div className="flex items-baseline gap-2">
@@ -173,7 +185,7 @@ export function Debts() {
               <PayoffProgressRing percentage={payoffProgress} />
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+            <div className="group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
               <span className="text-sm font-medium text-muted-foreground">Monthly Minimums</span>
               <div className="relative mb-2 mt-1">
                 <span className="text-2xl font-bold tracking-tight text-foreground">
@@ -183,7 +195,7 @@ export function Debts() {
               <p className="text-xs text-muted-foreground">Required base payment pool</p>
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
+            <div className="group surface surface-hover backdrop-blur-sm p-5 transition-all duration-300 hover:border-border hover:bg-card/80">
               <span className="text-sm font-medium text-muted-foreground">Weighted Average APR</span>
               <div className="relative mb-2 mt-1">
                 <span className="text-2xl font-bold tracking-tight text-foreground">
@@ -242,7 +254,7 @@ export function Debts() {
             <TabsContent value="active" className="space-y-4 outline-none">
               {activeDebts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center bg-card/20 rounded-xl border border-dashed">
-                  <CheckCircle2 className="h-10 w-10 text-green-500 mb-2" />
+                  <CheckCircle2 className="h-10 w-10 text-[var(--success)] mb-2" />
                   <h3 className="text-lg font-bold text-foreground">You are debt-free!</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     All listed debts are paid off. Incredible job!

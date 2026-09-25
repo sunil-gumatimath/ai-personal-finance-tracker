@@ -32,6 +32,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/system/ErrorState'
+import { PageHeading } from '@/components/layout'
 import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { ApiError } from '@/lib/errors'
@@ -231,30 +232,27 @@ export function Budgets() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Budgets</h1>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                        Set spending limits and track your progress
-                    </p>
-                </div>
-                <Button
-                    onClick={() => {
-                        resetForm()
-                        setIsDialogOpen(true)
-                    }}
-                    className="w-full sm:w-auto"
-                >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Budget
-                </Button>
-            </div>
+      {/* Header */}
+      <PageHeading
+        path="/budgets"
+        actions={
+          <Button
+            onClick={() => {
+              resetForm()
+              setIsDialogOpen(true)
+            }}
+            className="w-full sm:w-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Budget
+          </Button>
+        }
+      />
 
             {/* Overview Cards */}
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                <div className="group surface surface-hover backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
+                    <div className="surface-sheen absolute inset-0 pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Total Budget</span>
                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-primary">
@@ -286,8 +284,8 @@ export function Budgets() {
                     <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                <div className="group surface surface-hover backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
+                    <div className="surface-sheen absolute inset-0 pointer-events-none" />
                     <div className="relative flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-muted-foreground">Total Spent</span>
                         <div
@@ -296,7 +294,7 @@ export function Budgets() {
                                 totalPct >= 100
                                     ? "bg-[var(--expense)]/10 text-[var(--expense)]"
                                     : totalPct >= 80
-                                        ? "bg-amber-500/10 text-amber-500"
+                                        ? "bg-[var(--warning)]/10 text-[var(--warning)]"
                                         : "bg-[var(--income)]/10 text-[var(--income)]",
                             )}
                         >
@@ -314,7 +312,7 @@ export function Budgets() {
                             totalPct >= 100
                                 ? "text-[var(--expense)]"
                                 : totalPct >= 80
-                                    ? "text-amber-500"
+                                    ? "text-[var(--warning)]"
                                     : "text-[var(--income)]",
                         )}
                     >
@@ -328,8 +326,8 @@ export function Budgets() {
                     <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[var(--expense)] opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
                 </div>
 
-                <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                <div className="group surface surface-hover backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
+                    <div className="surface-sheen absolute inset-0 pointer-events-none" />
                     {(() => {
                         const remaining = totalBudget - totalSpent
                         const isOver = remaining < 0
@@ -391,7 +389,7 @@ export function Budgets() {
             {/* Budget Cards */}
             {budgets.length === 0 ? (
                 <div className="group relative overflow-hidden rounded-xl border-2 border-dashed border-border/50 bg-card/50 backdrop-blur-sm">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    <div className="surface-sheen absolute inset-0 pointer-events-none" />
                     <div className="relative flex flex-col items-center justify-center py-16 text-center">
                         <div className="relative mb-6">
                             <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
@@ -431,8 +429,8 @@ export function Budgets() {
                         const progressColor = getProgressColor(spent, limit)
 
                         return (
-                            <div key={budget.id} className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                            <div key={budget.id} className="group surface surface-hover backdrop-blur-sm p-5 transition-[border-color,background-color] duration-200 hover:border-border hover:bg-card/80">
+                                <div className="surface-sheen absolute inset-0 pointer-events-none" />
                                 <div className="relative space-y-4">
                                     <div className="flex items-center justify-between gap-2">
                                         <h3 className="flex min-w-0 items-center gap-2 text-base font-bold tracking-tight">
@@ -451,7 +449,7 @@ export function Budgets() {
                                             {isApproaching && (
                                                 <Badge
                                                     variant="outline"
-                                                    className="border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                                    className="border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--warning)]"
                                                 >
                                                     Approaching
                                                 </Badge>

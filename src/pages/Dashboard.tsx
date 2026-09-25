@@ -26,6 +26,7 @@ import { useAIInsights, type Insight } from "@/hooks/useAIInsights";
 import { useFinancialHealth } from "@/hooks/useFinancialHealth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/system/ErrorState";
+import { PageHeading } from "@/components/layout";
 
 // Extended stats to include last month for comparisons.
 // Deltas are `null` whenever there is no honest baseline (last month was 0),
@@ -76,7 +77,7 @@ function StatCardSkeleton() {
 
 export function Dashboard() {
 	const { user } = useAuth();
-	const { formatCurrency } = usePreferences();
+	const { formatCurrency, preferences } = usePreferences();
 	const [stats, setStats] = useState<ExtendedDashboardStats>(EMPTY_STATS);
 	const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
 		[],
@@ -414,23 +415,21 @@ export function Dashboard() {
 	return (
 		<div className="space-y-6">
 			{/* Header with Quick Actions */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between motion-safe:animate-fade-in-up">
-				<div>
-					<h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text">
-						Dashboard
-					</h1>
-					<p className="text-sm sm:text-base text-muted-foreground">
-						Welcome back! Here's your financial overview.
-					</p>
-				</div>
-				<div className="flex gap-2">
-					<Button asChild className="w-full sm:w-auto font-semibold active:scale-[0.98]">
-						<Link to="/transactions?action=new">
-							<Plus className="mr-2 h-4 w-4" />
-							Add Transaction
-						</Link>
-					</Button>
-				</div>
+			<div className="motion-safe:animate-fade-in-up">
+				<PageHeading
+					path="/"
+					actions={
+						<Button
+							asChild
+							className="w-full sm:w-auto font-semibold active:scale-[0.98]"
+						>
+							<Link to="/transactions?action=new">
+								<Plus className="mr-2 h-4 w-4" />
+								Add Transaction
+							</Link>
+						</Button>
+					}
+				/>
 			</div>
 
 			{/* Stats Cards sit directly under the header */}
@@ -443,7 +442,9 @@ export function Dashboard() {
 							title="Total Balance"
 							value={formatCurrency(stats.totalBalance)}
 							trendDescription={
-								stats.totalBalance >= 0 ? "Net worth positive" : "Building up"
+								stats.totalBalance >= 0
+									? "Net worth positive"
+									: "Net worth negative"
 							}
 							subtitle="Across all accounts"
 							changeType={stats.totalBalance >= 0 ? "positive" : "neutral"}
@@ -583,6 +584,7 @@ export function Dashboard() {
 							dismissInsight={dismissInsight}
 							error={insightsError}
 							onRetry={retryInsights}
+							aiConfigured={preferences.kilocodeApiKeyConfigured}
 						/>
 					</div>
 				</>
