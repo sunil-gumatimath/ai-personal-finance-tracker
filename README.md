@@ -26,16 +26,17 @@ A premium, AI-powered personal finance management platform for tracking transact
 ### Core Financial Management
 
 - Transaction engine for income, expenses, and internal transfers.
-- **Sortable, paginated transaction history**: sort by date, amount, description, or category, page through results with an adjustable page size, and share filtered views — search and type filters persist in the URL.
+- **Sortable, paginated transaction history**: sort by date, amount, description, or category, page through results with an adjustable page size, and share filtered views — search and type filters persist in the URL. Pagination is client-side over the fetched history; the API caps a single fetch at 1,000 rows and reports `total`/`truncated` so an incomplete view is labelled rather than silently presented as complete.
 - **Recurring transaction automation**: recurring templates with frequency, optional end date, and a server-computed next-due date. A Vercel Cron job (or the in-app **Process Recurring** button) materializes occurrences automatically — each one appears as a normal transaction linked to its template.
 - **Natural-language quick entry**: type *"paid $45 for groceries yesterday"* on the Transactions page and the AI extracts the fields into the add-transaction form for review.
 - **Reports page with PDF/CSV export**: month or trailing-12-month summaries — income vs. expenses, savings rate, category breakdowns, account balances, and transactions — downloadable as a formatted PDF or CSV.
 - **Weekly AI digest**: a generated summary of the week (spending, budgets, goals, debts) on the dedicated **Digest** page, with week/month/year/custom periods, one-click (re)generation, an archive of past digests, and an "Ask AI" drill-in.
-- **Hide balances**: a single app-wide privacy switch (Settings → Preferences → Privacy) that masks every monetary figure and persists across devices and navigation.
+- **Hide balances**: a single app-wide privacy switch (Settings → Preferences → Privacy) that masks every monetary figure — including chart axes and compact calendar cells — and persists across devices and navigation. The mask is applied inside the currency formatters themselves, so a new surface cannot bypass it.
 - Recurring transaction metadata and CSV export.
 - Category-based budgets with visual threshold states.
 - Savings goals with contribution tracking.
-- Debt and loan management with payment history, interest/principal breakdowns, payoff projections, and an **Interactive Payoff Planner** that uses a slider to simulate extra monthly payments, charts payoff balance projections over time, and compares Snowball vs. Avalanche strategy outcomes (time and interest saved).
+- Debt and loan management with payment history, interest/principal breakdowns, payoff projections, and an **Interactive Payoff Planner** that uses a slider to simulate extra monthly payments, charts payoff balance projections over time, and compares Snowball vs. Avalanche strategy outcomes (time and interest saved). When a payment never outruns the interest, every strategy reports "never pays off" rather than fabricating a 30-year schedule.
+- **Debt balances are trigger-derived.** Since migration 006, `debts.current_balance` is recomputed from `SUM(debt_payments.principal_amount)`, so it must be settled through the payments table. A debt with a seeded or imported opening balance and no payment rows will have that history superseded the first time a payment is recorded. "Mark as paid off" therefore writes a settling payment rather than zeroing the column.
 - Multi-account tracking for checking, savings, credit, investments, and cash.
 - Custom categories with custom color palettes, interactive icon selectors, real-time live preview, and quick category metrics cards.
 - Password reset flow and account deletion.
@@ -113,9 +114,9 @@ A premium, AI-powered personal finance management platform for tracking transact
 4. **Database setup for Neon:**
 
    - Create a Neon project.
-   - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql`, `002_debts_and_payments.sql`, `003_system_logs.sql`, `004_security_hardening.sql`, `005_recurring_and_digests.sql`, `006_data_integrity.sql`, `007_row_level_security_staged.sql`) in order in the Neon SQL editor.
+   - Apply the versioned migrations in `database/migrations/` (`001_initial_schema.sql` … `008_data_integrity_followup.sql`) in order in the Neon SQL editor, or just run `bun scripts/migrate.ts`.
    - Optionally run `database/seeds/default-categories.sql` to seed default categories.
-   - The migrations under `database/migrations/` are the canonical source of truth.
+   - The migrations under `database/migrations/` are the canonical source of truth. `database/schema.sql` is a **Neon console dump, not a schema definition** — it contains no triggers, foreign keys, CHECK constraints, or RLS policies, and cannot be applied to an empty database. Never provision from it.
    - Database tables are created empty; start adding your accounts and transactions in the UI.
 
 5. **AI setup:**
@@ -169,7 +170,9 @@ In-progress runs for the same branch are cancelled automatically so the latest c
 ## Documentation
 
 - [API reference](docs/API.md) — endpoints, authentication, errors, rate limits, and cron behavior.
-- Database migrations in `database/migrations/` are the canonical schema history and must be applied in filename order.
+- Database migrations in `database/migrations/` are the canonical schema history and must be applied in filename order. `database/schema.sql` is a console dump only — it has none of the triggers, foreign keys, CHECK constraints, or RLS policies the app depends on, and must not be used to provision a database.
+- Row Level Security is defined but **not enabled** (every `ENABLE` line in `007` is commented out). Tenant isolation therefore rests entirely on the `user_id = $1` predicates in the repository layer.
+  - **Enabling it is a three-part job, and the first part is the one people miss.** `NEON_DATABASE_URL` connects as `neondb_owner`, which has `rolbypassrls = true` — RLS is skipped entirely for that role, and `FORCE ROW LEVEL SECURITY` does *not* override it (FORCE only binds the table owner). Uncommenting the `ENABLE` lines on their own would compile, run, review as "protected", and enforce nothing. See the checklist at the top of `007`: create a `NOBYPASSRLS` role, set `app.current_user_id` per transaction, and leave `public.users` out of the list.
 - Pull requests use the checklist in `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## AI Features

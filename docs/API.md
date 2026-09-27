@@ -61,7 +61,7 @@ client for 15 minutes.
 | --- | --- | --- |
 | GET | `/api/accounts` | List accounts |
 | POST | `/api/accounts` | Create account |
-| PUT | `/api/accounts?id=…` | Update account |
+| PUT | `/api/accounts?id=…` | Update account. `balance` is **rejected with a 400**: it is a running total maintained by the `update_account_balance` trigger, so a manual correction would be silently overwritten by the next transaction. An opening `balance` may be supplied on `POST` only |
 | DELETE | `/api/accounts?id=…&cascade=0\|1` | Delete account (optional cascade) |
 | GET | `/api/accounts?action=linked-count&accountId=…` | Linked transaction count |
 
@@ -78,7 +78,7 @@ client for 15 minutes.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/transactions?limit=…&since=…` | List transactions (`limit` 1–1000, `since` = `YYYY-MM-DD`) |
+| GET | `/api/transactions?limit=…&since=…` | List transactions (`limit` 1–1000, `since` = `YYYY-MM-DD`). Also returns `total` — rows matching the query **before** the limit — and `truncated`, so a client can tell a complete set from a capped one without inferring it from the row count |
 | POST | `/api/transactions` | Create transaction (income / expense / transfer) |
 | PUT | `/api/transactions?id=…` | Update transaction |
 | DELETE | `/api/transactions?id=…` | Delete transaction |
@@ -110,7 +110,7 @@ client for 15 minutes.
 | PUT | `/api/debts?id=…` | Update debt |
 | DELETE | `/api/debts?id=…` | Delete debt |
 | GET | `/api/debts?action=payments&debtId=…` | List payments for a debt (`debtId` required) |
-| POST | `/api/debts?action=payments` | Record a payment — returns `{ payment, debt }` with the post-payment debt balance; overpayment is a 400 |
+| POST | `/api/debts?action=payments&debtId=.` | Record a payment - returns `{ payment, debt }` with the post-payment debt balance; overpayment is a 400. `debtId` may be given as the query parameter (preferred, matches the client) or as `debt_id` in the body. An omitted `principal_amount` is resolved server-side to `amount − interest_amount` — it is never silently stored as 0, which would leave the debt balance unmoved |
 
 ## Notifications
 
