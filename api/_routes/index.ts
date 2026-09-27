@@ -49,14 +49,30 @@ const ROUTES: Record<string, RouteHandler> = {
  * Falls back to the parent route for dynamic sub-paths (e.g. /api/accounts/:id).
  */
 export function resolveRoute(apiPath: string): RouteHandler | null {
-	if (ROUTES[apiPath]) return ROUTES[apiPath];
+	return resolveRouteEntry(apiPath)?.handler ?? null;
+}
+
+/**
+ * Resolve a route to BOTH its handler and its canonical registry key.
+ *
+ * The key matters because the lookup walks UP the path segments, so
+ * `/api/ai/chat`, `/api/ai/chat/a` and `/api/ai/chat/1` all resolve to the same
+ * handler. Rate limiting keyed on the raw path therefore gave each variant its
+ * own fresh budget — an unbounded multiplier on the four AI routes, every one
+ * of which costs an LLM call. Keying on the canonical registry name makes all
+ * variants share a single bucket.
+ */
+export function resolveRouteEntry(
+	apiPath: string,
+): { handler: RouteHandler; key: string } | null {
+	if (ROUTES[apiPath]) return { handler: ROUTES[apiPath], key: apiPath };
 
 	// Walk up the path segments so deeply-nested dynamic routes
 	// (e.g. /api/accounts/123/extra) still resolve to their parent handler.
 	const parts = apiPath.split("/");
 	for (let len = parts.length - 1; len >= 1; len--) {
 		const parent = parts.slice(0, len).join("/");
-		if (ROUTES[parent]) return ROUTES[parent];
+		if (ROUTES[parent]) return { handler: ROUTES[parent], key: parent };
 	}
 
 	return null;

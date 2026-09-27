@@ -9,10 +9,60 @@
 const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
-  "X-XSS-Protection": "1; mode=block",
+  // NOTE: `X-XSS-Protection` is intentionally absent. It is deprecated and,
+  // per OWASP guidance, enabling it in some older browsers can itself introduce
+  // vulnerabilities. The CSP in vercel.json is the real control.
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
 };
+
+/**
+ * Hard ceiling on a request body, checked before `req.json()`.
+ *
+ * The body is parsed before any handler runs — therefore before
+ * `getAuthedUserId` — so without a cap an unauthenticated caller could buffer
+ * an arbitrarily large body and exhaust process memory. Vercel caps at
+ * ~4.5 MB, so this matches it and keeps dev and prod behaviour identical.
+ */
+export const MAX_REQUEST_BODY_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Hard cap on concurrent log-feed WebSocket clients.
+ *
+ * `activeWsClients` is an uncapped `Set` and the upgrade path had no
+ * rate-limit, so a single authenticated user could open unbounded connections
+ * and grow the process heap. Per-client filtering already prevents any data
+ * leakage, so this is a memory-only concern.
+ */
+export const MAX_WS_CLIENTS = 50;
+
+/**
+ * Best-effort client identity for rate limiting.
+ *
+ * `x-forwarded-for` and `x-real-ip` are both **client-settable** unless the
+ * edge in front of the app is known to overwrite them. The previous in-code
+ * comment claimed keying on the leftmost XFF entry prevented spoofing by
+ * adding a hop — that only holds when a trusted proxy rewrites the header, and
+ * `x-real-ip` was used verbatim whenever XFF was absent.
+ *
+ * Neither is a security boundary here; the limiter is a cost control. What
+ * matters is that a caller cannot trivially rotate buckets.
+ */
+export function getClientId(headers: {
+  get(name: string): string | null;
+}): string {
+  const forwardedFor = headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const hops = forwardedFor
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1];
+  }
+  return (
+    headers.get("x-real-ip") || headers.get("cf-connecting-ip") || "unknown"
+  );
+}
 
 const HSTS_HEADER: Record<string, string> =
   process.env.NODE_ENV === "production"
@@ -75,6 +125,11 @@ const RATE_LIMITED_PREFIXES = [
   "/api/ai/insights",
   "/api/ai/digest",
   "/api/ai/parse-transaction",
+  // `/api/cron` is secret-gated and returns 403 before any DB work, so it is
+  // cheap to hit — but it was unrate-limited, so anyone could flood it to
+  // generate log noise. Rate limited here to blunt that; the endpoint still
+  // refuses to run without CRON_SECRET (fail-closed).
+  "/api/cron",
 ];
 
 /**
@@ -118,15 +173,27 @@ export function getAuthOriginFallback(): string {
  */
 export const DEFAULT_CURRENCY = "INR";
 
-/** Resolve an allowed CORS origin or reject the request. */
+/**
+ * Resolve an allowed CORS origin or reject the request.
+ *
+ * The allowlist is an exact-match `Set` built by `computeAllowedOrigins` from
+ * the known local/production origins, any `ALLOWED_ORIGINS` entries, and the
+ * specific hostnames Vercel injects (`VERCEL_PROJECT_PRODUCTION_URL`,
+ * `VERCEL_BRANCH_URL`, `VERCEL_URL`).
+ *
+ * This previously ALSO accepted any `https://*.vercel.app` origin via regex,
+ * which handed `Access-Control-Allow-Credentials: true` to anyone who deployed
+ * anything at all to Vercel — including other projects' preview deployments. It
+ * was not account takeover only because the session cookie is `SameSite=Lax`,
+ * so the browser would not attach it to a cross-site fetch. That is a single
+ * config change away from a full account-takeover chain, so the wildcard is
+ * gone rather than left as a latent hazard.
+ */
 export function resolveCorsOrigin(
   origin: string,
 ): { ok: true; origin: string } | { ok: false } {
   if (!origin) return { ok: true, origin: FALLBACK_ORIGIN };
   if (ALLOWED_ORIGINS.has(origin)) return { ok: true, origin };
-  if (/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app$/i.test(origin)) {
-    return { ok: true, origin };
-  }
   return { ok: false };
 }
 

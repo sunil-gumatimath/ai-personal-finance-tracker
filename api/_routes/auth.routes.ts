@@ -333,9 +333,17 @@ async function handleSignup(req: ApiRequest, res: ApiResponse) {
 				userEmail: email,
 				severity: "warning",
 				status: "failure",
-				metadata: { error },
+				metadata: {
+					// The full provider error object can carry a `body` that
+					// echoes request content. Persist only its message/status so a
+					// credential cannot end up in `system_logs.metadata`.
+					errorMessage: getErrorMessage(error),
+					status,
+				},
 			});
-			res.status(400).json({ error: error.message || "Signup failed" });
+			// Constant body for the same enumeration reason as the 409 branch
+			// below — a distinct message here is just as revealing.
+			res.status(400).json({ error: "Unable to create that account" });
 			return;
 		}
 
@@ -423,9 +431,19 @@ async function handleSignup(req: ApiRequest, res: ApiResponse) {
 			bodyMsg.includes("already exists") ||
 			bodyMsg.toLowerCase().includes("user already exists")
 		) {
-			res
-				.status(400)
-				.json({ error: bodyMsg || "Invalid registration details" });
+			// Log the upstream detail; return a CONSTANT body.
+			//
+			// Echoing `bodyMsg` verbatim leaked whatever the auth provider said,
+			// which may include DB/infra wording. It was also an account
+			// enumeration oracle: a distinct message for an already-registered
+			// address lets anyone test whether an email has an account, with no
+			// need to attempt a login. `handleLogin` already clamps its response
+			// for exactly this reason; signup did not.
+			//
+			// The correct fix for "is this email taken?" is a product decision
+			// (usually a post-signup "check your inbox" flow), not a leaked
+			// provider error string.
+			res.status(400).json({ error: "Unable to create that account" });
 			return;
 		}
 		res.status(500).json({ error: "Server error" });
@@ -498,7 +516,12 @@ async function handleLogin(req: ApiRequest, res: ApiResponse) {
 				userEmail: email,
 				severity: "warning",
 				status: "failure",
-				metadata: { clientId, error },
+				metadata: {
+					clientId,
+					// Message/status only — the full provider error object can echo
+					// request content, and `system_logs` is readable per user.
+					errorMessage: error.message || "Login failed",
+				},
 			});
 
 			const message = error.message?.includes(

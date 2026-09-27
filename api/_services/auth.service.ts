@@ -130,7 +130,21 @@ function requestUsesHttps(req?: {
 }): boolean {
   // Local HTTP development escape hatch: when ALLOW_INSECURE_COOKIES=true,
   // force the Secure flag off so the session cookie works over http://.
-  if (process.env.ALLOW_INSECURE_COOKIES === "true") return false;
+  //
+  // Hard-gated to non-production. Un-gated, a stray env var in production would
+  // silently drop `Secure` from the session cookie, allowing it over plaintext
+  // HTTP. Mirrors the `NODE_ENV !== "production"` gate in `dns-bypass.ts`.
+  if (
+    process.env.ALLOW_INSECURE_COOKIES === "true" &&
+    process.env.NODE_ENV !== "production"
+  ) {
+    return false;
+  }
+  if (process.env.ALLOW_INSECURE_COOKIES === "true") {
+    console.warn(
+      "[auth] ALLOW_INSECURE_COOKIES is ignored in production; the Secure flag stays set.",
+    );
+  }
 
   const forwardedProto = req?.headers?.["x-forwarded-proto"];
   if (typeof forwardedProto === "string") {

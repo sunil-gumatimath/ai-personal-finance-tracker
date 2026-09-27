@@ -10,10 +10,13 @@ import {
 import { getAuthedUserId } from './_services/auth.service.js'
 import {
   buildResponseHeaders,
+  getClientId,
   isRateLimitedPath,
+  MAX_REQUEST_BODY_BYTES,
+  MAX_WS_CLIENTS,
   resolveCorsOrigin,
 } from './_config/server-config.js'
-import { resolveRoute } from './_routes/index.js'
+import { resolveRouteEntry } from './_routes/index.js'
 
 const PORT = process.env.PORT || 3001
 
@@ -63,6 +66,17 @@ try {
           return new Response('Unauthorized', { status: 401 })
         }
 
+        // Cap concurrent log-feed sockets. `activeWsClients` is an uncapped
+        // Set, and the upgrade path was unrate-limited, so one authenticated
+        // user could open unbounded connections and grow the process heap.
+        // Memory-only (per-client filtering already prevents data leakage), but
+        // it is a trivial DoS. DEV-ONLY endpoint: `isLiveFeedSupported()` in
+        // useSystemLogs.ts restricts the client to localhost, and Vercel
+        // serverless has no long-lived socket support at all.
+        if (activeWsClients.size >= MAX_WS_CLIENTS) {
+          return new Response('Too many connections', { status: 503 })
+        }
+
         if (server.upgrade(req, { data: { userId } } as any)) return // upgrade successful
         return new Response('WebSocket upgrade failed', { status: 400 })
       }
@@ -103,25 +117,33 @@ try {
       }
 
       // Resolve route through the shared registry (matches Vercel routing).
-      const handler = resolveRoute(apiPath)
+      // We need the canonical key, not just the handler: the lookup walks up
+      // path segments, so several raw paths map to one route and the rate
+      // limiter must bucket them together.
+      const route = resolveRouteEntry(apiPath)
 
-      if (!handler) {
+      if (!route) {
         console.log(`❌ 404: ${pathname}`)
         return new Response(JSON.stringify({ error: `Route ${pathname} not found` }), {
           status: 404,
           headers,
         })
       }
+      const handler = route.handler
 
       // Rate limiting for sensitive endpoints. Auth routes do their own
       // stricter limiting inside auth.routes.ts, so isAuthEndpoint stays off.
-      if (isRateLimitedPath(pathname)) {
-        const forwardedFor = req.headers.get('x-forwarded-for')
-        const clientId =
-          (forwardedFor ? forwardedFor.split(',')[0]?.trim() : '') ||
-          req.headers.get('x-real-ip') ||
-          'unknown'
-        const { allowed, retryAfter } = await checkRateLimit(clientId, pathname)
+      //
+      // Keyed on `/api/${route.key}`, NOT `pathname`. Keying on the raw path
+      // meant `/api/ai/chat`, `/api/ai/chat/a`, `/api/ai/chat/1`, ... each got
+      // their own independent 20-request budget against the same handler —
+      // an unbounded multiplier on the routes that cost an LLM call per hit.
+      const canonicalPath = `/api/${route.key}`
+      if (isRateLimitedPath(canonicalPath)) {
+        const { allowed, retryAfter } = await checkRateLimit(
+          getClientId(req),
+          canonicalPath,
+        )
         if (!allowed) {
           headers.set('Retry-After', String(retryAfter ?? 60))
           return new Response(
@@ -129,6 +151,22 @@ try {
             { status: 429, headers },
           )
         }
+      }
+
+      // Reject an oversized body BEFORE parsing it.
+      //
+      // `req.json()` below fully buffers and parses the request, and it runs
+      // before any handler, therefore before `getAuthedUserId`. Combined with
+      // a client-controlled client id, that let an unauthenticated caller
+      // POST a multi-hundred-megabyte body repeatedly and OOM the process.
+      // Checking Content-Length up front makes the cheap rejection happen
+      // first; the streaming cap below covers a lying or absent header.
+      const declaredLength = Number(req.headers.get('content-length') ?? '0')
+      if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BODY_BYTES) {
+        return new Response(
+          JSON.stringify({ error: 'Request body too large' }),
+          { status: 413, headers },
+        )
       }
 
       // Parse body

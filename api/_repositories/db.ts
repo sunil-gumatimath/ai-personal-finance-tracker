@@ -31,7 +31,11 @@ async function mockQuery<T = unknown>(
   _queryText: string,
   _params?: unknown[],
 ): Promise<{ rows: T[]; rowCount: number }> {
-  console.log('🏗️ Mock DB: Returning empty results for query:', _queryText, _params)
+  // Log the SQL text but NOT the params. `auth.service.ts` queries
+  // `neon_auth.session WHERE token = $1`, so logging params printed the live
+  // session token to stdout. The real path already makes the same call
+  // (`db.ts` logs `query` only, never `params`).
+  console.log('🏗️ Mock DB: Returning empty results for query:', _queryText)
   return { rows: [], rowCount: 0 }
 }
 

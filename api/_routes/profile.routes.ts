@@ -7,6 +7,7 @@ import {
   sanitizePreferencesForClient,
 } from "../_utils/crypto.js"
 import type { ApiRequest, ApiResponse } from "../_utils/types.js"
+import { sendApiError } from "../_utils/respond.js"
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = await getAuthedUserId(req)
@@ -116,12 +117,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       })
     } catch (error) {
       console.error('Profile PATCH error:', error)
-      // Sanitize error messages to avoid leaking internal details
-      if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('exceeds maximum length'))) {
-        res.status(400).json({ error: 'Invalid request' })
-        return
-      }
-      res.status(500).json({ error: 'Server error' })
+      // Branch on the ERROR TYPE, not on a substring of its message.
+      //
+      // The old check (`message.includes('Invalid')`) mislabelled any *server*
+      // error whose text happened to contain "Invalid" as a client error, and
+      // `sendApiError` already does this correctly and fail-safely by mapping
+      // `AppError` subclasses to their own status.
+      sendApiError(res, error)
     }
     return
   }

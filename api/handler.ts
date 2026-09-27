@@ -3,10 +3,12 @@ import type { ApiRequest, ApiResponse } from "./_utils/types.js";
 import { checkRateLimit } from "./_middleware/rate-limit.js";
 import {
 	buildResponseHeaders,
+	getClientId,
 	isRateLimitedPath,
+	MAX_REQUEST_BODY_BYTES,
 	resolveCorsOrigin,
 } from "./_config/server-config.js";
-import { resolveRoute } from "./_routes/index.js";
+import { resolveRouteEntry } from "./_routes/index.js";
 import { logEvent } from "./_services/audit-log.service.js";
 
 // Allow long-running AI requests (free-tier reasoning models are slow).
@@ -46,10 +48,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 		}
 		pathname = `/api/${apiPath}`;
 	}
-	const routeHandler = resolveRoute(apiPath);
+	const route = resolveRouteEntry(apiPath);
 
-	if (!routeHandler) {
+	if (!route) {
 		res.status(404).json({ error: `Route ${pathname} not found` });
+		return;
+	}
+	const routeHandler = route.handler;
+
+	// `/api/ws-logs` is not part of the route registry — it is a raw socket
+	// upgrade handled by the Bun dev server. Reject it explicitly here rather
+	// than letting it fall through to the 404 path.
+	if (apiPath === "ws-logs") {
+		res.status(404).json({ error: "WebSocket upgrade is not available on this runtime" });
 		return;
 	}
 
@@ -69,17 +80,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 		return;
 	}
 
-	if (isRateLimitedPath(pathname)) {
-		// Key on the leftmost x-forwarded-for entry — that is the original
-		// client; the raw header may chain multiple proxy IPs and would let
-		// anyone rotate their key by spoofing an extra hop.
-		const forwardedFor = req.headers["x-forwarded-for"] as string | undefined;
-		const clientId =
-			forwardedFor?.split(",")[0]?.trim() ||
-			(req.headers["x-real-ip"] as string | undefined) ||
-			"unknown";
+	// Rate limiting keyed on the CANONICAL route key, not the raw path. The
+	// route lookup walks up path segments, so `/api/ai/chat`, `/api/ai/chat/a`
+	// and `/api/ai/chat/1` all reach the same handler; keying on the raw path
+	// gave each variant its own fresh budget against the LLM-backed routes.
+	const canonicalPath = `/api/${route.key}`;
+	if (isRateLimitedPath(canonicalPath)) {
 		// Auth routes apply their own stricter limiting inside auth.routes.ts.
-		const { allowed, retryAfter } = await checkRateLimit(clientId, pathname);
+		const { allowed, retryAfter } = await checkRateLimit(
+			getClientId({
+				get: (name) => {
+					const v = req.headers[name];
+					return Array.isArray(v) ? v.join(", ") : v ?? null;
+				},
+			}),
+			canonicalPath,
+		);
 		if (!allowed) {
 			res.setHeader("Retry-After", String(retryAfter ?? 60));
 			res
@@ -87,6 +103,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 				.json({ error: "Rate limit exceeded. Please try again later." });
 			return;
 		}
+	}
+
+	// Reject an oversized body before parsing it. Vercel pre-parses `req.body`
+	// with its own cap, but an explicitly-declared oversize payload is cheaper
+	// to refuse here and keeps dev/prod behaviour identical.
+	const declaredLength = Number(req.headers["content-length"] ?? "0");
+	if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BODY_BYTES) {
+		res.status(413).json({ error: "Request body too large" });
+		return;
 	}
 
 	let body: Record<string, unknown> = {};

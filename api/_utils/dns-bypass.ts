@@ -112,7 +112,22 @@ export async function initDnsOverride(): Promise<void> {
           : (input as Request).url;
 
     for (const entry of OVERRIDES) {
-      if (entry.ips.length === 0 || !url.includes(entry.domain)) continue;
+      if (entry.ips.length === 0) continue;
+      // Match on the parsed HOSTNAME, not a substring of the whole URL.
+      //
+      // `url.includes(entry.domain)` also matched a crafted URL such as
+      // `https://evil.example/?x=ep-....neon.tech`, whose host would then be
+      // rewritten to a Neon IP. Not exploitable here — the connection is a POST
+      // carrying a DB bearer token, TLS still validates against `evil.example`
+      // because SNI is pinned, and the feature is non-production-gated — but
+      // hostname equality is the correct predicate and costs nothing.
+      let hostname: string;
+      try {
+        hostname = new URL(url).hostname;
+      } catch {
+        continue;
+      }
+      if (hostname !== entry.domain) continue;
 
       const index = roundRobinIndex.get(entry.domain) ?? 0;
       const targetIp = entry.ips[index % entry.ips.length];
@@ -126,7 +141,11 @@ export async function initDnsOverride(): Promise<void> {
       requestInit.tls = { servername: entry.domain };
 
       console.log(`🛸 DNS override: ${entry.domain} -> ${targetIp}`);
-      return originalFetch(url.replace(entry.domain, targetIp), requestInit);
+      // Swap the host, preserving the rest of the URL verbatim (path, query).
+      return originalFetch(
+        url.replace(`//${entry.domain}`, `//${targetIp}`),
+        requestInit,
+      );
     }
 
     return originalFetch(input, init);
