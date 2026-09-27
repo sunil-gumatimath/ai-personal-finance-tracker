@@ -20,7 +20,7 @@ import {
   PaymentModal,
   StrategyDialog,
 } from "@/features/debts";
-import { toNumber } from "@/lib/debt-calculations";
+import { toNumber } from "@/lib/number";
 import type { DebtPayment } from "@/types";
 
 const NO_PAYMENTS: DebtPayment[] = [];

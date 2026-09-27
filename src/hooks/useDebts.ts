@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { api } from "@/lib/api-client";
+import { api, RequestAbortedError } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
@@ -10,9 +10,51 @@ import {
 	calculatePayoffTime,
 	calculateTotalInterest,
 	getProgress,
-	toNumber,
 } from "@/lib/debt-calculations";
 import type { Debt, DebtPayment } from "@/types";
+import { toNumber } from "@/lib/number";
+import { ApiError } from "@/lib/errors";
+
+/**
+ * Parse a numeric money field from a text input.
+ *
+ * The important behaviour is that it distinguishes three states that
+ * `parseFloat(x) || fallback` cannot:
+ *
+ *   - **blank** → the caller's fallback (usually 0, or another field)
+ *   - **"0"**   → a real, meaningful zero that must be preserved
+ *   - **junk**  → an error, not a silent `NaN`
+ *
+ * That last case mattered: `JSON.stringify({ x: NaN })` produces `{"x":null}`,
+ * so a blank required amount used to be sent to the server as `null` and the
+ * user saw a generic "Failed to save debt" toast instead of the server's
+ * precise "Valid original amount is required".
+ */
+function parseMoneyField(
+	raw: string,
+	label: string,
+	options?: { required?: boolean; allowNegative?: boolean },
+): number {
+	const trimmed = (raw ?? "").trim();
+	if (trimmed === "") {
+		if (options?.required === false) return 0;
+		throw new Error(`${label} is required`);
+	}
+	// Reject thousands separators and currency symbols outright. `parseFloat`
+	// stops at the first invalid character, so "1,00,000" silently became 1.
+	const normalized = trimmed.replace(/^[₹$€£¥]\s*/, "").replace(/,/g, "");
+	if (!/^[+-]?(\d+(\.\d+)?|\.\d+)$/.test(normalized)) {
+		throw new Error(`${label} must be a number`);
+	}
+	const value = Number(normalized);
+	if (!Number.isFinite(value)) {
+		throw new Error(`${label} must be a number`);
+	}
+	if (!options?.allowNegative && value < 0) {
+		throw new Error(`${label} cannot be negative`);
+	}
+	return value;
+}
 
 /**
  * Canonical debt-type vocabulary. Lives here (not in DebtCard) because both the
@@ -98,7 +140,18 @@ export function useDebts() {
 		notes: "",
 	});
 
+	/**
+	 * Request generation counter.
+	 *
+	 * Every mutation refetches. Two mutations in quick succession produced two
+	 * overlapping `fetchDebts()` calls whose `SELECT`s could resolve out of
+	 * order — and the slower one won, so a just-deleted debt reappeared in the
+	 * list. The counter makes the newest request authoritative.
+	 */
+	const fetchSeqRef = useRef(0);
+
 	const fetchDebts = useCallback(async () => {
+		const seq = ++fetchSeqRef.current;
 		if (!user) {
 			setLoading(false);
 			return;
@@ -106,11 +159,25 @@ export function useDebts() {
 		setLoading(true);
 		try {
 			const res = await api.debts.list();
+			// A newer request already started; its result is the one that counts.
+			if (seq !== fetchSeqRef.current) return;
 			const rows = (res.debts || []) as Debt[];
 
 			setDebts(rows.map(normalizeDebtRow));
+			// Prune payment history for debts that no longer exist, so a deleted
+			// debt's payments don't linger in state for the life of the tab.
+			setPaymentsByDebt((prev) => {
+				const live = new Set(rows.map((d) => d.id));
+				const stale = Object.keys(prev).filter((id) => !live.has(id));
+				if (stale.length === 0) return prev;
+				const next = { ...prev };
+				for (const id of stale) delete next[id];
+				return next;
+			});
 			setLoadError(null);
 		} catch (error) {
+			if (error instanceof RequestAbortedError) return;
+			if (seq !== fetchSeqRef.current) return;
 			// Previously this only fired a transient toast, so the page then
 			// rendered its "No debts yet" empty state — a failed fetch was
 			// indistinguishable from genuinely having no debts. Expose the
@@ -123,7 +190,7 @@ export function useDebts() {
 			);
 			toast.error("Failed to load debts");
 		} finally {
-			setLoading(false);
+			if (seq === fetchSeqRef.current) setLoading(false);
 		}
 	}, [user]);
 
@@ -136,7 +203,7 @@ export function useDebts() {
 				const res = await api.debts.payments.list(debtId);
 				const rows = (res.payments || []) as DebtPayment[];
 
-				const typedRows = (rows || []).map((payment) => ({
+				const typedRows = rows.map((payment) => ({
 					...payment,
 					amount: toNumber(payment.amount),
 					principal_amount: toNumber(payment.principal_amount),
@@ -145,9 +212,13 @@ export function useDebts() {
 
 				setPaymentsByDebt((prev) => ({ ...prev, [debtId]: typedRows }));
 			} catch (error) {
+				// An unmount-driven abort is control flow, not a failure worth logging.
+				if (error instanceof RequestAbortedError) return;
 				console.error("Error fetching payments:", error);
 			} finally {
-				setLoadingPaymentsId(null);
+				// Only clear the spinner if this request still owns it, so a slower
+				// earlier request cannot clear the flag for a newer one in flight.
+				setLoadingPaymentsId((current) => (current === debtId ? null : current));
 			}
 		},
 		[user],
@@ -178,20 +249,32 @@ export function useDebts() {
 		setIsSaving(true);
 
 		try {
-			// Explicit empty-string check: a blank field means "same as original
-			// amount", but an explicit "0" must stay 0 (`parseFloat || fallback`
-			// used to overwrite zero balances with the original amount).
+			// Parse a money field, distinguishing "blank" (use the fallback) from
+			// an explicit "0" (keep zero). `parseFloat(x) || fallback` cannot make
+			// that distinction — 0 is falsy — and it silently overwrote a zeroed
+			// balance with the original amount. The same idiom was reintroduced
+			// for `principal_amount` ~50 lines below, so it is centralised here.
+			const originalAmount = parseMoneyField(
+				formData.original_amount,
+				"Original Amount",
+			);
 			const currentBalance =
 				formData.current_balance.trim() === ""
-					? parseFloat(formData.original_amount)
-					: parseFloat(formData.current_balance);
+					? originalAmount
+					: parseMoneyField(formData.current_balance, "Current Balance", {
+							allowNegative: true,
+						});
 			const debtData = {
 				name: formData.name,
 				type: formData.type,
-				original_amount: parseFloat(formData.original_amount),
+				original_amount: originalAmount,
 				current_balance: currentBalance,
-				interest_rate: parseFloat(formData.interest_rate) || 0,
-				minimum_payment: parseFloat(formData.minimum_payment) || 0,
+				interest_rate: parseMoneyField(formData.interest_rate, "Interest Rate", {
+					required: false,
+				}),
+				minimum_payment: parseMoneyField(formData.minimum_payment, "Minimum Payment", {
+					required: false,
+				}),
 				due_day: formData.due_day ? parseInt(formData.due_day) : null,
 				start_date: formData.start_date || format(new Date(), "yyyy-MM-dd"),
 				end_date: formData.end_date || null,
@@ -211,10 +294,17 @@ export function useDebts() {
 
 			setIsDialogOpen(false);
 			resetForm();
-			fetchDebts();
+			// Awaited: an un-awaited refetch raced the next mutation's refetch,
+			// and a slower one could resolve later and resurrect a just-deleted row.
+			await fetchDebts();
 		} catch (error) {
 			console.error("Error saving debt:", error);
-			toast.error("Failed to save debt");
+			// Surface the server's message. The API produces precise text ("Valid
+			// original amount is required"), and every one of these paths used to
+			// discard it in favour of a generic string.
+			toast.error(
+				error instanceof ApiError ? error.message : "Failed to save debt",
+			);
 		} finally {
 			setIsSaving(false);
 		}
@@ -224,8 +314,14 @@ export function useDebts() {
 		e.preventDefault();
 		if (!user || !selectedDebt || isSaving) return;
 
-		const amount = parseFloat(paymentFormData.amount);
-		if (!Number.isFinite(amount) || amount <= 0) {
+		let amount: number;
+		try {
+			amount = parseMoneyField(paymentFormData.amount, "Payment Amount");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Enter a valid payment amount");
+			return;
+		}
+		if (amount <= 0) {
 			toast.error("Enter a payment amount greater than 0");
 			return;
 		}
@@ -233,9 +329,26 @@ export function useDebts() {
 		setIsSaving(true);
 
 		try {
-			const interestAmount = parseFloat(paymentFormData.interest_amount) || 0;
+			// "Leave blank to auto-split against the amount." A blank principal
+			// means `amount - interest`; an explicit "0" is a legitimate
+			// interest-only payment and must survive. `parseFloat(x) || fallback`
+			// could not express that, so a 0 principal was silently replaced.
+			const interestAmount = parseMoneyField(
+				paymentFormData.interest_amount,
+				"Interest Amount",
+				{ required: false },
+			);
 			const principalAmount =
-				parseFloat(paymentFormData.principal_amount) || amount - interestAmount;
+				paymentFormData.principal_amount.trim() === ""
+					? Math.max(0, amount - interestAmount)
+					: parseMoneyField(paymentFormData.principal_amount, "Principal Amount", {
+							required: false,
+						});
+
+			if (principalAmount + interestAmount > amount) {
+				toast.error("Principal plus interest cannot exceed the payment amount");
+				return;
+			}
 
 			const paymentData = {
 				debt_id: selectedDebt.id,
@@ -246,7 +359,7 @@ export function useDebts() {
 				notes: paymentFormData.notes || null,
 			};
 
-			const res = await api.debts.payments.create(paymentData);
+			const res = await api.debts.payments.create(selectedDebt.id, paymentData);
 			// Prefer the server-computed updated debt row; fall back to a
 			// refetch when the backend doesn't return one.
 			const serverDebt = res?.debt ? normalizeDebtRow(res.debt) : null;
@@ -285,17 +398,19 @@ export function useDebts() {
 
 			if (serverDebt) {
 				if (expandedDebt === selectedDebt.id) {
-					fetchPayments(selectedDebt.id);
+					await fetchPayments(selectedDebt.id);
 				}
 			} else {
-				fetchDebts();
+				await fetchDebts();
 				if (expandedDebt === selectedDebt.id) {
-					fetchPayments(selectedDebt.id);
+					await fetchPayments(selectedDebt.id);
 				}
 			}
 		} catch (error) {
 			console.error("Error recording payment:", error);
-			toast.error("Failed to record payment");
+			toast.error(
+				error instanceof ApiError ? error.message : "Failed to record payment",
+			);
 		} finally {
 			setIsSaving(false);
 		}
@@ -305,24 +420,46 @@ export function useDebts() {
 		try {
 			await api.debts.delete(id);
 			toast.success("Debt deleted");
-			fetchDebts();
+			await fetchDebts();
 		} catch (error) {
 			console.error("Error deleting debt:", error);
-			toast.error("Failed to delete debt");
+			toast.error(
+				error instanceof ApiError ? error.message : "Failed to delete debt",
+			);
 		}
 	};
 
 	const handleMarkPaidOff = async (debt: Debt) => {
 		try {
-			await api.debts.update(debt.id, {
-				current_balance: 0,
-				is_active: false,
-			});
+			// Write a settling payment rather than only flipping `current_balance`.
+			//
+			// Migration 006 makes `debts.current_balance` fully derived from
+			// `SUM(debt_payments.principal_amount)`. Setting the column to 0
+			// therefore looked correct until the next payment write, at which
+			// point the trigger recomputed the balance from the payment history
+			// and the debt silently reappeared — a debt the user had already
+			// settled came back at its full outstanding amount.
+			//
+			// Settling through the payments table makes the state durable and
+			// consistent with the trigger that maintains it.
+			const outstanding = toNumber(debt.current_balance);
+			if (outstanding > 0) {
+				await api.debts.payments.create(debt.id, {
+					amount: outstanding,
+					principal_amount: outstanding,
+					interest_amount: 0,
+					payment_date: format(new Date(), "yyyy-MM-dd"),
+					notes: "Marked as paid off",
+				});
+			}
+			await api.debts.update(debt.id, { is_active: false });
 			toast.success("Debt marked as paid off!");
-			fetchDebts();
+			await fetchDebts();
 		} catch (error) {
 			console.error("Error marking debt as paid:", error);
-			toast.error("Failed to update debt");
+			toast.error(
+				error instanceof ApiError ? error.message : "Failed to update debt",
+			);
 		}
 	};
 
