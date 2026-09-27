@@ -244,6 +244,39 @@ describe("buildSimulations", () => {
 		expect(sims.snowball.months).toBe(0);
 	});
 
+	it("flags snowball/avalanche as never paying off, not as a 360-month payoff", () => {
+		// Regression: with the extra-payment slider at 0 the snowball and
+		// avalanche strategies degenerate to minimums-only, but only the
+		// `minimums` strategy had a never-payoff check. The others fell through
+		// to the 360-month iteration cap and reported it as a payoff date with a
+		// large finite interest total — e.g. "360 months, ₹6,26,881 interest" on
+		// a $1,000 balance that never actually amortizes.
+		const stuck = makeDebt({
+			id: "stuck",
+			current_balance: 1000,
+			minimum_payment: 10,
+			interest_rate: 24,
+		});
+
+		const sims = buildSimulations([stuck], 0);
+
+		for (const strategy of ["snowball", "avalanche"] as const) {
+			expect(sims[strategy].neverPayoff).toBe(true);
+			expect(sims[strategy].months).toBe(Number.POSITIVE_INFINITY);
+			expect(sims[strategy].totalInterest).toBe(Number.POSITIVE_INFINITY);
+		}
+		// All three strategies now agree, so the dialog cannot contradict itself.
+		expect(sims.minimums.neverPayoff).toBe(true);
+		expect(sims.snowball.neverPayoff).toBe(sims.minimums.neverPayoff);
+
+		// A real extra payment still resolves to a finite, honest schedule.
+		const paidOff = buildSimulations([stuck], 200);
+		expect(paidOff.snowball.neverPayoff ?? false).toBe(false);
+		expect(Number.isFinite(paidOff.snowball.months)).toBe(true);
+		expect(paidOff.snowball.months).toBeGreaterThan(0);
+		expect(paidOff.snowball.months).toBeLessThan(360);
+	});
+
 	it("holds the minimums series flat (never zero) when minimums never pay off", () => {
 		// Stuck debt: $10/month vs $20/month of interest → neverPayoff.
 		// The healthy companion debt finishes fast, so the shared chart horizon

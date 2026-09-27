@@ -2,8 +2,10 @@ import { format } from "date-fns";
 import type { Debt } from "@/types";
 import { toNumber } from "@/lib/number";
 
-// Re-exported so existing consumers of debt-calculations keep working.
-export { toNumber };
+// `toNumber` used to be re-exported from here "so existing consumers keep
+// working", which gave it two import paths: 16 files used `@/lib/number` and
+// 2 used this re-export. That made readers open this file to discover the two
+// were the same function. Consumers now import it from its real home.
 
 interface SimulationResult {
 	months: number;
@@ -33,21 +35,19 @@ const runSimulation = (
 
 	let currentMonth = 0;
 	let totalInterestPaid = 0;
-	const monthlyData = [
-		{
-			month: 0,
-			remainingBalance: simulatedDebts.reduce(
-				(sum, d) => sum + d.current_balance,
-				0,
-			),
-		},
-	];
+	// Tracked outside the loop so the post-loop "did it actually clear?" check
+	// below can see the final balance.
+	let remainingBalance = simulatedDebts.reduce(
+		(sum, d) => sum + d.current_balance,
+		0,
+	);
+	const monthlyData = [{ month: 0, remainingBalance }];
 
-	const maxMonths = 360; // 30 years limit
+	const maxMonths = 360; // 30 years cap — NOT a payoff projection
 
-	// Minimums-only mode: if any debt's payment never covers its monthly
-	// interest, that balance grows forever — bail out with a sentinel instead
-	// of silently running to the 360-month cap.
+	// Fast path for minimums-only: if any debt's payment never covers its
+	// monthly interest, bail immediately rather than iterating 360 times. The
+	// authoritative check for every strategy is the post-loop one.
 	if (strategy === "minimums") {
 		const stuck = simulatedDebts.some(
 			(d) =>
@@ -128,7 +128,7 @@ const runSimulation = (
 			}
 		}
 
-		const remainingBalance = simulatedDebts.reduce(
+		remainingBalance = simulatedDebts.reduce(
 			(sum, d) => sum + d.current_balance,
 			0,
 		);
@@ -138,6 +138,24 @@ const runSimulation = (
 		});
 
 		if (remainingBalance === 0) break;
+	}
+
+	// The loop can also exit by hitting `maxMonths` with money still owed. That
+	// is NOT a 30-year payoff: it means the payment never outruns the interest
+	// and the balance grows (or stalls) forever. This only affected
+	// snowball/avalanche — `minimums` had an early bail-out above, so the two
+	// strategies disagreed inside the same dialog, and the extra-payment
+	// slider at 0 turned the "extra" strategies into minimums-only while
+	// still reporting a 360-month date and a large finite interest total.
+	//
+	// Report the sentinel instead of a fabricated schedule.
+	if (remainingBalance > 0) {
+		return {
+			months: Infinity,
+			totalInterest: Infinity,
+			monthlyData,
+			neverPayoff: true,
+		};
 	}
 
 	return {
@@ -216,7 +234,23 @@ export function buildStrategies(debts: Debt[]): DebtStrategies {
 		(sum, d) => sum + toNumber(d.current_balance),
 		0,
 	);
-	const totalOriginal = debts.reduce(
+	// `totalOriginal` MUST be scoped to the same population as `totalDebt`.
+	//
+	// It used to sum over ALL debts while `totalDebt` summed only active ones,
+	// and any inactive debt was filed under "paid off". Since
+	// `validateUpdateDebtInput` allows `is_active` and `current_balance` to be
+	// set independently, `PUT /api/debts {"is_active": false}` alone was a legal
+	// request — and it silently inflated the header:
+	//
+	//   A (orig 10000, bal 5000, active), B (orig 5000, bal 5000, active)
+	//   before -> totalOriginal 15000, totalDebt 10000, totalPaid  5000  "33% Paid Off"
+	//   after  -> totalOriginal 15000, totalDebt  5000, totalPaid 10000  "67% Paid Off"
+	//
+	// …while B still owed ₹5,000, and "Total Debt Remaining" under-reported by
+	// the same amount. An archived debt is not a paid one.
+	//
+	// Use the same filter for both so the ratio is always meaningful.
+	const totalOriginal = activeDebts.reduce(
 		(sum, d) => sum + toNumber(d.original_amount),
 		0,
 	);
@@ -226,7 +260,9 @@ export function buildStrategies(debts: Debt[]): DebtStrategies {
 	);
 	// Balance-weighted average APR: Σ(rate × balance) / Σ(balance). A plain
 	// mean would overstate the "typical" rate on a small high-APR card.
-	// Falls back to the plain mean when Σ balance is 0 (e.g. all zeros).
+	// The plain-mean fallback is unreachable — `activeDebts` is filtered on
+	// `current_balance > 0`, so `length > 0` implies `totalDebt > 0` — but it
+	// is kept as a guard rather than a branch.
 	const avgInterestRate =
 		totalDebt > 0
 			? activeDebts.reduce(
@@ -234,10 +270,7 @@ export function buildStrategies(debts: Debt[]): DebtStrategies {
 						sum + toNumber(d.interest_rate) * toNumber(d.current_balance),
 					0,
 				) / totalDebt
-			: activeDebts.length > 0
-				? activeDebts.reduce((sum, d) => sum + toNumber(d.interest_rate), 0) /
-					activeDebts.length
-				: 0;
+			: 0;
 	const totalPaid = Math.max(0, totalOriginal - totalDebt);
 
 	return {
