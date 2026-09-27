@@ -118,9 +118,44 @@ CREATE POLICY tenant_isolation_system_logs ON system_logs
   WITH CHECK (user_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid);
 
 -- --------------------------------------------------------------------
--- ACTIVATION (requires app-side session var support; see docs and the
--- checklist at the top of this file). Do NOT uncomment until the data
--- layer sets app.current_user_id inside every transaction:
+-- ACTIVATION. There are THREE prerequisites, not one. Satisfying only the
+-- first leaves the app exactly as unprotected as it is today while looking
+-- protected in review.
+--
+--   (1) A NON-BYPASSRLS application role. This is the step that was missing.
+--       Verified on the live database 2026-09-27: `NEON_DATABASE_URL` connects
+--       as `neondb_owner`, and that role has `rolbypassrls = true`. RLS is
+--       skipped entirely for a role with that attribute — `FORCE ROW LEVEL
+--       SECURITY` does NOT override it (FORCE only binds the table *owner*).
+--       So uncommenting every line below would compile, run, and enforce
+--       nothing. Create and connect as a plain role first:
+--
+--         CREATE ROLE pft_app LOGIN PASSWORD '...'
+--           NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+--         GRANT USAGE ON SCHEMA public TO pft_app;
+--         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO pft_app;
+--         GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO pft_app;
+--         ALTER DEFAULT PRIVILEGES IN SCHEMA public
+--           GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO pft_app;
+--
+--   (2) The data layer must SET `app.current_user_id` inside every transaction
+--       (SET LOCAL, so it cannot leak between pooled connections). Nothing does
+--       this today.
+--
+--   (3) `public.users` must stay OUT of the list below. It is the identity table
+--       the session lookup reads through (`auth.service.ts` queries
+--       `neon_auth.session`; `auth.routes.ts` and `audit-log.service.ts` read
+--       `FROM users WHERE id = $1`), keyed by the very id the app has already
+--       verified. Enabling RLS on it with no policy turns authentication into
+--       a deny-all outage rather than adding isolation.
+--
+-- Prefer migration 008's policy definitions over the ones in this file: 008
+-- drops the `::uuid` cast (a non-UUID session variable raised
+-- `invalid input syntax` instead of failing closed) and lets a tenant read back
+-- its own NULL-scoped `system_logs` rows. The comments in this file previously
+-- claimed the old `system_logs` WITH CHECK would reject NULL-user_id audit
+-- rows; testing disproved that — a NULL check result satisfies a PostgreSQL
+-- CHECK, so those writes were never at risk.
 --
 -- ALTER TABLE profiles        ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE profiles        FORCE  ROW LEVEL SECURITY;

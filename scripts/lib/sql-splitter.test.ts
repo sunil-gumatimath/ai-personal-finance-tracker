@@ -28,6 +28,7 @@ describe("splitSqlStatements", () => {
 			"005_recurring_and_digests.sql",
 			"006_data_integrity.sql",
 			"007_row_level_security_staged.sql",
+			"008_data_integrity_followup.sql",
 		]);
 	});
 
@@ -44,6 +45,7 @@ describe("splitSqlStatements", () => {
 				"005_recurring_and_digests.sql": 3,
 				"006_data_integrity.sql": 17,
 				"007_row_level_security_staged.sql": 22,
+				"008_data_integrity_followup.sql": 15,
 			};
 			expect(statements.length).toBe(expectedCounts[file]);
 
