@@ -141,7 +141,8 @@ try {
       const canonicalPath = `/api/${route.key}`
       if (isRateLimitedPath(canonicalPath)) {
         const { allowed, retryAfter } = await checkRateLimit(
-          getClientId(req),
+          // `req.headers`, not `req` -- a Request has no `.get()` method.
+          getClientId(req.headers),
           canonicalPath,
         )
         if (!allowed) {

@@ -51,7 +51,23 @@ export const MAX_WS_CLIENTS = 50;
 export function getClientId(headers: {
   get(name: string): string | null;
 }): string {
-  const forwardedFor = headers.get("x-forwarded-for");
+  // Defensive: this is called from two runtimes with two different header
+  // shapes (a WHATWG `Headers` from the Bun dev server, a plain record from
+  // the Vercel handler). Accept either, and never throw -- a rate limiter
+  // that crashes the request it is meant to protect is worse than one that
+  // falls back to a shared bucket. This also caught a real bug: passing the
+  // `Request` instead of `Request.headers` 500'd every AI route.
+  const read = (name: string): string => {
+    if (!headers) return "";
+    const anyHeaders = headers as unknown as Record<string, unknown>;
+    if (typeof anyHeaders.get === "function") {
+      return anyHeaders.get(name) ?? "";
+    }
+    const value = anyHeaders[name] ?? anyHeaders[name.toLowerCase()];
+    return Array.isArray(value) ? String(value[0] ?? "") : String(value ?? "");
+  };
+
+  const forwardedFor = read("x-forwarded-for");
   if (forwardedFor) {
     const hops = forwardedFor
       .split(",")
@@ -59,9 +75,7 @@ export function getClientId(headers: {
       .filter(Boolean);
     if (hops.length > 0) return hops[hops.length - 1];
   }
-  return (
-    headers.get("x-real-ip") || headers.get("cf-connecting-ip") || "unknown"
-  );
+  return read("x-real-ip") || read("cf-connecting-ip") || "unknown";
 }
 
 const HSTS_HEADER: Record<string, string> =
