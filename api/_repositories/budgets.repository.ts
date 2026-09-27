@@ -17,11 +17,15 @@ export async function findBudgetById(userId: string, id: string) {
 
 export async function listBudgets(userId: string) {
   const { rows } = await query<BudgetRow>(
+    // This query had NO ORDER BY at all, so budget card order was whatever the
+    // planner returned and could change between requests. The trailing id
+    // tiebreaker makes it stable.
     `
     SELECT b.*, row_to_json(c.*) as category
     FROM budgets b
     LEFT JOIN categories c ON b.category_id = c.id AND c.user_id = b.user_id
     WHERE b.user_id = $1
+    ORDER BY b.created_at ASC, b.id ASC
     `,
     [userId],
   );

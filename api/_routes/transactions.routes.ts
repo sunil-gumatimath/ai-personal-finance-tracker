@@ -52,8 +52,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
 	if (req.method === "GET") {
 		try {
-			const transactions = await listUserTransactions(userId, req.query);
-			res.status(200).json({ transactions });
+			// `total` / `truncated` let the client tell a complete set from a
+			// capped one. Reports and the Transactions page both display a
+			// truncation notice, and previously had to guess from the row count.
+			const { transactions, total, truncated } = await listUserTransactions(
+				userId,
+				req.query,
+			);
+			res.status(200).json({ transactions, total, truncated });
 		} catch (error) {
 			console.error("Transactions GET error:", error);
 			sendApiError(res, error);

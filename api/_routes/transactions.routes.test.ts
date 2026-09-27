@@ -10,9 +10,13 @@ import {
 
 const authMock = mockAuth("user-123");
 const service = mockService("../_services/transactions.service.js", {
-	listUserTransactions: async () => [
-		{ id: "tx-1", amount: "-12.50", description: "Coffee", accountId: "acc-1" },
-	],
+	listUserTransactions: async () => ({
+		transactions: [
+			{ id: "tx-1", amount: "-12.50", description: "Coffee", accountId: "acc-1" },
+		],
+		total: 1,
+		truncated: false,
+	}),
 	createUserTransaction: async () => ({
 		id: "tx-new",
 		amount: "-5.00",
@@ -78,11 +82,29 @@ describe("transactions route", () => {
 					accountId: "acc-1",
 				},
 			],
+			// New: the service now reports the pre-limit total and whether the
+			// limit dropped anything, so the client no longer has to infer
+			// truncation from the row count (which was wrong at the boundary).
+			total: 1,
+			truncated: false,
 		});
 		expect(service.listUserTransactions).toHaveBeenCalledWith("user-123", {
 			limit: "10",
 			since: "2026-08-01",
 		});
+	});
+
+	test("GET reports truncation when the limit dropped rows", async () => {
+		authMock.mockImplementation(() => Promise.resolve("user-123"));
+		service.listUserTransactions.mockResolvedValue({
+			transactions: [{ id: "tx-1" }, { id: "tx-2" }],
+			total: 1500,
+			truncated: true,
+		});
+		const { res, captured } = makeResponse();
+		await handler(makeRequest({ query: { limit: "2" } }), res);
+		expect(captured.statusCode).toBe(200);
+		expect(captured.body).toMatchObject({ total: 1500, truncated: true });
 	});
 
 	test("POST creates a transaction with 201", async () => {

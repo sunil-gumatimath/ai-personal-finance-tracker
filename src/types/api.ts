@@ -124,6 +124,10 @@ export interface CategoryPayload {
 
 export interface TransactionsListResponse {
 	transactions: Transaction[];
+	/** Rows matching the query BEFORE any `limit` was applied. */
+	total?: number;
+	/** True when `limit` dropped rows, i.e. this is a partial view. */
+	truncated?: boolean;
 }
 
 export interface TransactionResponse {
@@ -150,6 +154,12 @@ export type TransactionUpdatePayload = Partial<TransactionCreatePayload>;
 export interface ProcessRecurringResponse {
 	created: Transaction[];
 	completed: number;
+	/**
+	 * Templates that could not be materialized (e.g. the account or category was
+	 * deleted). Surfaced so a partial run is visible instead of silently
+	 * reporting fewer created rows than the user expected.
+	 */
+	failed?: number;
 }
 
 // ─── Budgets ─────────────────────────────────────────────────────────────────
@@ -231,7 +241,14 @@ export interface DebtPaymentResponse {
 }
 
 export interface DebtPaymentPayload {
-	debt_id: string;
+	/**
+	 * The debt this payment settles.
+	 *
+	 * Sent as the `?debtId=` query parameter by `api.debts.payments.create`,
+	 * so it is NOT part of the POST body. Omitted rather than `string` because
+	 * leaving it required made the client type lie: every real call omitted it.
+	 */
+	debt_id?: string;
 	amount: number;
 	principal_amount?: number;
 	interest_amount?: number;

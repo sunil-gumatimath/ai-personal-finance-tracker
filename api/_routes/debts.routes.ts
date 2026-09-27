@@ -36,12 +36,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === "POST") {
       try {
+        // The debt id may arrive as `?debtId=` (matching the GET branch and
+        // the client's `payments.create` signature) or in the body as
+        // `debt_id`. Accept both so neither caller form is second-class.
+        const body = (req.body || {}) as Record<string, unknown>;
+        const debtIdFromQuery = req.query?.debtId;
+        const payload =
+          typeof debtIdFromQuery === "string" && debtIdFromQuery.length > 0
+            ? { ...body, debt_id: debtIdFromQuery }
+            : body;
+
         // Response includes the post-update debt (new balance) alongside the
         // payment — the frontend consumes `response.debt`.
-        const { payment, debt } = await createUserDebtPayment(
-          userId,
-          req.body || {},
-        );
+        const { payment, debt } = await createUserDebtPayment(userId, payload);
         res.status(201).json({ payment, debt });
       } catch (error) {
         console.error("Debt payments POST error:", error);

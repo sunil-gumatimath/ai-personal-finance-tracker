@@ -27,6 +27,11 @@ export async function createUserAccount(
   data: Record<string, unknown>,
 ) {
   validateCreateAccountInput(data);
+  // `balance` is accepted here as an OPENING balance — creating an account that
+  // already exists in the real world legitimately needs one. It is rejected on
+  // UPDATE (see `updateUserAccount`) because after the row exists the
+  // `update_account_balance` trigger owns the value, and a manual correction
+  // would be silently overwritten by the next transaction.
   const account = await createAccount(userId, data);
   if (!account) throw new Error("Account creation failed");
 
@@ -52,6 +57,16 @@ export async function updateUserAccount(
   validateUpdateAccountInput(data);
   const oldAccount = await findAccountById(userId, id);
   if (!oldAccount) throw new NotFoundError("Account not found");
+
+  // Reject a balance correction outright rather than letting the query builder
+  // drop it silently. `balance` is trigger-owned, so accepting the write would
+  // look like it succeeded and then be overwritten by the next transaction —
+  // the worst outcome, because the user believes the correction stuck.
+  if (data.balance !== undefined) {
+    throw new ValidationError(
+      "Balance is calculated from transactions and cannot be edited directly",
+    );
+  }
 
   const account = await updateAccount(userId, id, data);
   if (!account) throw new ValidationError("No valid fields to update");

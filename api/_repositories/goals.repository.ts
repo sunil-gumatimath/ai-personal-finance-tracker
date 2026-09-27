@@ -13,7 +13,7 @@ export async function findGoalById(userId: string, id: string) {
 
 export async function listGoals(userId: string) {
   const { rows } = await query<GoalRow>(
-    "SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC",
+    "SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC, id DESC",
     [userId],
   );
   return rows;

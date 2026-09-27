@@ -34,19 +34,33 @@ export async function listTransactions({ userId, since, limit }: ListTransaction
   const limitClause = limit ? `LIMIT $${params.length + 1}` : "";
   if (limit) params.push(limit);
 
-  const { rows } = await query(
+  const { rows } = await query<TransactionRow & { total_count?: number }>(
     `
     SELECT
       t.*,
       row_to_json(c.*) as category,
       row_to_json(a.*) as account,
-      row_to_json(ta.*) as to_account
+      row_to_json(ta.*) as to_account,
+      -- Total matching rows BEFORE the limit, so the client can tell a
+      -- genuinely complete set from a truncated one. Without it the Reports
+      -- page had to infer truncation from the row count, which is wrong at
+      -- the boundary: a user with exactly 1000 transactions saw a truncation
+      -- warning for a set that was not truncated.
+      COUNT(*) OVER () as total_count
     FROM transactions t
     LEFT JOIN categories c ON t.category_id = c.id AND c.user_id = t.user_id
     LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
     LEFT JOIN accounts ta ON t.to_account_id = ta.id AND ta.user_id = t.user_id
     WHERE ${whereParts.join(" AND ")}
-    ORDER BY t.date DESC
+    -- The trailing ", t.id DESC" is a TIEBREAKER, not decoration.
+    --
+    -- Combined with a LIMIT, ordering by date alone makes WHICH rows survive
+    -- the cut non-deterministic: transactions sharing a date can come back in
+    -- any order. Reports requests limit: 1000, so a user with 1,050
+    -- transactions could get an arbitrary subset of one day's rows -- and the
+    -- September totals, category breakdown, trend chart and exported PDF would
+    -- all change on reload with no way for the client to detect it.
+    ORDER BY t.date DESC, t.id DESC
     ${limitClause}
     `,
     params,

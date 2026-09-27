@@ -5,7 +5,7 @@ export type AccountRow = Record<string, unknown> & { id: string; name?: string; 
 
 export async function listAccounts(userId: string) {
   const { rows } = await query(
-    "SELECT * FROM accounts WHERE user_id = $1 ORDER BY is_active DESC, name ASC",
+    "SELECT * FROM accounts WHERE user_id = $1 ORDER BY is_active DESC, name ASC, id ASC",
     [userId],
   );
   return rows;

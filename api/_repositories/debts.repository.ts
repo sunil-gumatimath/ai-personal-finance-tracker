@@ -14,7 +14,7 @@ export async function findDebtById(userId: string, id: string) {
 
 export async function listDebts(userId: string) {
   const { rows } = await query<DebtRow>(
-    "SELECT * FROM debts WHERE user_id = $1 ORDER BY is_active DESC, current_balance DESC",
+    "SELECT * FROM debts WHERE user_id = $1 ORDER BY is_active DESC, current_balance DESC, id ASC",
     [userId],
   );
   return rows;
@@ -25,7 +25,7 @@ export async function listDebtPayments(userId: string, debtId: string) {
     `
     SELECT * FROM debt_payments
     WHERE debt_id = $1 AND user_id = $2
-    ORDER BY payment_date DESC
+    ORDER BY payment_date DESC, id DESC
     LIMIT 10
     `,
     [debtId, userId],
