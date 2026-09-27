@@ -28,6 +28,53 @@ function getWeekStart(date = new Date()): string {
 	return `${y}-${m}-${dd}`;
 }
 
+/** First day of the current calendar month. */
+function getMonthStart(date = new Date()): string {
+	const d = new Date(date.getFullYear(), date.getMonth(), 1);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+/** First day of the current calendar year. */
+function getYearStart(date = new Date()): string {
+	return `${date.getFullYear()}-01-01`;
+}
+
+/**
+ * Stable archive key for a digest period.
+ *
+ * `week_start` is the `UNIQUE(user_id, week_start)` upsert key, so it has to
+ * identify the *period*, not the day the digest happened to be generated. It
+ * previously took `result.startDate` — a rolling `today - N days` date — which
+ * meant a "month" digest stored a date 30 days ago in a column named
+ * `week_start` (contradicting migration 005's "one row per user per week,
+ * Monday-based" intent), and regenerating the same period on a different
+ * calendar day produced a *different* key, so the upsert inserted a duplicate
+ * row instead of replacing the old one. The archive grew on every refresh.
+ *
+ * An explicit `startDate` (custom period) is honoured verbatim, since that one
+ * really is chosen by the user.
+ */
+function getPeriodStartDate(
+	period: "week" | "month" | "year" | "custom" | undefined,
+	requestedStart?: string,
+	fallbackStart?: string,
+): string {
+	if (period === "custom" && requestedStart) return requestedStart;
+	const now = new Date();
+	switch (period) {
+		case "month":
+			return getMonthStart(now);
+		case "year":
+			return getYearStart(now);
+		case "custom":
+			// No explicit start: any stable date identifies this custom window.
+			return fallbackStart ?? getWeekStart(now);
+		case "week":
+		default:
+			return getWeekStart(now);
+	}
+}
+
 /**
  * AI weekly digest: `GET /api/ai/digest` returns the latest stored digest;
  * `POST /api/ai/digest` generates (or regenerates) one for the current week
@@ -67,7 +114,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 			};
 
 			const result = await generateWeeklyDigestContent(userId, body, req.signal);
-			const weekStart = result.startDate || getWeekStart();
+			// Stable per-period key — see `getPeriodStartDate`. Using the rolling
+			// window start here made "regenerate" append duplicate archive rows.
+			const weekStart = getPeriodStartDate(
+				body.period,
+				body.startDate,
+				result.startDate,
+			);
 
 			// Upsert the digest for this timeframe.
 			const { rows } = await query<DigestRow>(

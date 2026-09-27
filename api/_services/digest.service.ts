@@ -8,6 +8,7 @@ import {
 	type DigestStats,
 } from "../_domain/ai-digest.js";
 import { formatCurrency } from "../_utils/format.js";
+import { toDateString } from "../_domain/budgets.js";
 
 interface DigestContextRow {
 	type: string;
@@ -93,10 +94,19 @@ export async function generateWeeklyDigestContent(
 	}
 
 	const today = new Date();
-	const endDateStr = options?.endDate || today.toISOString().slice(0, 10);
+	// LOCAL date strings, not `toISOString()`.
+	//
+	// `toISOString()` converts to UTC, so for a user east of Greenwich it
+	// reports *yesterday*. The app's default currency is INR (UTC+5:30), so at
+	// 02:00 local on the 27th the window became the 19th→26th instead of the
+	// 20th→27th: an 8-day window that silently excluded the current day, and so
+	// omitted today's spending from the AI summary for the first 5½ hours of
+	// every morning. `toDateString` (in `_domain/budgets.ts`) reads local date
+	// fields, which is what a user means by "today".
+	const endDateStr = options?.endDate || toDateString(today);
 	const startObj = new Date(today);
 	startObj.setDate(startObj.getDate() - days);
-	const startDateStr = options?.startDate || startObj.toISOString().slice(0, 10);
+	const startDateStr = options?.startDate || toDateString(startObj);
 
 	const formatNumber = (value: unknown): number =>
 		typeof value === "number" ? value : Number(value || 0);
@@ -114,20 +124,27 @@ export async function generateWeeklyDigestContent(
          FROM transactions t
          LEFT JOIN categories c ON t.category_id = c.id AND c.user_id = t.user_id
          WHERE t.user_id = $1 AND t.date >= $2::date AND t.date <= $3::date
-         ORDER BY t.date DESC`,
+         ORDER BY t.date DESC, t.id DESC`,
 			[userId, startDateStr, endDateStr],
 		),
 		query<DigestBudgetRow>(
+			// Window mirrors `getBudgetWindow` in `_domain/budgets.ts` — keep the
+			// two in step. The `t.date <= LEAST(...)` upper bound is the fix for
+			// future-dated expenses inflating the current period: nothing rejects
+			// future dates (scheduling and recurring entries need them), so
+			// without an upper bound next month's spending reported as this
+			// month's overspend.
 			`SELECT b.amount, b.period, c.name as category_name,
                 COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'expense'), 0) as spent
          FROM budgets b
          LEFT JOIN categories c ON b.category_id = c.id AND c.user_id = b.user_id
          LEFT JOIN transactions t ON t.category_id = b.category_id AND t.user_id = b.user_id
            AND t.date >= CASE b.period
-             WHEN 'weekly'  THEN GREATEST(COALESCE(b.start_date, '1970-01-01'::date), CURRENT_DATE - INTERVAL '7 days')
+             WHEN 'weekly'  THEN GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('week', CURRENT_DATE))
              WHEN 'monthly' THEN GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('month', CURRENT_DATE))
              ELSE GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('year', CURRENT_DATE))
            END
+           AND t.date <= LEAST(COALESCE(b.end_date, CURRENT_DATE), CURRENT_DATE)
          WHERE b.user_id = $1 AND (b.end_date IS NULL OR b.end_date >= CURRENT_DATE)
          GROUP BY b.id, b.amount, b.period, c.name`,
 			[userId],
