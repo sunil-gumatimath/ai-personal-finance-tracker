@@ -6,6 +6,16 @@ import type { LogEntry } from "@/types/api";
 
 export type WsStatus = "connected" | "reconnecting" | "disconnected";
 
+/**
+ * Client-side cap on retained log entries.
+ *
+ * The REST path is capped server-side (`DEFAULT_LIMIT` in logs.routes.ts) but
+ * the WebSocket path prepended entries without limit, so a long-lived dev tab
+ * grew the array forever — and because `computeStats` is an O(n) reduce run per
+ * message, every streamed event got progressively more expensive.
+ */
+const MAX_CLIENT_LOGS = 500;
+
 export interface LogStats {
 	total: number;
 	created: number;
@@ -90,6 +100,19 @@ export function useSystemLogs() {
 	const RECONNECT_BASE_DELAY_MS = 1000;
 	const RECONNECT_MAX_DELAY_MS = 30000;
 
+	// Mirror of `logs` so the socket handler can compute the next list without
+	// reading (and therefore depending on) state.
+	const logsRef = useRef<LogEntry[]>([]);
+
+	/**
+	 * Request generation counter.
+	 *
+	 * Without it, two overlapping `fetchInitialData()` calls (a manual refresh
+	 * plus a remount, or StrictMode's double-invoke) raced, and whichever
+	 * resolved last won regardless of order.
+	 */
+	const fetchSeqRef = useRef(0);
+
 	const updateStats = useCallback((currentLogs: LogEntry[]) => {
 		setStats(computeStats(currentLogs, serverTotalRef.current));
 	}, []);
@@ -100,17 +123,22 @@ export function useSystemLogs() {
 	 * `error` so the page can render an ErrorState instead of an empty state.
 	 */
 	const fetchInitialData = useCallback(async (): Promise<boolean> => {
+		const seq = ++fetchSeqRef.current;
 		try {
 			setLoading(true);
 			const logsData = await api.systemLogs.list();
+			// A newer request already started; its response is the one that counts.
+			if (seq !== fetchSeqRef.current) return false;
 			const fetchedLogs = logsData.logs || [];
 			serverTotalRef.current =
 				logsData.total ?? serverTotalRef.current ?? fetchedLogs.length;
+			logsRef.current = fetchedLogs;
 			setLogs(fetchedLogs);
 			updateStats(fetchedLogs);
 			setError(null);
 			return true;
 		} catch (err) {
+			if (seq !== fetchSeqRef.current) return false;
 			console.error("Failed to fetch logs:", err);
 			setError(
 				err instanceof Error
@@ -119,7 +147,7 @@ export function useSystemLogs() {
 			);
 			return false;
 		} finally {
-			setLoading(false);
+			if (seq === fetchSeqRef.current) setLoading(false);
 		}
 	}, [updateStats]);
 
@@ -165,11 +193,24 @@ export function useSystemLogs() {
 			try {
 				const log: LogEntry = JSON.parse(event.data);
 				serverTotalRef.current += 1;
-				setLogs((prev) => {
-					const newLogs = [log, ...prev];
-					updateStats(newLogs);
-					return newLogs;
-				});
+				// `setLogs` now caps the array, and `updateStats` is called with
+				// the SAME capped list that is stored.
+				//
+				// It used to run `updateStats` from INSIDE the `setLogs` updater
+				// function, which must be pure: React is free to re-invoke
+				// updaters (StrictMode double-invokes every one, and concurrent
+				// rendering can replay them), so `setStats` could fire during
+				// the render phase. Under StrictMode it also double-fired on
+				// every single streamed message.
+				//
+				// The array also grew without bound — the REST path caps at 200
+				// (`DEFAULT_LIMIT` in logs.routes.ts) but the socket path
+				// prepended forever, making every message an O(n) reduce plus an
+				// O(n) re-filter in the page, for the life of the tab.
+				const nextLogs = [log, ...logsRef.current].slice(0, MAX_CLIENT_LOGS);
+				logsRef.current = nextLogs;
+				setLogs(nextLogs);
+				updateStats(nextLogs);
 
 				if (log.severity === "critical") {
 					toast.error(`Critical Event: ${formatAction(log.action)}`, {
@@ -224,10 +265,31 @@ export function useSystemLogs() {
 		};
 	}, [updateStats, liveSupported]);
 
+	// Initial data fetch: runs ONCE on mount.
+	//
+	// This used to share an effect with the socket, whose callback closes over
+	// `liveSupported` — and `setLiveSupported(...)` was called from inside that
+	// same effect. So on localhost the effect ran twice: once with
+	// `liveSupported === false` (socket early-returned, fetch fired as request
+	// A), then again after state settled (fetch fired as request B). Two
+	// `GET /api/system-logs` per page load in dev, two `setLoading` cycles, and
+	// A/B racing each other. In production `isLiveFeedSupported()` returns
+	// false and `setLiveSupported(false)` bails out on `Object.is`, so it
+	// happened to be single-fetch there.
+	//
+	// A data concern gating a connection concern through one effect was the
+	// root cause; they are now separate.
+	useEffect(() => {
+		void fetchInitialData();
+	}, [fetchInitialData]);
+
+	// Socket lifecycle: depends on `liveSupported`, which is set once here.
+	useEffect(() => {
+		setLiveSupported(isLiveFeedSupported());
+	}, []);
+
 	useEffect(() => {
 		disposedRef.current = false;
-		setLiveSupported(isLiveFeedSupported());
-		fetchInitialData();
 		connectWebSocket();
 
 		return () => {
@@ -244,7 +306,7 @@ export function useSystemLogs() {
 				reconnectTimeoutRef.current = null;
 			}
 		};
-	}, [fetchInitialData, connectWebSocket]);
+	}, [connectWebSocket]);
 
 	return { logs, loading, stats, wsStatus, liveSupported, error, refresh: fetchInitialData };
 }
