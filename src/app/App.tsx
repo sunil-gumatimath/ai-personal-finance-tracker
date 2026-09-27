@@ -38,11 +38,13 @@ import { Toaster } from "@/components/ui/sonner";
 // Protected Route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	const { user, initializing } = useAuth();
-	// Gate ONLY on the initial session bootstrap; sign-in/up actions own their
-	// pending state at the page level.
-	const booted = initializing ?? false;
 
-	if (booted) {
+	// Gate ONLY on the initial session bootstrap; sign-in/up actions own their
+	// pending state at the page level. `initializing` is a plain boolean that
+	// starts `true`, so no `??` fallback is needed — and a `?? false` here
+	// would be actively unsafe, since defaulting an unknown boot state to
+	// "not booting" would render the app before the session check resolved.
+	if (initializing) {
 		return <FullScreenLoader label="Checking your session…" />;
 	}
 
@@ -56,9 +58,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // Public Route wrapper (redirect to dashboard if already logged in)
 function PublicRoute({ children }: { children: React.ReactNode }) {
 	const { user, initializing } = useAuth();
-	const booted = initializing ?? false;
 
-	if (booted) {
+	if (initializing) {
 		return <FullScreenLoader label="Checking your session…" />;
 	}
 

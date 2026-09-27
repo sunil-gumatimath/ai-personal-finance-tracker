@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { api } from '@/lib/api-client'
+import { api, isPublicAuthRoute } from '@/lib/api-client'
 import { authClient } from '@/lib/auth'
+import { ApiError } from '@/lib/errors'
 
 // Define types for Auth
 type UserMetadata = {
@@ -27,8 +28,6 @@ interface AuthContextType {
      * so pages own their own pending UI.
      */
     initializing: boolean
-    /** Legacy alias of `initializing`. */
-    loading: boolean
     signIn: (email: string, password: string) => Promise<void>
     signUp: (email: string, password: string, fullName: string) => Promise<void>
     signOut: () => Promise<void>
@@ -38,9 +37,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-/** Routes where an auth failure is expected — no forced redirect there. */
-const PUBLIC_AUTH_ROUTES = ['/login', '/signup', '/forgot-password']
 
 /**
  * Extracts an Error from unknown throwables / SDK error objects without ever
@@ -67,13 +63,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const restoreSession = useCallback(async () => {
         // Remove bearer tokens left by older releases. Authentication now
         // uses an HttpOnly same-site cookie that JavaScript cannot read.
-        localStorage.removeItem('auth_token')
+        //
+        // This MUST stay inside the try. `localStorage` throws SecurityError in
+        // Safari Private Browsing, when `dom.storage.enabled=false`, under
+        // enterprise policy, and in sandboxed iframes. When it threw here —
+        // before the try — the `finally` never ran, `initializing` stayed
+        // `true` forever, and the app sat on an unrecoverable
+        // "Checking your session…" loader with no login form and no error
+        // boundary to catch it.
+        try {
+            localStorage.removeItem('auth_token')
+        } catch {
+            // Storage unavailable; the cookie is the credential either way.
+        }
 
         try {
             const { user: authedUser } = await api.auth.me()
             setUser(authedUser)
         } catch (err) {
-            console.error('Failed to restore auth session:', err)
+            // A network failure is not the same as "signed out" — say so,
+            // otherwise a flaky connection silently bounces a valid session to
+            // the login page with no message and no retry.
+            if (err instanceof ApiError && err.code === 'NETWORK_ERROR') {
+                console.error('Could not reach the server to restore the session:', err)
+            } else {
+                console.error('Failed to restore auth session:', err)
+            }
             setUser(null)
         } finally {
             setInitializing(false)
@@ -81,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [])
 
     useEffect(() => {
-        restoreSession()
+        void restoreSession()
     }, [restoreSession])
 
     /**
@@ -114,10 +129,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [])
 
     const signOut = useCallback(async () => {
+        // Clear local state FIRST and unconditionally. Every step below is
+        // best-effort: a storage or provider failure must never leave the user
+        // apparently signed in, and must never throw out of a sign-out (the
+        // header awaits this, so a throw would skip its navigation).
+        setUser(null)
+        try {
+            localStorage.removeItem('auth_token')
+        } catch {
+            // Storage unavailable.
+        }
         await api.auth.logout().catch(() => undefined)
         await authClient.signOut().catch(() => undefined)
-        localStorage.removeItem('auth_token')
-        setUser(null)
     }, [])
 
     const resetPassword = useCallback(async (email: string) => {
@@ -136,9 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const deleteAccount = useCallback(async () => {
         try {
             await api.auth.deleteAccount()
-            await authClient.signOut().catch(() => undefined)
-            localStorage.removeItem('auth_token')
             setUser(null)
+            try {
+                localStorage.removeItem('auth_token')
+            } catch {
+                // Storage unavailable.
+            }
+            await authClient.signOut().catch(() => undefined)
         } catch (err) {
             console.error('Delete account error:', err)
             throw toError(err)
@@ -147,12 +174,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Global 401/403 handling: api-client dispatches this event on any auth
     // error outside the public routes; sign out and send the user to /login.
+    //
+    // Re-entrancy guarded: a page that fires several requests in parallel
+    // (Dashboard issues 5+, `useFinancialHealth` a `Promise.all` of 3) will
+    // dispatch one event per 401. Without the latch that meant N concurrent
+    // sign-outs, each doing a logout round-trip, plus N competing navigations.
     useEffect(() => {
+        let handling = false
         const handleSessionExpired = () => {
-            if (PUBLIC_AUTH_ROUTES.includes(location.pathname)) return
+            if (handling) return
+            if (isPublicAuthRoute(location.pathname)) return
+            handling = true
             void (async () => {
-                await signOut()
-                navigate('/login', { replace: true })
+                try {
+                    await signOut()
+                    navigate('/login', { replace: true })
+                } finally {
+                    handling = false
+                }
             })()
         }
         window.addEventListener('app:session-expired', handleSessionExpired)
@@ -198,7 +237,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         () => ({
             user,
             initializing,
-            loading: initializing,
             signIn,
             signUp,
             signOut,

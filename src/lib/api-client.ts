@@ -37,14 +37,35 @@ import type {
 } from "@/types";
 import { ApiError } from "@/lib/errors";
 
+/** Default ceiling for a single request. */
+const API_DEFAULT_TIMEOUT_MS = 1000 * 60;
+
+export class RequestAbortedError extends Error {
+	constructor() {
+		super("Request aborted");
+		this.name = "RequestAbortedError";
+	}
+}
+
 async function apiFetch<T>(
 	path: string,
-	options?: RequestInit,
+	options?: RequestInit & { timeoutMs?: number },
 ): Promise<T> {
 	const headers = new Headers(options?.headers);
 	if (!headers.has("Content-Type")) {
 		headers.set("Content-Type", "application/json");
 	}
+
+	// A hung request used to leave the UI waiting forever. The bootstrap
+	// `/api/auth?action=me` call had no timeout at all, so a server that
+	// accepted the connection and never answered parked the app on
+	// "Checking your session…" indefinitely.
+	const timeoutMs = options?.timeoutMs ?? API_DEFAULT_TIMEOUT_MS;
+	const timeoutSignal = AbortSignal.timeout(timeoutMs);
+	const callerSignal = options?.signal ?? null;
+	const signal = callerSignal
+		? AbortSignal.any([callerSignal, timeoutSignal])
+		: timeoutSignal;
 
 	let res: Response;
 	try {
@@ -52,8 +73,21 @@ async function apiFetch<T>(
 			...options,
 			headers,
 			credentials: "include",
+			signal,
 		});
-	} catch {
+	} catch (_err) {
+		// A caller-driven abort (component unmounted, request superseded) is a
+		// normal control-flow signal, not an error to surface. Callers that
+		// clean up in an effect need to be able to ignore it.
+		if (callerSignal?.aborted) {
+			throw new RequestAbortedError();
+		}
+		if (timeoutSignal.aborted) {
+			throw new ApiError("The request timed out. Please try again.", {
+				status: 0,
+				code: "TIMEOUT_ERROR",
+			});
+		}
 		// fetch() rejects on network failures (offline, server down, DNS
 		// issues) with a raw TypeError. Convert it to a typed ApiError so
 		// callers get a friendly message and a status they can branch on.
@@ -76,16 +110,49 @@ async function apiFetch<T>(
 		throw error;
 	}
 
-	return (await res.json()) as T;
+	return (await parseJsonBody<T>(res));
 }
 
-/** Routes where an auth error is expected and must not force a redirect loop. */
-function isPublicAuthRoute(pathname: string): boolean {
-	return ["/login", "/signup", "/forgot-password"].includes(pathname);
+/**
+ * Parse a JSON response body, tolerating the empty bodies that 204/205 and
+ * some HEAD-ish responses return.
+ *
+ * A bare `res.json()` throws a raw `SyntaxError` ("Unexpected end of JSON
+ * input") on an empty body, escaping as a non-`ApiError` that no caller
+ * recognises — so a legitimate 204 looked like a crash.
+ */
+async function parseJsonBody<T>(res: Response): Promise<T> {
+	if (res.status === 204 || res.status === 205) {
+		return undefined as T;
+	}
+	const text = await res.text();
+	if (text === "") return undefined as T;
+	try {
+		return JSON.parse(text) as T;
+	} catch {
+		throw new ApiError("The server returned an unreadable response.", {
+			status: res.status,
+			code: "INVALID_RESPONSE",
+		});
+	}
 }
 
-/** Default client timeout (ms) for AI requests so a hung upstream doesn't spin forever (M6). */
-const API_DEFAULT_TIMEOUT_MS = 1000 * 60;
+/**
+ * Routes where an auth error is expected and must not force a redirect loop.
+ *
+ * Single source of truth: `AuthContext` imports this rather than keeping its
+ * own copy. Two divergent copies of a security-relevant list is exactly how
+ * "/login redirects to /login" bugs appear.
+ *
+ * Trailing slashes are tolerated because React Router matches them, so an
+ * exact-match check let `/login/` fall through and fire a session-expired
+ * redirect on the login page itself.
+ */
+export function isPublicAuthRoute(pathname: string): boolean {
+	return ["/login", "/signup", "/forgot-password"].some(
+		(route) => pathname === route || pathname === `${route}/`,
+	);
+}
 
 export const api = {
 	auth: {
@@ -116,7 +183,8 @@ export const api = {
 			}),
 	},
 	accounts: {
-		list: () => apiFetch<AccountsListResponse>("/api/accounts"),
+		list: (signal?: AbortSignal) =>
+			apiFetch<AccountsListResponse>("/api/accounts", { signal }),
 		create: (data: AccountCreatePayload) =>
 			apiFetch<AccountResponse>("/api/accounts", {
 				method: "POST",
@@ -140,9 +208,10 @@ export const api = {
 			),
 	},
 	categories: {
-		list: (type?: string) =>
+		list: (type?: string, signal?: AbortSignal) =>
 			apiFetch<CategoriesListResponse>(
 				`/api/categories${type ? `?type=${encodeURIComponent(type)}` : ""}`,
+				{ signal },
 			),
 		create: (data: CategoryPayload) =>
 			apiFetch<CategoryResponse>("/api/categories", {
@@ -163,12 +232,14 @@ export const api = {
 			}),
 	},
 	transactions: {
-		list: (params?: { limit?: number; since?: string }) => {
+		list: (params?: { limit?: number; since?: string }, signal?: AbortSignal) => {
 			const qs = new URLSearchParams();
 			if (params?.limit) qs.set("limit", String(params.limit));
 			if (params?.since) qs.set("since", params.since);
 			const suffix = qs.toString() ? `?${qs.toString()}` : "";
-			return apiFetch<TransactionsListResponse>(`/api/transactions${suffix}`);
+			return apiFetch<TransactionsListResponse>(`/api/transactions${suffix}`, {
+				signal,
+			});
 		},
 		create: (data: TransactionCreatePayload) =>
 			apiFetch<TransactionResponse>("/api/transactions", {
@@ -195,7 +266,8 @@ export const api = {
 			),
 	},
 	budgets: {
-		list: () => apiFetch<BudgetsListResponse>("/api/budgets"),
+		list: (signal?: AbortSignal) =>
+			apiFetch<BudgetsListResponse>("/api/budgets", { signal }),
 		create: (data: BudgetPayload) =>
 			apiFetch<BudgetResponse>("/api/budgets", {
 				method: "POST",
@@ -249,11 +321,14 @@ export const api = {
 				apiFetch<DebtPaymentsListResponse>(
 					`/api/debts?action=payments&debtId=${encodeURIComponent(debtId)}`,
 				),
-			create: (data: DebtPaymentPayload) =>
-				apiFetch<DebtPaymentResponse>("/api/debts?action=payments", {
-					method: "POST",
-					body: JSON.stringify(data),
-				}),
+			create: (debtId: string, data: DebtPaymentPayload) =>
+				apiFetch<DebtPaymentResponse>(
+					`/api/debts?action=payments&debtId=${encodeURIComponent(debtId)}`,
+					{
+						method: "POST",
+						body: JSON.stringify(data),
+					},
+				),
 		},
 	},
 	ai: {
