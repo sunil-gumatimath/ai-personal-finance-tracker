@@ -58,3 +58,20 @@ export const currencyLocales: Record<string, string> = {
 	INR: "en-IN",
 	JPY: "ja-JP",
 };
+
+/**
+ * The set of currencies the app can actually render, derived from
+ * `currencyLocales` so the two can never drift.
+ *
+ * This is the client-side half of the validation the server also performs
+ * (`api/_routes/profile.routes.ts`). Persisted preferences can pre-date a
+ * change, be tampered with, or arrive from a `storage` event, so the client
+ * must not trust a stored currency string blindly: an unrecognised code makes
+ * `Intl.NumberFormat` throw a `RangeError` *during render*, which the
+ * ErrorBoundary turns into a blank authenticated app.
+ */
+export const SUPPORTED_CURRENCIES = Object.keys(currencyLocales);
+
+export function isSupportedCurrency(value: unknown): value is string {
+	return typeof value === "string" && SUPPORTED_CURRENCIES.includes(value);
+}
