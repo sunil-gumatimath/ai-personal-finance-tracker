@@ -102,7 +102,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           metadata 
         FROM system_logs 
         ${whereClause}
-        ORDER BY timestamp DESC 
+        ORDER BY timestamp DESC, id DESC 
         LIMIT $${values.length}`,
       values,
     )

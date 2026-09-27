@@ -1,21 +1,54 @@
 import type { LogEntry } from "@/types/api";
+import { formatUserDateLong } from "@/lib/format-date";
+import { toNumber } from "@/lib/number";
 
 /**
  * Optional formatting overrides threaded from user preferences. Omitted
  * fields fall back to the historical defaults (USD / en-US).
+ *
+ * `dateFormat` is here because `@/lib/format-date` documents itself as "the one
+ * place" that honours the user's Date Format setting — and this module was
+ * quietly bypassing it with bare `toLocaleDateString()` at five call sites,
+ * on the one page (System Logs) where a mismatch against the rest of the app is
+ * most visible.
  */
 export interface FormatOptions {
 	currency?: string;
 	locale?: string;
+	/** The user's `dateFormat` pattern, e.g. "dd/MM/yyyy". */
+	dateFormat?: string;
+	/** The user's currency, reused by `formatUserDateLong` for its locale. */
+	dateLocaleCurrency?: string;
 }
 
 const DEFAULT_FORMAT_OPTIONS: Required<FormatOptions> = {
 	currency: "USD",
 	locale: "en-US",
+	dateFormat: "MM/dd/yyyy",
+	dateLocaleCurrency: "USD",
 };
 
 function resolveFormatOptions(opts?: FormatOptions): Required<FormatOptions> {
 	return { ...DEFAULT_FORMAT_OPTIONS, ...opts };
+}
+
+/**
+ * Render a timestamp honouring the user's Date Format preference.
+ *
+ * Delegates to `formatUserDateLong`, which is the shared implementation. The
+ * absolute form keeps its time component, so the date part goes through the
+ * preference and the time is appended in the user's locale.
+ */
+function formatDateForUser(
+	date: Date,
+	opts: Required<FormatOptions>,
+	withTime: boolean,
+): string {
+	if (Number.isNaN(date.getTime())) return "—";
+	// `formatUserDateLong` needs a currency to derive a locale; reuse the one
+	// already resolved for amounts so both render in the same language.
+	const datePart = formatUserDateLong(date, { currency: opts.dateLocaleCurrency });
+	return withTime ? `${datePart}, ${date.toLocaleTimeString(opts.locale)}` : datePart;
 }
 
 export function formatAction(action: string): string {
@@ -52,12 +85,16 @@ export function formatResource(resource: string): {
 	return { type, id, short };
 }
 
-export function formatTimestamp(timestamp: string): {
+export function formatTimestamp(
+	timestamp: string,
+	opts?: FormatOptions,
+): {
 	absolute: string;
 	relative: string;
 } {
+	const resolved = resolveFormatOptions(opts);
 	const date = new Date(timestamp);
-	const absolute = date.toLocaleString();
+	const absolute = formatDateForUser(date, resolved, true);
 
 	const now = new Date();
 	const diffMs = now.getTime() - date.getTime();
@@ -71,7 +108,7 @@ export function formatTimestamp(timestamp: string): {
 	else if (diffMin < 60) relative = `${diffMin}m ago`;
 	else if (diffHr < 24) relative = `${diffHr}h ago`;
 	else if (diffDay < 7) relative = `${diffDay}d ago`;
-	else relative = date.toLocaleDateString();
+	else relative = formatDateForUser(date, resolved, false);
 
 	return { absolute, relative };
 }
@@ -83,12 +120,26 @@ export function formatTimestamp(timestamp: string): {
  */
 function formatCurrency(amount: string | number, opts?: FormatOptions): string {
 	const { currency, locale } = resolveFormatOptions(opts);
-	const num = typeof amount === "string" ? parseFloat(amount) : amount;
-	if (isNaN(num)) return String(amount);
-	return new Intl.NumberFormat(locale, {
-		style: "currency",
-		currency,
-	}).format(num);
+	// Reuse the strict money coercion rather than a bare `parseFloat`, which
+	// would silently accept a thousands separator as a decimal point
+	// ("1,234.56" → 1). This is also the one formatter here that previously had
+	// no guard against an invalid currency code, unlike its siblings
+	// (`lib/number.ts` and `api/_utils/format.ts`), which both have one.
+	const num = toNumber(amount);
+	if (typeof amount === "string" && amount.trim() !== "" && num === 0) {
+		return String(amount);
+	}
+	try {
+		return new Intl.NumberFormat(locale, {
+			style: "currency",
+			currency,
+		}).format(num);
+	} catch {
+		return new Intl.NumberFormat("en-US", {
+			style: "currency",
+			currency: "USD",
+		}).format(num);
+	}
 }
 
 export function formatFieldName(field: string): string {
@@ -129,11 +180,12 @@ export function formatFieldValue(
 	if (field === "amount" && (typeof value === "number" || typeof value === "string")) {
 		return formatCurrency(value, opts);
 	}
+	const resolved = resolveFormatOptions(opts);
 	if (field === "date" && (typeof value === "string" || typeof value === "number" || value instanceof Date)) {
-		return new Date(value).toLocaleDateString();
+		return formatDateForUser(new Date(value), resolved, false);
 	}
 	if ((field === "updated_at" || field === "created_at") && (typeof value === "string" || typeof value === "number" || value instanceof Date)) {
-		return new Date(value).toLocaleString();
+		return formatDateForUser(new Date(value), resolved, true);
 	}
 	if (field === "type" && typeof value === "string") {
 		return value.charAt(0).toUpperCase() + value.slice(1);

@@ -121,7 +121,7 @@ export function LogDetailDrawer({
 									{formatAction(log.action)}
 								</SheetTitle>
 								<SheetDescription className="text-xs mt-0.5">
-									{formatTimestamp(log.timestamp).absolute}
+									{formatTimestamp(log.timestamp, formatOptions).absolute}
 								</SheetDescription>
 							</div>
 						</div>
@@ -199,7 +199,7 @@ export function LogDetailDrawer({
 												Time
 											</span>
 											<span className="text-sm font-medium">
-												{formatTimestamp(log.timestamp).relative}
+												{formatTimestamp(log.timestamp, formatOptions).relative}
 											</span>
 										</div>
 									</CardContent>

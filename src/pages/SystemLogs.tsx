@@ -96,13 +96,17 @@ export function SystemLogs() {
 	const [inspectedLog, setInspectedLog] = useState<LogEntry | null>(null);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	// User's currency/locale threaded into every log formatter call.
+	// User's currency/locale/date-format threaded into every log formatter call.
+	// `dateFormat` was missing, which is why this page rendered browser-locale
+	// dates next to the user's chosen format everywhere else in the app.
 	const formatOptions = useMemo<FormatOptions>(
 		() => ({
 			currency: preferences.currency,
 			locale: currencyLocales[preferences.currency] || "en-US",
+			dateFormat: preferences.dateFormat,
+			dateLocaleCurrency: preferences.currency,
 		}),
-		[preferences.currency],
+		[preferences.currency, preferences.dateFormat],
 	);
 
 	const openDrawer = useCallback((log: LogEntry) => {
@@ -136,11 +140,15 @@ export function SystemLogs() {
 		setDateRange("all");
 	};
 
-	const hasActiveFilters =
+	// Explicitly boolean. The `||` chain made this `string | boolean`, which
+	// type-checked only because it was used in `&&`; rendering it or passing it
+	// to a boolean prop would have leaked the search string.
+	const hasActiveFilters: boolean = Boolean(
 		searchQuery ||
 		selectedAction !== "all" ||
 		selectedSeverity !== "all" ||
-		dateRange !== "all";
+		dateRange !== "all"
+	);
 
 	const filteredLogs = useMemo(() => {
 		const now = new Date();
@@ -155,10 +163,16 @@ export function SystemLogs() {
 		monthStart.setDate(monthStart.getDate() - 30);
 
 		return logs.filter((log) => {
+			// `action` is typed non-optional, but it comes from
+			// `audit-log.service` and a null there would throw inside this
+			// useMemo, blanking the page. The neighbouring `userEmail` already
+			// guards itself; `resource` did not.
+			const action = log.action ?? "";
+			const resource = log.resource ?? "";
 			const matchesSearch =
 				searchQuery === "" ||
-				log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				log.resource.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				resource.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				(log.userEmail || "")
 					.toLowerCase()
 					.includes(searchQuery.toLowerCase()) ||
@@ -192,7 +206,7 @@ export function SystemLogs() {
 
 	const exportLogs = (format: "json" | "csv") => {
 		// Export what the user currently sees (filtered), not the raw fetch.
-		const { content, filename } = buildLogExport(filteredLogs, format);
+		const { content, filename } = buildLogExport(filteredLogs, format, formatOptions);
 		downloadLogFile(content, filename);
 		toast.success(
 			filteredLogs.length === logs.length

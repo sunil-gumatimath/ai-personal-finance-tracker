@@ -6,6 +6,7 @@ import {
 	formatTimestamp,
 	generateHumanDescription,
 	getFieldChanges,
+	type FormatOptions,
 } from "./log-formatter";
 import { escapeCsvField } from "./csv";
 
@@ -21,8 +22,13 @@ export interface LogExport {
 export function buildLogExport(
 	logs: LogEntry[],
 	format: "json" | "csv",
+	opts?: FormatOptions,
 ): LogExport {
-	const baseName = `activity-logs-${new Date().toISOString().slice(0, 10)}`;
+	// LOCAL date, not `toISOString()` — the export is named for the user's day,
+	// and UTC reports yesterday for anyone east of Greenwich (the default
+	// currency here is INR, UTC+5:30).
+	const now = new Date();
+	const baseName = `activity-logs-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
 	if (format === "json") {
 		const enhancedLogs = logs.map((log) => ({
@@ -30,9 +36,9 @@ export function buildLogExport(
 			humanReadable: {
 				action: formatAction(log.action),
 				resource: formatResource(log.resource).short,
-				timestamp: formatTimestamp(log.timestamp),
-				description: generateHumanDescription(log),
-				fieldChanges: getFieldChanges(log.oldValue, log.newValue),
+				timestamp: formatTimestamp(log.timestamp, opts),
+				description: generateHumanDescription(log, opts),
+				fieldChanges: getFieldChanges(log.oldValue, log.newValue, opts),
 				metadata: formatMetadata(log.metadata),
 			},
 		}));
@@ -53,14 +59,14 @@ export function buildLogExport(
 		"Changes",
 	];
 	const rows = logs.map((log) => {
-		const changes = getFieldChanges(log.oldValue, log.newValue)
+		const changes = getFieldChanges(log.oldValue, log.newValue, opts)
 			.map((change) => change.summary)
 			.join("; ");
 		return [
-			formatTimestamp(log.timestamp).absolute,
+			formatTimestamp(log.timestamp, opts).absolute,
 			formatAction(log.action),
 			log.userEmail || "system",
-			generateHumanDescription(log),
+			generateHumanDescription(log, opts),
 			formatResource(log.resource).short,
 			log.severity,
 			log.status,

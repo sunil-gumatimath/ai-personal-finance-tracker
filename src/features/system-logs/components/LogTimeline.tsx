@@ -103,7 +103,7 @@ export function LogTimeline({
 						<div className="absolute left-[36px] top-6 bottom-6 w-px bg-border/60 hidden sm:block" />
 
 						{visibleLogs.map((log, index) => {
-							const timeInfo = formatTimestamp(log.timestamp);
+							const timeInfo = formatTimestamp(log.timestamp, formatOptions);
 							const description = generateHumanDescription(
 								log,
 								formatOptions,

@@ -46,7 +46,17 @@ export function formatUserDateShort(
 	preferences: Pick<Preferences, "dateFormat">,
 ): string {
 	if (Number.isNaN(date.getTime())) return "—";
-	return format(date, patternFor(preferences.dateFormat).replace("yyyy", ""));
+	// Drop ONLY the trailing year, keeping the separator that precedes it.
+	//
+	// A blanket `.replace("yyyy", "")` on the full pattern produced "d/M/" for
+	// `dd/MM/yyyy` and "M/d/" for `MM/dd/yyyy`, so every short date rendered as
+	// "26/9/" — with a trailing slash. It went unnoticed only because the
+	// function had no call sites.
+	const pattern = patternFor(preferences.dateFormat).replace(/yyyy/, "").trimEnd();
+	// A pattern that loses the year needs a year to be unambiguous about which
+	// century it refers to; fall back to the full form rather than emit a
+	// separator with no value after it.
+	return /[a-zA-Z]/.test(pattern) ? format(date, patternFor(preferences.dateFormat)) : format(date, pattern);
 }
 
 /**
