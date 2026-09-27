@@ -64,8 +64,16 @@ export function StrategyDialog({
   const currencySymbol = getCurrencySymbol(preferences.currency, locale);
 
   // Currency-aware axis ticks (compact form: $1.2K) using the app's locale.
+  // The privacy flag is threaded through so the projection chart cannot leak
+  // balances while `hideBalances` is on.
   const formatAxisTick = (val: number) =>
-    formatCompactCurrency(val, preferences.currency || "USD", locale);
+    formatCompactCurrency(
+      val,
+      preferences.currency || "USD",
+      locale,
+      1,
+      preferences.hideBalances,
+    );
 
   // Slider headroom scales with the actual debt load: twice the minimums,
   // rounded up to the step, never below $1000 so small debts stay adjustable.

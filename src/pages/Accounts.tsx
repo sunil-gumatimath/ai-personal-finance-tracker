@@ -59,6 +59,8 @@ import { PageHeading } from "@/components/layout";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { toNumber } from "@/lib/number";
+import { ApiError } from "@/lib/errors";
+import { AccountCardActions } from "@/features/accounts/AccountCardActions";
 import { SWATCHES } from "@/lib/palette";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -116,8 +118,10 @@ const SORT_OPTIONS: ReadonlyArray<{ value: SortOption; label: string }> = [
 export function Accounts() {
   const { user } = useAuth();
   const { formatCurrency, preferences } = usePreferences();
-// Single app-wide source of truth for balance masking (persisted + synced).
-const showBalances = !preferences.hideBalances;
+  // Balance masking now lives inside `formatCurrency` (see PreferencesContext),
+  // so every monetary surface honours the `hideBalances` switch. It used to be
+  // a file-local `showBalances` applied at 5 of 81 render sites, which left the
+  // Dashboard, Reports and every chart showing real amounts regardless.
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -256,11 +260,31 @@ const showBalances = !preferences.hideBalances;
       fetchAccounts();
     } catch (error) {
       console.error("Error saving account:", error);
-      toast.error("Failed to save account");
+      // Surface the server's message. A validation mismatch (e.g. a balance
+      // correction, which is now rejected) was previously reported as a bare
+      // "Failed to save account".
+      toast.error(
+        error instanceof ApiError ? error.message : "Failed to save account",
+      );
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Open the edit dialog pre-filled from an account row. Extracted so the
+  // Active and Inactive card grids share one implementation — it was inlined
+  // in both, and the two copies had already drifted.
+  const openEditDialog = useCallback((account: Account) => {
+    setEditingAccount(account);
+    setFormData({
+      name: account.name,
+      type: account.type,
+      balance: toNumber(account.balance).toString(),
+      color: account.color,
+      is_active: account.is_active,
+    });
+    setIsDialogOpen(true);
+  }, []);
 
   // Initiate delete - check for linked transactions first
   const initiateDelete = async (account: Account) => {
@@ -417,7 +441,7 @@ const showBalances = !preferences.hideBalances;
           <CardContent className="pt-4">
             <div className="flex flex-col gap-1">
               <h2 className="text-4xl sm:text-5xl font-black tracking-tighter tabular-nums bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-                {showBalances ? formatCurrency(totalBalance) : "••••••"}
+                {formatCurrency(totalBalance)}
               </h2>
               <div className="flex items-center gap-2 mt-2">
                 {totalBalance >= 0 ? (
@@ -453,7 +477,7 @@ const showBalances = !preferences.hideBalances;
           </CardHeader>
           <CardContent className="pt-4">
             <div className="text-2xl font-black tabular-nums text-[var(--income)] tracking-tight">
-              {showBalances ? formatCurrency(totalAssets) : "••••••"}
+              {formatCurrency(totalAssets)}
             </div>
           </CardContent>
         </Card>
@@ -472,7 +496,7 @@ const showBalances = !preferences.hideBalances;
           </CardHeader>
           <CardContent className="pt-4">
             <div className="text-2xl font-black tabular-nums text-[var(--expense)] tracking-tight">
-              {showBalances ? formatCurrency(totalLiabilities) : "••••••"}
+              {formatCurrency(totalLiabilities)}
             </div>
           </CardContent>
         </Card>
@@ -585,38 +609,11 @@ const showBalances = !preferences.hideBalances;
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/50 border border-border/50 shadow-inner transition-transform duration-200 group-hover:scale-105">
                         <Icon className="h-6 w-6" style={{ color }} />
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-60 hover:opacity-100 rounded-lg hover:bg-secondary"
-                          onClick={() => {
-                            setEditingAccount(account);
-                            setFormData({
-                              name: account.name,
-                              type: account.type,
-                              balance: account.balance.toString(),
-                              color: account.color,
-                              is_active: account.is_active,
-                            });
-                            setIsDialogOpen(true);
-                          }}
-                          title="Edit account"
-                          aria-label={`Edit ${account.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-60 hover:opacity-100 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => initiateDelete(account)}
-                          title="Delete account"
-                          aria-label={`Delete ${account.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <AccountCardActions
+                        account={account}
+                        onEdit={openEditDialog}
+                        onDelete={initiateDelete}
+                      />
                     </div>
                   </CardHeader>
 
@@ -633,9 +630,7 @@ const showBalances = !preferences.hideBalances;
                             : "text-[var(--expense)]",
                         )}
                       >
-                        {showBalances
-                          ? formatCurrency(toNumber(account.balance))
-                          : "••••••"}
+                        {formatCurrency(toNumber(account.balance))}
                       </h3>
                     </div>
 
@@ -689,38 +684,12 @@ const showBalances = !preferences.hideBalances;
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 border border-border/50">
                         <Icon className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg"
-                          onClick={() => {
-                            setEditingAccount(account);
-                            setFormData({
-                              name: account.name,
-                              type: account.type,
-                              balance: account.balance.toString(),
-                              color: account.color,
-                              is_active: account.is_active,
-                            });
-                            setIsDialogOpen(true);
-                          }}
-                          title="Edit account"
-                          aria-label={`Edit ${account.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
-                          onClick={() => initiateDelete(account)}
-                          title="Delete account"
-                          aria-label={`Delete ${account.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <AccountCardActions
+                        account={account}
+                        onEdit={openEditDialog}
+                        onDelete={initiateDelete}
+                        muted
+                      />
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4 pt-4">
@@ -736,9 +705,7 @@ const showBalances = !preferences.hideBalances;
                             : "text-[var(--expense)]",
                         )}
                       >
-                        {showBalances
-                          ? formatCurrency(toNumber(account.balance))
-                          : "••••••"}
+                        {formatCurrency(toNumber(account.balance))}
                       </h3>
                     </div>
                     <div className="pt-4 border-t border-border/30">

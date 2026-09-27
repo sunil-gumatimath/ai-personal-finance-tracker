@@ -38,10 +38,12 @@ const chartConfig = {
 } satisfies ChartConfig
 
 // Compact, currency-aware axis ticks (e.g. "$5k", "₹1.2L") using the user's locale.
+// `hidden` threads the balance-privacy switch through to the axis; without it a
+// chart leaked real amounts no matter what the user had toggled.
 const makeTickFormatter =
-    (currency: string, locale: string) =>
+    (currency: string, locale: string, hidden: boolean) =>
     (value: number): string =>
-        formatCompactCurrency(value, currency, locale)
+        formatCompactCurrency(value, currency, locale, 1, hidden)
 
 // Custom Tooltip — hoisted out of the component body so it isn't recreated on
 // every render (which forces Recharts to remount the tooltip layer).
@@ -274,7 +276,7 @@ export function SpendingChart({ data, isLoading = false }: SpendingChartProps) {
                             <YAxis
                                 tickLine={false}
                                 axisLine={false}
-                                tickFormatter={makeTickFormatter(preferences.currency, locale)}
+                                tickFormatter={makeTickFormatter(preferences.currency, locale, preferences.hideBalances)}
                                 tickMargin={10}
                                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
                             />

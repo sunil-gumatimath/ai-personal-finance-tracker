@@ -44,6 +44,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { api } from "@/lib/api-client";
 import { downloadTransactionsCsv } from "@/lib/transaction-csv";
 import { parseTransactionDate } from "@/lib/date-utils";
+import { savingsRatePercent } from "@/lib/date-range";
 import { formatCompactCurrency, toNumber } from "@/lib/number";
 import { formatUserDate, formatUserDateLong } from "@/lib/format-date";
 import { currencyLocales } from "@/types/preferences";
@@ -163,8 +164,16 @@ export function Reports() {
 				? transactionsRes.transactions
 				: [];
 			setTransactions(fetched as Transaction[]);
-			// The API caps results; flag when we may be looking at a subset.
-			setTruncated(fetched.length >= REPORTS_TX_LIMIT);
+			// Trust the server's own `truncated` flag, which is computed from
+			// `COUNT(*) OVER ()` before the limit. It used to be inferred from
+			// `fetched.length >= REPORTS_TX_LIMIT`, which showed a truncation
+			// warning to a user with exactly 1000 transactions when nothing had
+			// actually been dropped.
+			setTruncated(
+				typeof transactionsRes.truncated === "boolean"
+					? transactionsRes.truncated
+					: fetched.length >= REPORTS_TX_LIMIT,
+			);
 			setAccounts(
 				(Array.isArray(accountsRes.accounts)
 					? accountsRes.accounts
@@ -229,10 +238,8 @@ export function Reports() {
 		return { income, expenses, net: income - expenses };
 	}, [periodTransactions]);
 
-	const savingsRate =
-		totals.income > 0
-			? Math.round((totals.net / totals.income) * 1000) / 10
-			: 0;
+	// One shared definition (signed percentage) — see `savingsRatePercent`.
+	const savingsRate = Math.round(savingsRatePercent(totals.income, totals.expenses) * 10) / 10;
 
 	const categorySpending = useMemo<CategorySpend[]>(() => {
 		const byCategory = new Map<string, { amount: number; color: string }>();
@@ -614,7 +621,13 @@ export function Reports() {
 									fontSize={11}
 									width={70}
 									tickFormatter={(val) =>
-										formatCompactCurrency(Number(val), preferences.currency, locale)
+										formatCompactCurrency(
+										Number(val),
+										preferences.currency,
+										locale,
+										1,
+										preferences.hideBalances,
+									)
 									}
 								/>
 							<ChartTooltip
@@ -720,6 +733,8 @@ export function Reports() {
 														value,
 														preferences.currency,
 														locale,
+														1,
+														preferences.hideBalances,
 													)
 												}
 											/>
@@ -768,7 +783,18 @@ export function Reports() {
 										key={account.id}
 										className="flex items-center justify-between text-sm"
 									>
-										<span className="font-medium">{account.name}</span>
+										<span className="font-medium">
+										{account.name}
+										{/* Archived accounts are excluded from the Dashboard
+										    "Total Balance" and the Accounts page. Listing them
+										    here unlabelled left two different totals with no
+										    way to reconcile them. */}
+										{account.is_active === false && (
+											<span className="ml-2 text-xs text-muted-foreground">
+												(archived)
+											</span>
+										)}
+									</span>
 										<span className="font-mono">
 											{formatCurrency(toNumber(account.balance))}
 										</span>

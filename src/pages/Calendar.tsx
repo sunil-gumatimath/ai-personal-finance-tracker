@@ -289,7 +289,7 @@ export function Calendar() {
                                         <ArrowDownLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {/* Compact below sm so wide amounts stop clipping */}
                                         <span className="sm:hidden tabular-nums">
-                                            {formatCompactCurrency(day.summary.income, preferences.currency, locale)}
+                                            {formatCompactCurrency(day.summary.income, preferences.currency, locale, 1, preferences.hideBalances)}
                                         </span>
                                         <span className="hidden sm:inline tabular-nums">
                                             {formatCurrency(day.summary.income)}
@@ -300,7 +300,7 @@ export function Calendar() {
                                     <div className="flex items-center gap-1 rounded bg-[var(--expense)]/10 px-1 py-0.5 text-[10px] text-[var(--expense)]">
                                         <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden="true" />
                                         <span className="sm:hidden tabular-nums">
-                                            {formatCompactCurrency(day.summary.expense, preferences.currency, locale)}
+                                            {formatCompactCurrency(day.summary.expense, preferences.currency, locale, 1, preferences.hideBalances)}
                                         </span>
                                         <span className="hidden sm:inline tabular-nums">
                                             {formatCurrency(day.summary.expense)}
