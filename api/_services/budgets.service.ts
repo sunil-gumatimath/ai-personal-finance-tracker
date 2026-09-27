@@ -1,7 +1,8 @@
 import { NotFoundError, ValidationError } from "../_errors/AppError.js";
 import { assertUuid } from "../_domain/common.js";
 import {
-  getBudgetPeriodStartDate,
+  getBudgetWindow,
+  isDateInBudgetWindow,
   toDateString,
   validateCreateBudgetInput,
   validateUpdateBudgetInput,
@@ -19,7 +20,9 @@ import {
 
 export async function listUserBudgets(userId: string) {
   const now = new Date();
-  const earliestStartDate = toDateString(new Date(now.getFullYear(), 0, 1));
+  // Fetch a little extra history so a budget whose own `start_date` predates
+  // this calendar year still has transactions to sum.
+  const earliestStartDate = toDateString(new Date(now.getFullYear() - 1, 0, 1));
 
   const [budgets, transactions] = await Promise.all([
     listBudgets(userId),
@@ -35,13 +38,28 @@ export async function listUserBudgets(userId: string) {
   }
 
   return budgets.map((budget: BudgetRow) => {
-    const startDateStr = getBudgetPeriodStartDate(budget.period, now);
+    // One shared definition of the counting window, so this page, the AI
+    // digest, notifications and the financial-health score can no longer
+    // report four different numbers for the same budget on the same day.
+    const window = getBudgetWindow(
+      {
+        period: budget.period,
+        start_date: (budget.start_date as string | null) ?? null,
+        end_date: (budget.end_date as string | null) ?? null,
+      },
+      now,
+    );
     const categoryTransactions = transactionsByCategory.get(budget.category_id) || [];
     const spent = categoryTransactions
-      .filter((transaction) => transaction.date >= startDateStr)
+      .filter((transaction) => isDateInBudgetWindow(transaction.date, window))
       .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
 
-    return { ...budget, spent };
+    return {
+      ...budget,
+      spent,
+      period_start: window.start,
+      period_end: window.end,
+    };
   });
 }
 
@@ -60,9 +78,12 @@ export async function updateUserBudget(
   data: Record<string, unknown>,
 ) {
   assertUuid(id, "budget ID");
-  validateUpdateBudgetInput(data);
   const existing = await findBudgetById(userId, id);
   if (!existing) throw new NotFoundError("Budget not found");
+
+  // Validated against the post-update row so a patch that only moves
+  // `end_date` before the stored `start_date` is a 400, not a DB CHECK 500.
+  validateUpdateBudgetInput(data, existing);
 
   await assertBudgetReferencesOwned(userId, data, existing);
   const budget = await updateBudget(userId, id, data);

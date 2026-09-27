@@ -36,7 +36,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
       const prefs = profile?.preferences || {}
 
-      // Get budget alerts
+      // Get budget alerts.
+      //
+      // The window below mirrors `getBudgetWindow` in `_domain/budgets.ts` so
+      // this endpoint agrees with the Budgets page and the AI digest. It used
+      // to apply `CURRENT_DATE - INTERVAL '1 month'` to EVERY period, so a
+      // weekly or yearly budget was measured over the last 30 days, and it had
+      // no upper bound at all, so future-dated expenses counted against the
+      // current period.
       const { rows: budgetAlerts } = await query<BudgetAlertRow>(
         `
         SELECT
@@ -53,7 +60,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         LEFT JOIN transactions t ON b.category_id = t.category_id
           AND t.user_id = b.user_id
           AND t.type = 'expense'
-          AND t.date >= GREATEST(b.start_date, CURRENT_DATE - INTERVAL '1 month')
+          AND t.date >= CASE b.period
+            WHEN 'weekly'  THEN GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('week', CURRENT_DATE))
+            WHEN 'monthly' THEN GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('month', CURRENT_DATE))
+            ELSE GREATEST(COALESCE(b.start_date, '1970-01-01'::date), DATE_TRUNC('year', CURRENT_DATE))
+          END
+          AND t.date <= LEAST(COALESCE(b.end_date, CURRENT_DATE), CURRENT_DATE)
         WHERE b.user_id = $1
           AND (b.end_date IS NULL OR b.end_date >= CURRENT_DATE)
         GROUP BY b.id, b.amount, c.name, c.color, b.period, b.start_date, b.end_date
@@ -103,7 +115,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         LEFT JOIN categories c ON t.category_id = c.id
         WHERE t.user_id = $1
         AND t.date >= CURRENT_DATE - INTERVAL '7 days'
-        ORDER BY t.date DESC
+        ORDER BY t.date DESC, t.id DESC
         LIMIT 10
         `,
         [userId],

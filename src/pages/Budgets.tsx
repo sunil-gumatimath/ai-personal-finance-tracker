@@ -39,15 +39,17 @@ import { ApiError } from '@/lib/errors'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePreferences } from '@/hooks/usePreferences'
 import { toNumber } from '@/lib/number'
+import {
+	budgetProgressPercent,
+	budgetStatus,
+	toMonthlyEquivalent,
+} from '@/lib/budget-periods'
 import { cn } from '@/lib/utils'
 import type { Budget, Category } from '@/types'
 
-/** Monthly-equivalent multiplier so mixed-period budgets sum honestly. */
-const PERIOD_TO_MONTHLY: Record<Budget['period'], number> = {
-    weekly: 52 / 12,
-    monthly: 1,
-    yearly: 1 / 12,
-}
+// Monthly-equivalent multiplier and the shared overspend thresholds now live in
+// `@/lib/budget-periods` so the Dashboard's health score, this page, and the
+// server-side digest/notifications all aggregate mixed periods identically.
 
 function capitalizePeriod(period: Budget['period']): string {
     return period.charAt(0).toUpperCase() + period.slice(1)
@@ -55,10 +57,14 @@ function capitalizePeriod(period: Budget['period']): string {
 
 /** Threshold color for progress bars and % text, using money tokens. */
 function getProgressColor(spent: number, limit: number): string {
-    const percentage = limit > 0 ? (spent / limit) * 100 : spent > 0 ? 101 : 0
-    if (percentage >= 100) return 'var(--expense)'
-    if (percentage >= 80) return 'var(--color-amber-500)'
-    return 'var(--income)'
+    switch (budgetStatus(budgetProgressPercent(spent, limit))) {
+        case 'over':
+            return 'var(--expense)'
+        case 'warning':
+            return 'var(--color-amber-500)'
+        default:
+            return 'var(--income)'
+    }
 }
 
 export function Budgets() {
@@ -216,19 +222,18 @@ export function Budgets() {
     // Mixed periods can't be summed raw — normalize each to its monthly
     // equivalent first (weekly ×52/12, yearly ÷12), then aggregate.
     const totalBudget = budgets.reduce(
-        (sum, b) => sum + toNumber(b.amount) * PERIOD_TO_MONTHLY[b.period],
+        (sum, b) => sum + toMonthlyEquivalent(toNumber(b.amount), b.period),
         0,
     )
     const totalSpent = budgets.reduce(
-        (sum, b) => sum + toNumber(b.spent) * PERIOD_TO_MONTHLY[b.period],
+        (sum, b) => sum + toMonthlyEquivalent(toNumber(b.spent), b.period),
         0,
     )
     const periodCounts = budgets.reduce<Record<string, number>>((acc, b) => {
         acc[b.period] = (acc[b.period] ?? 0) + 1
         return acc
     }, {})
-    const totalPct =
-        totalBudget > 0 ? (totalSpent / totalBudget) * 100 : totalSpent > 0 ? 101 : 0
+    const totalPct = budgetProgressPercent(totalSpent, totalBudget)
 
     return (
         <div className="space-y-6">
@@ -420,12 +425,16 @@ export function Budgets() {
                         const spent = toNumber(budget.spent)
                         const limit = toNumber(budget.amount)
                         // TRUE percentage — never clamped for display.
-                        const rawPercentage =
-                            limit > 0 ? (spent / limit) * 100 : spent > 0 ? 101 : 0
+                        const rawPercentage = budgetProgressPercent(spent, limit)
                         // The bar itself still caps at 100 so the indicator stays put.
                         const barPercentage = Math.min(Math.max(rawPercentage, 0), 100)
-                        const isOverBudget = spent > limit
-                        const isApproaching = !isOverBudget && rawPercentage >= 80
+                        // Shared threshold, so this page and the AI digest cannot
+                        // disagree at the boundary. It used to be a strict `>` here
+                        // against `>=` server-side, so exactly 100% read as
+                        // "On track" here and "over budget" in the digest.
+                        const status = budgetStatus(rawPercentage)
+                        const isOverBudget = status === 'over'
+                        const isApproaching = status === 'warning'
                         const progressColor = getProgressColor(spent, limit)
 
                         return (
