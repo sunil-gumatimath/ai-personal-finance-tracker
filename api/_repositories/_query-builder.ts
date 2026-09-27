@@ -9,6 +9,19 @@ const ALLOWED_COLUMNS: Record<string, string[]> = {
 	accounts: [
 		"name",
 		"type",
+		// `balance` is allowed here ONLY as an opening balance on INSERT.
+		//
+		// It is a materialized running total maintained by the
+		// `update_account_balance` trigger on `transactions` (migration 001).
+		// A manual *correction* was silently destroyed by the next transaction
+		// on that account: correct Checking from ₹200 to ₹5,000, record a ₹100
+		// expense, and the trigger computed `5000 - 100 = 4900` — the
+		// correction vanished with no warning.
+		//
+		// So `accounts.service` rejects `balance` on update with an explicit
+		// error rather than letting the builder drop it silently. Creating an
+		// account that already exists in the real world legitimately needs to set
+		// an opening balance, so the create path still passes it through.
 		"balance",
 		"currency",
 		"color",
@@ -130,6 +143,52 @@ function validateColumns(table: string, columns: string[]): string[] {
 }
 
 /**
+ * Renumber `$n` placeholders in a caller-supplied WHERE clause to sit after the
+ * SET/INSERT values.
+ *
+ * Two guards, both latent-footgun fixes rather than live bugs (every call site
+ * passes a literal clause with a matching parameter count):
+ *
+ *  - The clause may only reference `$1 .. $paramCount`. Without this, a clause
+ *    mentioning `$3` with two params would silently renumber to a placeholder
+ *    that no longer exists.
+ *  - A `$n` inside a single-quoted string literal is left alone, so a literal
+ *    like `'cost $2'` is not rewritten.
+ *
+ * Implemented as a single scan rather than chained `.replace()` calls, because
+ * `String.replace` with a function does not expose the current match's index,
+ * and a naive "count quotes before this match" approach reads the wrong offset
+ * for any repeated placeholder.
+ */
+function offsetPlaceholders(
+	whereClause: string,
+	offset: number,
+	paramCount: number,
+): string {
+	const TOKEN = /'(?:[^']|'')*'|\$(\d+)/g;
+	let out = "";
+	let last = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = TOKEN.exec(whereClause)) !== null) {
+		out += whereClause.slice(last, match.index);
+		if (match[1] === undefined) {
+			// A quoted literal — copy through untouched.
+			out += match[0];
+		} else {
+			const n = parseInt(match[1], 10);
+			if (n < 1 || n > paramCount) {
+				throw new ValidationError("Invalid query parameter reference");
+			}
+			out += `$${n + offset}`;
+		}
+		last = match.index + match[0].length;
+	}
+	out += whereClause.slice(last);
+	return out;
+}
+
+/**
  * Builds a safe UPDATE query with parameterized values
  */
 export function buildUpdateQuery(
@@ -155,9 +214,10 @@ export function buildUpdateQuery(
 
 	// Add WHERE params after SET params
 	const whereParamOffset = keys.length;
-	const adjustedWhereClause = whereClause.replace(
-		/\$(\d+)/g,
-		(_, num) => `$${parseInt(num) + whereParamOffset}`,
+	const adjustedWhereClause = offsetPlaceholders(
+		whereClause,
+		whereParamOffset,
+		whereParams.length,
 	);
 
 	const text = `UPDATE "${table}" SET ${setClause} WHERE ${adjustedWhereClause} RETURNING *`;
@@ -185,18 +245,27 @@ export function buildInsertQuery(
 
 	// Add additional columns (like user_id). These are server-supplied, but
 	// still validate the keys so nothing unexpected can reach the SQL text.
+	const extraKeys: string[] = [];
 	if (additionalColumns) {
 		Object.entries(additionalColumns).forEach(([key, value]) => {
 			if (!IDENTIFIER_REGEX.test(key)) {
 				throw new ValidationError("Invalid insert column name");
 			}
-			keys.push(key);
+			extraKeys.push(key);
 			values.push(value);
 		});
 	}
 
-	const columns = keys.map((k) => `"${k}"`).join(", ");
-	const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
+	// A payload containing nothing but `user_id`/`id` used to build
+	// `INSERT INTO "x" () VALUES () RETURNING *` — a syntax error reported as an
+	// opaque 500. Reject it as the client error it is.
+	const allKeys = [...keys, ...extraKeys];
+	if (allKeys.length === 0) {
+		throw new ValidationError("No valid fields to create");
+	}
+
+	const columns = allKeys.map((k) => `"${k}"`).join(", ");
+	const placeholders = allKeys.map((_, i) => `$${i + 1}`).join(", ");
 	const text = `INSERT INTO "${table}" (${columns}) VALUES (${placeholders}) RETURNING *`;
 
 	return { text, values };

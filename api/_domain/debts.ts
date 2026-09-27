@@ -6,10 +6,8 @@ import {
   assertOptionalBoundedString,
   assertPositiveNumber,
   assertRequiredString,
+  MAX_MONEY_AMOUNT,
 } from "./common.js";
-
-/** Sane ceiling for money amounts (DECIMAL(15,2) columns). */
-const MAX_AMOUNT = 1_000_000_000_000;
 
 const DEBT_TYPES = [
   "mortgage",
@@ -22,13 +20,13 @@ const DEBT_TYPES = [
 ] as const;
 
 function assertAmount(value: unknown, message: string) {
-  assertNumberInRange(value, 0.01, MAX_AMOUNT, message);
+  assertNumberInRange(value, 0.01, MAX_MONEY_AMOUNT, message);
 }
 
 /** Non-negative optional amount (principal portions, minimum payments…). */
 function assertNonNegativeAmount(value: unknown, message: string) {
   if (value === undefined || value === null) return;
-  assertNumberInRange(value, 0, MAX_AMOUNT, message);
+  assertNumberInRange(value, 0, MAX_MONEY_AMOUNT, message);
 }
 
 export function validateCreateDebtInput(data: Record<string, unknown>) {
@@ -51,7 +49,7 @@ export function validateUpdateDebtInput(data: Record<string, unknown>) {
     assertNumberInRange(
       data.current_balance,
       0,
-      MAX_AMOUNT,
+      MAX_MONEY_AMOUNT,
       "Current balance must be a non-negative number",
     );
   }
@@ -111,7 +109,26 @@ export function validateUpdateDebtInput(data: Record<string, unknown>) {
 /**
  * Payment amounts must line up with the DB CHECKs: amount > 0, principal and
  * interest each >= 0, and principal + interest <= total amount.
+ *
+ * `principal_amount` is resolved here rather than left to the column's
+ * `NOT NULL DEFAULT 0`. That default was a silent money bug: the overpayment
+ * pre-check in `debts.service` treats an omitted principal as the full
+ * `amount`, so the request validated cleanly — but the row stored 0, and since
+ * migration 006 derives `debts.current_balance` from `SUM(principal_amount)`,
+ * **the debt balance simply never moved**. Resolving the value in the domain
+ * means validation and persistence can no longer disagree about what an
+ * omission means.
  */
+export function resolveDebtPaymentPrincipal(data: Record<string, unknown>): number {
+  const raw = data.principal_amount;
+  if (raw === undefined || raw === null || raw === "") {
+    const amount = Number(data.amount);
+    const interest = Number(data.interest_amount ?? 0);
+    return Number.isFinite(amount) ? Math.max(0, amount - (Number.isFinite(interest) ? interest : 0)) : 0;
+  }
+  return Number(raw);
+}
+
 export function validateCreateDebtPaymentInput(data: Record<string, unknown>) {
   assertRequiredString(data.debt_id, "Debt ID is required");
   assertAmount(data.amount, "Valid payment amount is required");
@@ -130,10 +147,16 @@ export function validateCreateDebtPaymentInput(data: Record<string, unknown>) {
       "Interest amount must be a non-negative number",
     );
   }
+  // The sum check has to consider the *resolved* parts, not just the ones the
+  // client happened to send. Previously, sending only `amount` skipped the
+  // check entirely and relied on the DB CHECK to raise a 500.
+  const resolvedPrincipal = resolveDebtPaymentPrincipal(data);
+  const resolvedInterest =
+    interest === undefined || interest === null ? 0 : Number(interest);
   if (
-    typeof principal === "number" &&
-    typeof interest === "number" &&
-    principal + interest > (data.amount as number)
+    Number.isFinite(resolvedPrincipal) &&
+    Number.isFinite(resolvedInterest) &&
+    resolvedPrincipal + resolvedInterest > (data.amount as number)
   ) {
     throw new ValidationError(
       "Principal plus interest cannot exceed the payment amount",

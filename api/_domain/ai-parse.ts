@@ -5,6 +5,8 @@
  * parse is rejected when the shape is unusable).
  */
 
+import { isCalendarDateString } from "./common.js";
+
 type ParsedTransactionType = "income" | "expense" | "transfer";
 
 export interface ParsedTransaction {
@@ -27,17 +29,12 @@ const VALID_TYPES = new Set<ParsedTransactionType>([
 	"transfer",
 ]);
 
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
+// Delegates to the one calendar-date implementation in `_domain/common.ts`.
+// This file previously carried a byte-identical copy (and a THIRD existed in
+// `_domain/transactions.ts`), so a fix to the date rules had to be applied three
+// times. `assertIsoDateString` now uses the shared version too.
 function isDateString(value: unknown): value is string {
-	if (typeof value !== "string" || !DATE_REGEX.test(value)) return false;
-	const [y, m, d] = value.split("-").map(Number);
-	const date = new Date(y, m - 1, d);
-	return (
-		date.getFullYear() === y &&
-		date.getMonth() === m - 1 &&
-		date.getDate() === d
-	);
+	return isCalendarDateString(value);
 }
 
 function cleanString(value: unknown, maxLength: number): string | null {
@@ -47,16 +44,39 @@ function cleanString(value: unknown, maxLength: number): string | null {
 	return trimmed.slice(0, maxLength);
 }
 
-/** The AI may return amounts as strings ("$45.50") — coerce defensively. */
+/**
+ * The AI may return amounts as strings ("$45.50") — coerce defensively.
+ *
+ * The positivity check is re-applied AFTER rounding. It used to be checked only
+ * on the pre-rounding value while the rounded value was returned, so `0.001`
+ * and `"0.004"` both produced `0` — not `null`. The caller only tests
+ * `amount === null`, so the route answered 200 with `amount: 0`, violating this
+ * function's own `> 0` contract, and the dialog prefilled "0" for a request
+ * the server had declared valid.
+ *
+ * The string branch also no longer strips characters that change magnitude.
+ * `replace(/[^0-9.-]/g, "")` turned `"1e5"` into `15` (a 6,667× understatement)
+ * and `"1.5e3"` into `1.53`. Exponent notation is rejected outright instead,
+ * which is the honest answer for an amount a model produced.
+ */
 function parseAmount(value: unknown): number | null {
 	if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-		return Math.round(value * 100) / 100;
+		const rounded = Math.round(value * 100) / 100;
+		return rounded > 0 ? rounded : null;
 	}
 	if (typeof value === "string") {
-		const cleaned = value.replace(/[^0-9.-]/g, "");
+		// Tolerate a leading currency symbol and thousands separators, which a
+		// model legitimately emits. Reject anything else rather than stripping
+		// it, because stripping can silently change the number.
+		const cleaned = value
+			.trim()
+			.replace(/^[₹$€£¥]\s*/, "")
+			.replace(/,(?=\d{3}\b)/g, "");
+		if (!/^\+?(?:\d+(?:\.\d+)?|\.\d+)$/.test(cleaned)) return null;
 		const parsed = Number(cleaned);
 		if (Number.isFinite(parsed) && parsed > 0) {
-			return Math.round(parsed * 100) / 100;
+			const rounded = Math.round(parsed * 100) / 100;
+			return rounded > 0 ? rounded : null;
 		}
 	}
 	return null;

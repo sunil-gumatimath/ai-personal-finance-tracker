@@ -4,10 +4,8 @@ import {
   assertOptionalBoundedString,
   assertPositiveNumber,
   assertRequiredString,
+  MAX_MONEY_AMOUNT,
 } from "./common.js";
-
-/** Sane ceiling for money amounts (DECIMAL(15,2) columns). */
-const MAX_AMOUNT = 1_000_000_000_000;
 
 export function validateCreateGoalInput(data: Record<string, unknown>) {
   assertRequiredString(data.name, "Goal name is required");
@@ -24,7 +22,7 @@ export function validateUpdateGoalInput(data: Record<string, unknown>) {
     assertNumberInRange(
       data.target_amount,
       0.01,
-      MAX_AMOUNT,
+      MAX_MONEY_AMOUNT,
       "Valid target amount is required",
     );
   }
@@ -32,7 +30,7 @@ export function validateUpdateGoalInput(data: Record<string, unknown>) {
     assertNumberInRange(
       data.current_amount,
       0,
-      MAX_AMOUNT,
+      MAX_MONEY_AMOUNT,
       "Current amount must be a finite non-negative number",
     );
   }

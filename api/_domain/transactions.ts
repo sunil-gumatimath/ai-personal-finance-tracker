@@ -1,4 +1,8 @@
 import { ValidationError } from "../_errors/AppError.js";
+import {
+	assertMoneyAmount,
+	isCalendarDateString,
+} from "./common.js";
 export { assertUuid } from "./common.js";
 
 export type TransactionType = "income" | "expense" | "transfer";
@@ -45,14 +49,6 @@ export function assertPositiveAmount(value: unknown) {
 	}
 }
 
-export function validateCreateTransactionInput(data: TransactionInput) {
-	parseTransactionType(data.type);
-	assertPositiveAmount(data.amount);
-}
-
-/** Sane ceiling for money amounts (DECIMAL(15,2) columns). */
-const MAX_AMOUNT = 1_000_000_000_000;
-
 const MAX_TEXT_LENGTHS = { description: 500, notes: 2000 } as const;
 
 function assertBoundedText(value: unknown, max: number, message: string) {
@@ -62,23 +58,94 @@ function assertBoundedText(value: unknown, max: number, message: string) {
 }
 
 /**
+ * The DB enforces this as a CHECK constraint
+ * (`transfer_requires_to_account`, migration 001):
+ *
+ *   (type = 'transfer' AND to_account_id IS NOT NULL) OR
+ *   (type != 'transfer' AND to_account_id IS NULL)
+ *
+ * Validating it here too turns what used to be a raw Postgres error surfacing
+ * as a 500 into a 400 the client can act on. The constraint is bidirectional,
+ * so an expense carrying a stray `to_account_id` was equally fatal.
+ */
+function assertTransferInvariant(
+	type: TransactionType,
+	toAccountId: unknown,
+): void {
+	const hasDestination =
+		typeof toAccountId === "string" && toAccountId.trim().length > 0;
+	if (type === "transfer" && !hasDestination) {
+		throw new ValidationError(
+			"A destination account is required for transfers",
+		);
+	}
+	if (type !== "transfer" && hasDestination) {
+		throw new ValidationError(
+			"A destination account is only valid for transfers",
+		);
+	}
+}
+
+export function validateCreateTransactionInput(data: TransactionInput) {
+	const type = parseTransactionType(data.type);
+	assertMoneyAmount(data.amount, "Valid amount is required");
+
+	// Create used to check only the type and the amount. Everything below was
+	// enforced only on update (or only by Postgres), so a `POST` carrying a junk
+	// date, a non-string description, or a string where a boolean belongs
+	// reached the database and came back as an opaque 500.
+	if (data.date !== undefined && data.date !== null) {
+		if (!isCalendarDateString(data.date)) {
+			throw new ValidationError("Invalid date format. Use YYYY-MM-DD");
+		}
+	}
+	if (data.description !== undefined && data.description !== null) {
+		assertBoundedText(
+			data.description,
+			MAX_TEXT_LENGTHS.description,
+			`Description must be at most ${MAX_TEXT_LENGTHS.description} characters`,
+		);
+	}
+	if (data.notes !== undefined && data.notes !== null) {
+		assertBoundedText(
+			data.notes,
+			MAX_TEXT_LENGTHS.notes,
+			`Notes must be at most ${MAX_TEXT_LENGTHS.notes} characters`,
+		);
+	}
+	for (const key of ["account_id", "to_account_id", "category_id"] as const) {
+		const value = data[key];
+		if (value === undefined || value === null || value === "") continue;
+		if (typeof value !== "string") {
+			throw new ValidationError(`Invalid ${key.replace("_", " ")}`);
+		}
+	}
+	if (data.is_recurring !== undefined && data.is_recurring !== null) {
+		if (typeof data.is_recurring !== "boolean") {
+			throw new ValidationError("is_recurring must be a boolean");
+		}
+	}
+	assertTransferInvariant(type, data.to_account_id);
+}
+
+/**
  * Partial update semantics: only validate the keys that are present, but
  * validate those strictly so bad values never reach Postgres. Recurring
  * fields are normalized separately by sanitizeRecurringInput.
  */
-export function validateUpdateTransactionInput(data: TransactionInput) {
-	if ("type" in data && data.type !== undefined) {
-		parseTransactionType(data.type);
-	}
+export function validateUpdateTransactionInput(
+	data: TransactionInput,
+	existing?: TransactionInput,
+) {
+	const type =
+		"type" in data && data.type !== undefined
+			? parseTransactionType(data.type)
+			: typeof existing?.type === "string"
+				? (existing.type as TransactionType)
+				: null;
+
 	if ("amount" in data) {
-		if (
-			typeof data.amount !== "number" ||
-			!Number.isFinite(data.amount) ||
-			data.amount <= 0 ||
-			data.amount > MAX_AMOUNT
-		) {
-			throw new ValidationError("Valid amount is required");
-		}
+		assertMoneyAmount(data.amount, "Valid amount is required");
 	}
 	if ("description" in data && data.description !== null) {
 		assertBoundedText(
@@ -95,7 +162,7 @@ export function validateUpdateTransactionInput(data: TransactionInput) {
 		);
 	}
 	if ("date" in data && data.date !== undefined && data.date !== null) {
-		if (typeof data.date !== "string" || !DATE_REGEX.test(data.date)) {
+		if (!isCalendarDateString(data.date)) {
 			throw new ValidationError("Invalid date format. Use YYYY-MM-DD");
 		}
 	}
@@ -112,6 +179,16 @@ export function validateUpdateTransactionInput(data: TransactionInput) {
 		typeof data.is_recurring !== "boolean"
 	) {
 		throw new ValidationError("is_recurring must be a boolean");
+	}
+	// The transfer invariant is evaluated against the POST-update row, so a
+	// partial update that flips `type` without supplying (or clearing)
+	// `to_account_id` is caught here instead of aborting on the DB CHECK as a
+	// 500. Pass the stored row so a partial update that touches neither field
+	// is still validated correctly.
+	if (type) {
+		const effectiveDestination =
+			"to_account_id" in data ? data.to_account_id : existing?.to_account_id;
+		assertTransferInvariant(type, effectiveDestination);
 	}
 }
 
@@ -203,16 +280,9 @@ export function computeNextDueDate(
 	return formatDateLocal(base);
 }
 
-/** True when `value` is a plausible YYYY-MM-DD calendar date. */
+/** True when `value` is a real YYYY-MM-DD calendar date. */
 function isDateString(value: unknown): value is string {
-	if (typeof value !== "string" || !DATE_REGEX.test(value)) return false;
-	const [y, m, d] = value.split("-").map(Number);
-	const date = new Date(y, m - 1, d);
-	return (
-		date.getFullYear() === y &&
-		date.getMonth() === m - 1 &&
-		date.getDate() === d
-	);
+	return isCalendarDateString(value);
 }
 
 function assertRecurringFrequency(value: unknown): RecurringFrequency {
