@@ -1,6 +1,6 @@
 import { NotFoundError, ValidationError } from "../_errors/AppError.js";
 import { assertUuid } from "../_domain/common.js";
-import { validateCategoryType, validateCreateCategoryInput } from "../_domain/categories.js";
+import { validateCategoryType, validateCreateCategoryInput, validateUpdateCategoryInput } from "../_domain/categories.js";
 import { ensureDefaultCategories } from "../_utils/default-categories.js";
 import { assertCategoryReferencesOwned } from "./ownership.service.js";
 import {
@@ -9,6 +9,7 @@ import {
   findCategoryById,
   listCategories,
   updateCategory,
+  wouldCreateCategoryCycle,
 } from "../_repositories/categories.repository.js";
 
 export async function listUserCategories(userId: string, type?: string) {
@@ -35,7 +36,21 @@ export async function updateUserCategory(
   const existing = await findCategoryById(userId, id);
   if (!existing) throw new NotFoundError("Category not found");
 
-  await assertCategoryReferencesOwned(userId, data);
+  // This call previously did not exist, so an update could set an unchecked
+  // `type` (a 500 from the DB CHECK) and an unchecked `parent_id` (a cycle).
+  validateUpdateCategoryInput(data);
+
+  await assertCategoryReferencesOwned(userId, data, existing);
+
+  // Reject a parent assignment that would make the hierarchy cyclic.
+  if (data.parent_id !== undefined && data.parent_id !== null && data.parent_id !== "") {
+    const parentId = String(data.parent_id);
+    if (await wouldCreateCategoryCycle(userId, id, parentId)) {
+      throw new ValidationError(
+        "That parent would create a circular category hierarchy",
+      );
+    }
+  }
 
   const category = await updateCategory(userId, id, data);
   if (!category) throw new ValidationError("No valid fields to update");

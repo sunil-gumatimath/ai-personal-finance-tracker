@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { ValidationError, NotFoundError } from "../_errors/AppError.js";
-import { OwnershipError } from "../_services/ownership.service.js";
 import {
 	makeRequest,
 	makeResponse,
@@ -166,12 +165,14 @@ describe("DELETE /api/accounts?id=…", () => {
 		);
 	});
 
-	test("403 maps OwnershipError (cross-user access attempt)", async () => {
+	// Cross-tenant access resolves as 404, not 403. `assertOwned` deliberately
+	// raises NotFoundError so a foreign id is indistinguishable from a missing
+	// one — a 403 would confirm the row exists. This test used to construct an
+	// `OwnershipError` that nothing in the codebase ever threw.
+	test("404 maps a cross-tenant account to not-found (no existence oracle)", async () => {
 		authMock.mockImplementation(() => Promise.resolve("user-123"));
 		service.deleteUserAccount.mockImplementation(() =>
-			Promise.reject(
-				new OwnershipError("Account does not belong to user", 403),
-			),
+			Promise.reject(new NotFoundError("Account not found")),
 		);
 		const restore = silenceConsoleError();
 		const { res, captured } = makeResponse();
@@ -180,9 +181,9 @@ describe("DELETE /api/accounts?id=…", () => {
 			res,
 		);
 		restore();
-		expect(captured.statusCode).toBe(403);
+		expect(captured.statusCode).toBe(404);
 		expect(captured.body).toEqual({
-			error: "Account does not belong to user",
+			error: "Account not found",
 		});
 	});
 });
