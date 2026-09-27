@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
 import { parseTransactionDate } from "@/lib/date-utils";
 import { toNumber } from "@/lib/number";
+import { toDateKey, savingsRatePercent } from "@/lib/date-range";
 import type {
 	Transaction,
 	DashboardStats,
@@ -38,12 +39,11 @@ interface ExtendedDashboardStats extends DashboardStats {
 	expensesChange: number | null;
 }
 
-// Helper to get local date string (YYYY-MM-DD) to avoid timezone issues
+// Local YYYY-MM-DD for a Date. Same logic as `toDateKey` in @/lib/date-range;
+// kept local because it takes a `Date` and is only used to build period
+// boundaries here. Transaction dates go through `toDateKey`.
 function getLocalDateString(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, "0");
-	const day = String(date.getDate()).padStart(2, "0");
-	return `${year}-${month}-${day}`;
+	return toDateKey(date);
 }
 
 const EMPTY_STATS: ExtendedDashboardStats = {
@@ -149,31 +149,22 @@ export function Dashboard() {
 			};
 
 			const twoMonthData = allTransactions.filter((t) => {
-				const dateVal = String(t.date).split("T")[0];
-				return dateVal >= startOfLastMonthStr;
+				return toDateKey(t.date) >= startOfLastMonthStr;
 			}) as TwoMonthRow[];
 
 			{
-				// Helper to normalize date to YYYY-MM-DD (PostgreSQL may return Date objects or ISO strings)
-				const normalizeDate = (dateVal: string | Date): string => {
-					if (dateVal instanceof Date) {
-						const year = dateVal.getFullYear();
-						const month = String(dateVal.getMonth() + 1).padStart(2, "0");
-						const day = String(dateVal.getDate()).padStart(2, "0");
-						return `${year}-${month}-${day}`;
-					}
-					// If it's a string, strip time portion if present
-					return String(dateVal).split("T")[0];
-				};
-
-				// Split into current and last month
+				// Split into current and last month. `toDateKey` is the shared
+				// local-date extraction; the hand-rolled `normalizeDate` this
+				// replaces used `String(date).split("T")[0]`, which silently
+				// misbehaves for a `Date` (String(Date) has no "T", so the split
+				// returned the whole string).
 				const currentMonthData = twoMonthData.filter(
-					(t) => normalizeDate(t.date) >= startOfMonthStr,
+					(t) => toDateKey(t.date) >= startOfMonthStr,
 				);
 				const lastMonthData = twoMonthData.filter(
 					(t) =>
-						normalizeDate(t.date) >= startOfLastMonthStr &&
-						normalizeDate(t.date) < startOfMonthStr,
+						toDateKey(t.date) >= startOfLastMonthStr &&
+						toDateKey(t.date) < startOfMonthStr,
 				);
 
 				// Calculate current month stats
@@ -208,7 +199,7 @@ export function Dashboard() {
 					monthlyIncome: income,
 					monthlyExpenses: expenses,
 					monthlyNet: income - expenses,
-					savingsRate: income > 0 ? ((income - expenses) / income) * 100 : 0,
+					savingsRate: savingsRatePercent(income, expenses),
 					lastMonthIncome,
 					lastMonthExpenses,
 					incomeChange,
@@ -300,7 +291,7 @@ export function Dashboard() {
 
 			// Fetch 6-month trend data
 			const trendData = allTransactions
-				.filter((t) => String(t.date).split("T")[0] >= sixMonthsAgoStr)
+				.filter((t) => toDateKey(t.date) >= sixMonthsAgoStr)
 				.map((t) => ({
 					type: t.type,
 					amount: t.amount as number,

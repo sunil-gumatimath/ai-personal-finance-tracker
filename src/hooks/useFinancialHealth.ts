@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
-import { api } from '@/lib/api-client'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { api, RequestAbortedError } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { toNumber } from '@/lib/number'
+import { toMonthlyEquivalent } from '@/lib/budget-periods'
+import { isDateInRange, savingsRatePercent, savingsScoreFromPercent, toDateKey, toMonthKey } from '@/lib/date-range'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 import type { Transaction, Budget, Account } from '@/types'
 
@@ -53,9 +55,21 @@ export function useFinancialHealth() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    /**
+     * Request generation counter.
+     *
+     * `refresh` is exposed to callers, so two runs can overlap (a click plus a
+     * remount, or StrictMode's double-invoke). Whichever resolved last used to
+     * win, regardless of which was newer. The counter makes the newest request
+     * authoritative and lets a superseded one bail out before it can overwrite
+     * fresher data.
+     */
+    const seqRef = useRef(0)
+
     // NOTE: deliberately does NOT depend on formatCurrency/preferences.
     // All currency values are stored raw; formatting happens at render time.
-    const calculateHealth = useCallback(async () => {
+    const calculateHealth = useCallback(async (signal?: AbortSignal) => {
+        const seq = ++seqRef.current
         if (!user) {
             setLoading(false)
             return
@@ -75,9 +89,9 @@ export function useFinancialHealth() {
                 budgetsRes,
                 accountsRes
             ] = await Promise.all([
-                api.transactions.list({ since: threeMonthsAgo }),
-                api.budgets.list(),
-                api.accounts.list()
+                api.transactions.list({ since: threeMonthsAgo }, signal),
+                api.budgets.list(signal),
+                api.accounts.list(signal)
             ])
 
             const typedTransactions = (transactionsRes.transactions || []) as Transaction[]
@@ -85,28 +99,44 @@ export function useFinancialHealth() {
             const typedAccounts = (accountsRes.accounts || []) as Account[]
 
             // 1. Savings Rate Calculation
-            const currentMonthTransactions = typedTransactions.filter(t => {
-                const dateStr = String(t.date).split('T')[0]
-                return dateStr >= startOfCurrMonth && dateStr <= endOfCurrMonth
-            })
+            //
+            // `isDateInRange` replaces `String(t.date).split('T')[0]`, which is
+            // the UTC-parse path for a `Date` (String(Date) has no "T", so the
+            // split returned the whole string) — the exact trap
+            // `parseTransactionDate` documents.
+            const currentMonthTransactions = typedTransactions.filter(t =>
+                isDateInRange(t.date, startOfCurrMonth, endOfCurrMonth)
+            )
 
             const income = currentMonthTransactions.filter(t => t.type === 'income').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
             const expenses = currentMonthTransactions.filter(t => t.type === 'expense').reduce((sum: number, t) => sum + toNumber(t.amount), 0)
-            const savingsRate = income > 0 ? Math.max(0, (income - expenses) / income) : 0
+            // Signed percentage, matching the Dashboard and Reports. The
+            // `savingsRate` exposed on this hook is therefore a percentage like
+            // everywhere else, not the 0..1 ratio it used to be.
+            const savingsRate = savingsRatePercent(income, expenses)
 
             // 2. Budget Adherence
-            const spendingByCategory = new Map<string, number>()
-            currentMonthTransactions.filter(t => t.type === 'expense').forEach(t => {
-                const catId = t.category_id || 'uncategorized'
-                spendingByCategory.set(catId, (spendingByCategory.get(catId) || 0) + toNumber(t.amount))
-            })
-
+            //
+            // Use the server's `spent`, which is computed by the single shared
+            // budget window in `api/_domain/budgets.ts`. This hook used to
+            // re-derive current-month spending locally and compare it against
+            // the raw `b.amount`, ignoring `b.period` entirely — so a weekly
+            // ₹500 limit was measured against a full month of spending, and a
+            // yearly limit looked permanently "on track". Because adherence is
+            // 30% of the score, the Financial Health card disagreed with the
+            // Budgets page by construction.
             let totalBudgeted = 0
             let categoriesOnTrack = 0
             typedBudgets.forEach(b => {
-                totalBudgeted += toNumber(b.amount)
-                const spent = spendingByCategory.get(b.category_id) || 0
-                if (spent <= toNumber(b.amount)) {
+                const limit = toNumber(b.amount)
+                // Normalise to a monthly equivalent so mixed periods aggregate
+                // honestly — the same helper the Budgets page uses, so the two
+                // surfaces cannot report different totals for one user.
+                totalBudgeted += toMonthlyEquivalent(limit, b.period)
+                // `spent` is authoritative; fall back to 0 (not a local
+                // re-derivation) if an older server omits it.
+                const spent = toNumber((b as { spent?: number | string }).spent)
+                if (spent <= limit) {
                     categoriesOnTrack++
                 }
             })
@@ -117,28 +147,42 @@ export function useFinancialHealth() {
             // Handle PostgreSQL DECIMAL type which may come as string
             const currentEmergencyFund = savingsAccounts.reduce((sum, a) => sum + toNumber(a.balance), 0)
 
-            // Fetch last 3 months expenses to average; keep per-transaction amounts
-            // so we can fall back to the median when there is no history at all.
+            // Average the months we actually have data for.
+            //
+            // This used to divide by a hardcoded 3 regardless of how much
+            // history existed, so a user with ONE month of ₹30,000 expenses got
+            // avgMonthlyExpenses = ₹10,000 and an emergency-fund target of
+            // ₹60,000 instead of ₹1,80,000 — telling them they were 3× further
+            // along than they were. Count the distinct months that actually
+            // contain spend, and fall back when there is no history at all.
             const pastExpenseAmounts: number[] = []
             let pastExpenses = 0
+            const pastMonthsWithSpend = new Set<string>()
             typedTransactions
                 .filter(t => {
-                    const dateStr = String(t.date).split('T')[0]
-                    return t.type === 'expense' && dateStr >= threeMonthsAgo && dateStr < startOfCurrMonth
+                    if (t.type !== 'expense') return false
+                    const key = toDateKey(t.date)
+                    return key >= threeMonthsAgo && key < startOfCurrMonth
                 })
                 .forEach(t => {
                     const amount = toNumber(t.amount)
                     pastExpenses += amount
                     pastExpenseAmounts.push(amount)
+                    // Local YYYY-MM key, so timezone can't split one month in two.
+                    pastMonthsWithSpend.add(toMonthKey(t.date))
                 })
-            // Median of observed expenses (robust to one-off spikes); falls back
-            // to this month, and only then to a static $2,000 assumption.
+            // True median (mean of the two middle values on an even count).
+            // `Math.floor((n - 1) / 2)` returns the LOWER middle element, so
+            // [10, 20] reported 10 instead of 15.
             const sortedPast = [...pastExpenseAmounts].sort((a, b) => a - b)
             const medianExpense = sortedPast.length > 0
-                ? (sortedPast[Math.floor((sortedPast.length - 1) / 2)] ?? 0)
+                ? (sortedPast.length % 2 === 1
+                    ? sortedPast[(sortedPast.length - 1) / 2]
+                    : (sortedPast[sortedPast.length / 2 - 1] + sortedPast[sortedPast.length / 2]) / 2)
                 : 0
-            const avgMonthlyExpenses = pastExpenses > 0
-                ? pastExpenses / 3
+            const monthsOfHistory = pastMonthsWithSpend.size
+            const avgMonthlyExpenses = pastExpenses > 0 && monthsOfHistory > 0
+                ? pastExpenses / monthsOfHistory
                 : medianExpense > 0
                     ? medianExpense
                     : (expenses > 0 ? expenses : 2000) // last-resort static fallback for brand-new users
@@ -146,7 +190,12 @@ export function useFinancialHealth() {
             const emergencyFundProgress = Math.min(1, currentEmergencyFund / targetEmergencyFund)
 
             // 4. Score Calculation (Weights: Savings 40%, Budget 30%, Emergency 30%)
-            const savingsScore = Math.min(100, savingsRate * 100)
+            //
+            // `savingsRate` is already a percentage, and the clamp lives in
+            // `savingsScoreFromPercent`. It used to be a 0..1 ratio here, so this
+            // multiplied by 100 — and a clamped 0 (from `Math.max(0, ...)`)
+            // scored identically to exactly break-even.
+            const savingsScore = savingsScoreFromPercent(savingsRate)
             const budgetScore = budgetAdherence * 100
             const efScore = emergencyFundProgress * 100
 
@@ -167,9 +216,11 @@ export function useFinancialHealth() {
                 nextSteps.push({ kind: 'message', text: 'Add your first income or expense transaction to start tracking.' })
                 nextSteps.push({ kind: 'message', text: 'Set up budgets for your spending categories.' })
             } else {
-                if (savingsRate < 0.2 && income > 0) {
+                // `savingsRate` is a percentage, so the threshold is 20 (was 0.2
+                // against a 0..1 ratio).
+                if (savingsRate < 20 && income > 0) {
                     nextSteps.push({ kind: 'savings-boost', amount: Math.round(income * 0.1) })
-                } else if (savingsRate < 0.2 && income === 0) {
+                } else if (savingsRate < 20 && income === 0) {
                     nextSteps.push({ kind: 'message', text: 'Add your income transactions to accurately track your savings rate.' })
                 }
                 if (budgetAdherence < 0.8) {
@@ -204,16 +255,23 @@ export function useFinancialHealth() {
             })
 
         } catch (error) {
+            // An unmount-driven abort is control flow, not a failure.
+            if (error instanceof RequestAbortedError) return
+            if (seq !== seqRef.current) return
             console.error('Error calculating financial health:', error)
             setError(error instanceof Error ? error.message : 'Failed to calculate your financial health score.')
         } finally {
-            setLoading(false)
+            if (seq === seqRef.current) setLoading(false)
         }
     }, [user])
 
     useEffect(() => {
-        calculateHealth()
+        // Abort on unmount so a slow response cannot set state on a component
+        // that no longer exists.
+        const controller = new AbortController()
+        void calculateHealth(controller.signal)
+        return () => controller.abort()
     }, [calculateHealth])
 
-    return { data, loading, error, refresh: calculateHealth }
+    return { data, loading, error, refresh: () => calculateHealth() }
 }

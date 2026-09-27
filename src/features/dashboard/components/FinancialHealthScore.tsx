@@ -259,7 +259,11 @@ export function FinancialHealthScore({ data, loading, error, onRetry }: Financia
             id: 'savings',
             icon: TrendingUp,
             label: 'Savings Rate',
-            value: Math.round(savingsRate * 100),
+            // `savingsRate` is already a signed percentage (see
+            // `savingsRatePercent`), so no *100. It previously arrived as a
+            // 0..1 ratio, which is why the Dashboard/Reports percentage and this
+            // card's number could disagree.
+            value: Math.round(savingsRate),
             weight: 40,
             description: 'Percentage of income saved',
             detail: metrics ? `${formatCurrency(metrics.monthlyIncome - metrics.monthlyExpenses)} saved this month` : ''
