@@ -158,8 +158,8 @@ export const ROUTE_SUBTITLES: Record<string, string> = {
 // @/components/layout/PageHeading — it consumes ROUTE_TITLES/ROUTE_SUBTITLES so
 // every route renders an identical H1 block.
 
-/** Brand suffix for document titles, e.g. "Dashboard · FinanceTrack". */
-export const APP_BRAND = "FinanceTrack";
+/** Brand suffix for document titles, e.g. "Dashboard · Finance Tracker". */
+export const APP_BRAND = "Finance Tracker";
 
 /** Base document title — must match the <title> in index.html. */
-export const APP_TITLE = "Personal Finance Tracker";
+export const APP_TITLE = "Finance Tracker";

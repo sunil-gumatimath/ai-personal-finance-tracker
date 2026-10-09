@@ -7,7 +7,7 @@ import {
 } from "./ai-models";
 
 // A model that is neither the current default nor a legacy default.
-const OTHER_MODEL = "stepfun/step-3.7-flash:free";
+const OTHER_MODEL = "poolside/laguna-xs-2.1:free";
 
 describe("resolveAllowedModel", () => {
 	it("falls back to the default when unset or unknown", () => {
@@ -23,6 +23,16 @@ describe("resolveAllowedModel", () => {
 
 	it("keeps explicitly chosen models as-is", () => {
 		expect(resolveAllowedModel(OTHER_MODEL)).toBe(OTHER_MODEL);
+	});
+
+	it("falls back to the default for models that left the free catalog", () => {
+		expect(resolveAllowedModel("inclusionai/ling-3.0-flash-sante:free")).toBe(
+			DEFAULT_AI_MODEL,
+		);
+		expect(resolveAllowedModel("qwen/qwen3.8-27b:free")).toBe(DEFAULT_AI_MODEL);
+		expect(resolveAllowedModel("stepfun/step-3.7-flash:free")).toBe(
+			DEFAULT_AI_MODEL,
+		);
 	});
 
 	it("only allowlists models, and includes the current default", () => {

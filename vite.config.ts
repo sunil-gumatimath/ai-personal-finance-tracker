@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "pwa-icon.svg"],
       manifest: {
-        name: "FinanceTrack",
-        short_name: "FinanceTrack",
-        description: "AI-Powered Personal Finance Tracker",
+        name: "Finance Tracker",
+        short_name: "Finance Tracker",
+        description: "AI-Powered Finance Tracker",
         start_url: "/",
         display: "standalone",
         background_color: "#09090b",

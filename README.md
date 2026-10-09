@@ -1,4 +1,4 @@
-# AI Personal Finance Tracker
+# Finance Tracker
 
 A premium, AI-powered personal finance management platform for tracking transactions, budgets, goals, accounts, debts, and financial health. The app combines a responsive React interface with Bun-powered API routes, Neon PostgreSQL storage, persisted AI insights, and configurable AI providers.
 
@@ -9,7 +9,7 @@ A premium, AI-powered personal finance management platform for tracking transact
 - **AI Financial Coach**: Personalized coaching cards, spending alerts, kudos, and anomaly detection with currency-aware thresholds.
 - **AI Assistant Chat**: Natural-language conversations about balances, budgets, goals, debt, categories, trends, and spending questions.
 - **KiloCode AI**: Configure the Kilo Gateway API key in Settings.
-- **Free Model Selection**: Choose from a curated allowlist of free KiloCode models (with context sizes and descriptions), default `inclusionai/ling-3.0-flash-fin:free`.
+- **Free Model Selection**: Choose from a curated allowlist of free KiloCode models (with context sizes and descriptions), default `inclusionai/ling-3.1-flash`.
 - **Persisted Insights**: AI insights are stored in the database, can be dismissed per-card, and are reused to avoid unnecessary regeneration.
 - **Chat Cooldown**: UI-level cooldown between AI requests to prevent spam.
 - **Privacy Notice**: Settings explicitly warns that financial data is sent to the KiloCode API.

@@ -32,18 +32,18 @@ interface FreeModel {
  */
 const FREE_MODELS: FreeModel[] = [
 	{
-		id: "inclusionai/ling-3.0-flash-fin:free",
-		label: "Ling 3.0 Flash Fin (Recommended Default)",
+		id: "inclusionai/ling-3.1-flash",
+		label: "Ling 3.1 Flash (Recommended Default)",
 		context: "262K",
 		description:
-			"Finance-tuned MoE (5.1B active / 124B) — built for real-world investment and money analysis.",
+			"Fast hybrid-reasoning MoE (25B active / 560B) — instant chat, successor to the retired Ling 3.0 Flash Fin.",
 	},
 	{
-		id: "inclusionai/ling-3.0-flash-sante:free",
-		label: "Ling 3.0 Flash Sante (Free)",
-		context: "262K",
+		id: "stepfun/step-5-preview-free",
+		label: "Step 5 Preview (Free)",
+		context: "1M",
 		description:
-			"Health & medicine-tuned MoE — fast general chat, not finance-specialised.",
+			"StepFun flagship for agentic work — strong on finance and professional knowledge, text/image/video in, 1M context.",
 	},
 	{
 		id: "kilo-auto/free",
@@ -57,20 +57,13 @@ const FREE_MODELS: FreeModel[] = [
 		label: "OpenRouter Free Router (Free)",
 		context: "200K",
 		description:
-			"OpenRouter's free router — smart-filters OpenRouter's free model pool per request.",
+			"OpenRouter's free router — picks from OpenRouter's free model pool per request.",
 	},
 	{
 		id: "liquid/lfm-2.5-2.6b:free",
 		label: "LFM2.5 2.6B (Free)",
 		context: "64K",
 		description: "Compact Liquid AI model — great for data extraction and RAG.",
-	},
-	{
-		id: "qwen/qwen3.8-27b:free",
-		label: "Qwen3.8 27B (Free)",
-		context: "262K",
-		description:
-			"Open-weight vision-language model for coding, research and professional workflows.",
 	},
 	{
 		id: "dots-studio/dots-3-note-preview:free",
@@ -90,13 +83,6 @@ const FREE_MODELS: FreeModel[] = [
 		context: "1M",
 		description:
 			"NVIDIA MoE (3B active / 30B) — high-throughput agentic workloads, 1M context.",
-	},
-	{
-		id: "stepfun/step-3.7-flash:free",
-		label: "Step 3.7 Flash (Free)",
-		context: "262K",
-		description:
-			"StepFun multimodal MoE with selectable reasoning levels (high/medium/low).",
 	},
 	{
 		id: "cohere/north-mini-code:free",
@@ -138,11 +124,12 @@ const FREE_MODELS: FreeModel[] = [
 ];
 
 /**
- * Fast, finance-tuned default: chat answers feel instant and the model was
- * trained for money/investment tasks. Users who want deeper reasoning can
- * still pick Nemotron Ultra in Settings (it stays on the allowlist).
+ * Fast default: Ling 3.1 Flash keeps chat answers instant and is the direct
+ * successor to the retired finance-tuned Ling 3.0 Flash Fin. Users who want
+ * deeper reasoning can pick Step 5 Preview or Nemotron Ultra in Settings (both
+ * stay on the allowlist).
  */
-const DEFAULT_MODEL = "inclusionai/ling-3.0-flash-fin:free";
+const DEFAULT_MODEL = "inclusionai/ling-3.1-flash";
 
 /**
  * Model ids that previously shipped as the app default. Profiles that still
@@ -150,6 +137,8 @@ const DEFAULT_MODEL = "inclusionai/ling-3.0-flash-fin:free";
  * being pinned to a retired model.
  */
 const LEGACY_DEFAULT_MODELS = [
+	// Default before Ling 3.1 Flash — retired from the free catalog.
+	"inclusionai/ling-3.0-flash-fin:free",
 	// Default before Ling 3.0 Flash Fin.
 	"inclusionai/ling-3.0-flash:free",
 	// Default before Ling 3.0 Flash — retired from the free catalog.

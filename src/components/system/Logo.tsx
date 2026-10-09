@@ -106,7 +106,7 @@ export function Logo({
 							textSizes[size].title,
 						)}
 					>
-						Fin<span className="text-primary font-black ml-[1px]">Track</span>
+						Finance<span className="text-primary font-black ml-[1px]">Tracker</span>
 					</span>
 					<div className="flex items-center gap-1 mt-1">
 						<span
