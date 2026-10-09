@@ -1,1018 +1,169 @@
-import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
-import {
-  Plus,
-  Wallet,
-  CreditCard,
-  PiggyBank,
-  Building,
-  Pencil,
-  Trash2,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Banknote,
-  LineChart,
-  Sparkles,
-  Search,
-  Filter,
-  ArrowUpDown,
-  Loader2,
-} from "lucide-react";
+import { useMemo } from "react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/system/ErrorState";
 import { BalanceVisibilityToggle } from "@/components/system/BalanceVisibilityToggle";
 import { PageHeading } from "@/components/layout";
-import { toast } from "sonner";
-import { api } from "@/lib/api-client";
-import { toNumber } from "@/lib/number";
-import { ApiError } from "@/lib/errors";
-import { AccountCardActions } from "@/features/accounts/AccountCardActions";
-import { SWATCHES } from "@/lib/palette";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/hooks/usePreferences";
-import { cn } from "@/lib/utils";
 import type { Account } from "@/types";
+import {
+	AccountSummaryCards,
+	AccountsEmptyState,
+	AccountsSkeleton,
+	AccountFiltersBar,
+	AccountGrid,
+	AddAccountPrompt,
+	AccountFormDialog,
+	DeleteAccountDialog,
+	NoAccountsFound,
+	filterAndSortAccounts,
+	partitionByActive,
+	summarizeAccounts,
+	useAccountDelete,
+	useAccountFilters,
+	useAccountForm,
+	useAccountList,
+} from "@/features/accounts";
 
-const ACCOUNT_TYPES = [
-  {
-    value: "checking",
-    label: "Checking Account",
-    icon: Building,
-    gradient: "from-blue-500 to-blue-600",
-  },
-  {
-    value: "savings",
-    label: "Savings Account",
-    icon: PiggyBank,
-    gradient: "from-emerald-500 to-emerald-600",
-  },
-  {
-    value: "credit",
-    label: "Credit Card",
-    icon: CreditCard,
-    gradient: "from-purple-500 to-purple-600",
-  },
-  {
-    value: "investment",
-    label: "Investment",
-    icon: LineChart,
-    gradient: "from-amber-500 to-orange-600",
-  },
-  {
-    value: "cash",
-    label: "Cash",
-    icon: Banknote,
-    gradient: "from-green-500 to-green-600",
-  },
-  {
-    value: "other",
-    label: "Other",
-    icon: Wallet,
-    gradient: "from-slate-500 to-slate-600",
-  },
-];
-
-type SortOption = "name" | "balance" | "type" | "created";
-
-const SORT_OPTIONS: ReadonlyArray<{ value: SortOption; label: string }> = [
-  { value: "name", label: "Name" },
-  { value: "balance", label: "Balance" },
-  { value: "type", label: "Type" },
-  { value: "created", label: "Newest" },
-];
-
+/**
+ * Accounts page — orchestration only.
+ *
+ * This file was 1018 lines holding every card, dialog, filter and reducer in
+ * one component body. All of that now lives under `features/accounts/`, with
+ * the derivation logic (filter/sort/totals) in pure, tested functions. What is
+ * left here is the wiring: fetch, filter state, two dialogs, and composition.
+ */
 export function Accounts() {
-  const { user } = useAuth();
-  const { formatCurrency, preferences } = usePreferences();
-  // Balance masking now lives inside `formatCurrency` (see PreferencesContext),
-  // so every monetary surface honours the `hideBalances` switch. It used to be
-  // a file-local `showBalances` applied at 5 of 81 render sites, which left the
-  // Dashboard, Reports and every chart showing real amounts regardless.
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+	const { user } = useAuth();
+	const { formatCurrency, preferences } = usePreferences();
 
-  // Search/filter/sort live in the URL so views are shareable/refreshable.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const searchQuery = searchParams.get("q") ?? "";
-  const filterType = searchParams.get("type") ?? "all";
-  const sortParam = searchParams.get("sort");
-  const sortBy: SortOption = SORT_OPTIONS.some((o) => o.value === sortParam)
-    ? (sortParam as SortOption)
-    : "name";
+	const { accounts, loading, fetchError, handleRetry, refetch } = useAccountList(
+		user?.id,
+	);
 
-  const setSearchQueryParam = useCallback(
-    (value: string) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (value) next.set("q", value);
-          else next.delete("q");
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
-  );
+	const {
+		searchQuery,
+		filterType,
+		sortBy,
+		setSearchQuery,
+		setFilterType,
+		setSortBy,
+		clearFilters,
+	} = useAccountFilters();
 
-  const setFilterTypeParam = useCallback(
-    (value: string) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (value !== "all") next.set("type", value);
-          else next.delete("type");
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
-  );
+	// Totals come from the full list so that filtering the grid never changes
+	// the headline net worth.
+	const totals = useMemo(() => summarizeAccounts(accounts), [accounts]);
 
-  const setSortParam = useCallback(
-    (value: string) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (SORT_OPTIONS.some((o) => o.value === value)) next.set("sort", value);
-          else next.delete("sort");
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
-  );
+	const { activeAccounts, inactiveAccounts } = useMemo(
+		() =>
+			partitionByActive(
+				filterAndSortAccounts(accounts, { searchQuery, filterType, sortBy }),
+			),
+		[accounts, searchQuery, filterType, sortBy],
+	);
 
-  // Delete confirmation state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
-  const [linkedTransactionsCount, setLinkedTransactionsCount] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
+	const form = useAccountForm({
+		currency: preferences.currency,
+		onSaved: refetch,
+	});
 
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "checking" as Account["type"],
-    balance: "",
-    color: SWATCHES[0].value,
-    is_active: true,
-  });
+	const del = useAccountDelete({ onDeleted: refetch });
 
-  const fetchAccounts = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+	if (loading) {
+		return <AccountsSkeleton />;
+	}
 
-    try {
-      const res = await api.accounts.list();
-      setAccounts((res.accounts || []) as Account[]);
-      setFetchError(false);
-    } catch (error) {
-      console.error("Error fetching accounts:", error);
-      setFetchError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+	if (fetchError) {
+		return (
+			<div className="py-8">
+				<ErrorState
+					title="Couldn't load accounts"
+					message="We couldn't load your accounts. Check your connection and try again."
+					onRetry={handleRetry}
+				/>
+			</div>
+		);
+	}
 
-  useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+	const hasAccounts = accounts.length > 0;
 
-  const handleRetry = useCallback(() => {
-    setFetchError(false);
-    setLoading(true);
-    void fetchAccounts();
-  }, [fetchAccounts]);
+	return (
+		<div className="space-y-6 animate-in fade-in duration-300">
+			<PageHeading
+				path="/accounts"
+				subtitle={`Manage your financial accounts · ${accounts.length} ${
+					accounts.length === 1 ? "account" : "accounts"
+				}`}
+				actions={
+					<>
+						<BalanceVisibilityToggle />
+						<Button onClick={form.openCreate} className="w-full sm:w-auto">
+							<Plus className="mr-2 h-4 w-4" />
+							Add Account
+						</Button>
+					</>
+				}
+			/>
 
-  const getAccountIcon = (type: string) => {
-    const accountType = ACCOUNT_TYPES.find((t) => t.value === type);
-    return accountType?.icon || Wallet;
-  };
+			<AccountSummaryCards
+				totals={totals}
+				activeCount={activeAccounts.length}
+				formatCurrency={formatCurrency}
+			/>
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || isSaving) return;
+			{hasAccounts && (
+				<AccountFiltersBar
+					searchQuery={searchQuery}
+					filterType={filterType}
+					sortBy={sortBy}
+					onSearchChange={setSearchQuery}
+					onFilterChange={setFilterType}
+					onSortChange={setSortBy}
+				/>
+			)}
 
-    setIsSaving(true);
+			{hasAccounts &&
+				activeAccounts.length === 0 &&
+				inactiveAccounts.length === 0 && (
+					<NoAccountsFound onClearFilters={clearFilters} />
+				)}
 
-    try {
-      const accountData = {
-        name: formData.name,
-        type: formData.type,
-        balance: parseFloat(formData.balance) || 0,
-        color: formData.color,
-        icon: formData.type,
-        is_active: formData.is_active,
-        currency: preferences.currency,
-      };
+			{hasAccounts && (activeAccounts.length > 0 || inactiveAccounts.length > 0) && (
+				<AccountGrid
+					activeAccounts={activeAccounts}
+					inactiveAccounts={inactiveAccounts}
+					formatCurrency={formatCurrency}
+					onEdit={form.openEdit}
+					onDelete={(account: Account) => void del.initiateDelete(account)}
+				/>
+			)}
 
-      if (editingAccount) {
-        await api.accounts.update(editingAccount.id, accountData);
-        toast.success("Account updated successfully");
-      } else {
-        await api.accounts.create(accountData);
-        toast.success("Account created successfully");
-      }
+			{!hasAccounts && <AccountsEmptyState onCreate={form.openCreate} />}
 
-      resetForm();
-      setIsDialogOpen(false); // keep the dialog open until the save resolves
-      fetchAccounts();
-    } catch (error) {
-      console.error("Error saving account:", error);
-      // Surface the server's message. A validation mismatch (e.g. a balance
-      // correction, which is now rejected) was previously reported as a bare
-      // "Failed to save account".
-      toast.error(
-        error instanceof ApiError ? error.message : "Failed to save account",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
+			{hasAccounts && <AddAccountPrompt onCreate={form.openCreate} />}
 
-  // Open the edit dialog pre-filled from an account row. Extracted so the
-  // Active and Inactive card grids share one implementation — it was inlined
-  // in both, and the two copies had already drifted.
-  const openEditDialog = useCallback((account: Account) => {
-    setEditingAccount(account);
-    setFormData({
-      name: account.name,
-      type: account.type,
-      balance: toNumber(account.balance).toString(),
-      color: account.color,
-      is_active: account.is_active,
-    });
-    setIsDialogOpen(true);
-  }, []);
+			<AccountFormDialog
+				open={form.isDialogOpen}
+				onOpenChange={(open) => {
+					if (!open) form.close();
+				}}
+				editingAccount={form.editingAccount}
+				formData={form.formData}
+				onChange={form.updateForm}
+				onSubmit={(e) => void form.submit(e)}
+				isSaving={form.isSaving}
+			/>
 
-  // Initiate delete - check for linked transactions first
-  const initiateDelete = async (account: Account) => {
-    setAccountToDelete(account);
-
-    try {
-      // Check for transactions where this account is used as source OR destination
-      const res = await api.accounts.linkedCount(account.id);
-      setLinkedTransactionsCount(res.count);
-    } catch (error) {
-      console.error("Error checking transactions:", error);
-      setLinkedTransactionsCount(0);
-    }
-
-    setDeleteDialogOpen(true);
-  };
-
-  // Confirm and execute delete
-  const handleDelete = async () => {
-    if (!accountToDelete) return;
-
-    setIsDeleting(true);
-    try {
-      // If there are linked transactions, we need to handle them
-      await api.accounts.delete(
-        accountToDelete.id,
-        linkedTransactionsCount > 0,
-      );
-
-      toast.success(`"${accountToDelete.name}" deleted successfully`);
-      fetchAccounts();
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      toast.error("Failed to delete account. Please try again.");
-    } finally {
-      setIsDeleting(false);
-      setDeleteDialogOpen(false);
-      setAccountToDelete(null);
-      setLinkedTransactionsCount(0);
-    }
-  };
-
-  const resetForm = () => {
-    setEditingAccount(null);
-    setFormData({
-      name: "",
-      type: "checking",
-      balance: "",
-      color: SWATCHES[0].value,
-      is_active: true,
-    });
-  };
-
-  // Filter and sort accounts
-  const filteredAccounts = accounts.filter((account) => {
-    const matchesSearch = account.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesType = filterType === "all" || account.type === filterType;
-    return matchesSearch && matchesType;
-  });
-
-  const sortedAccounts = [...filteredAccounts].sort((a, b) => {
-    switch (sortBy) {
-      case "name":
-        return a.name.localeCompare(b.name);
-      case "balance":
-        return toNumber(b.balance) - toNumber(a.balance);
-      case "type":
-        return a.type.localeCompare(b.type);
-      case "created":
-        return (
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-      default:
-        return 0;
-    }
-  });
-
-  const activeAccounts = sortedAccounts.filter((a) => a.is_active);
-  const inactiveAccounts = sortedAccounts.filter((a) => !a.is_active);
-  const totalBalance = accounts
-    .filter((a) => a.is_active)
-    .reduce((sum, a) => sum + toNumber(a.balance), 0);
-  const totalAssets = accounts
-    .filter((a) => a.is_active && toNumber(a.balance) > 0)
-    .reduce((sum, a) => sum + toNumber(a.balance), 0);
-  const totalLiabilities = Math.abs(
-    accounts
-      .filter((a) => a.is_active && toNumber(a.balance) < 0)
-      .reduce((sum, a) => sum + toNumber(a.balance), 0),
-  );
-
-  if (loading) {
-    return <LoadingSkeleton />;
-  }
-
-  if (fetchError) {
-    return (
-      <div className="py-8">
-        <ErrorState
-          title="Couldn't load accounts"
-          message="We couldn't load your accounts. Check your connection and try again."
-          onRetry={handleRetry}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Header with Quick Actions */}
-      <PageHeading
-          path="/accounts"
-          subtitle={`Manage your financial accounts · ${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}`}
-          actions={
-            <>
-              <BalanceVisibilityToggle />
-              <Button
-                onClick={() => {
-                  resetForm();
-                  setIsDialogOpen(true);
-                }}
-                className="w-full sm:w-auto"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Account
-              </Button>
-            </>
-          }
-      />
-
-      {/* Financial Overview Cards */}
-      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm shadow-sm sm:col-span-2 group border-primary/20">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/12 to-transparent pointer-events-none" />
-          <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-[80px] group-hover:bg-primary/20 transition-colors duration-300" />
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[var(--warning)]" />
-                <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-                  Total Net Worth
-                </CardTitle>
-              </div>
-              <Badge
-                variant="outline"
-                className="bg-primary/10 text-primary border-primary/20 py-1 font-bold"
-              >
-                {activeAccounts.length} ACTIVE
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-4xl sm:text-5xl font-black tracking-tighter tabular-nums bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-                {formatCurrency(totalBalance)}
-              </h2>
-              <div className="flex items-center gap-2 mt-2">
-                {totalBalance >= 0 ? (
-                  <Badge className="bg-[var(--income)]/10 text-[var(--income)] border-[var(--income)]/20 hover:bg-[var(--income)]/20 px-2 py-0.5 pointer-events-none font-bold">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    SURPLUS
-                  </Badge>
-                ) : (
-                  <Badge className="bg-[var(--expense)]/10 text-[var(--expense)] border-[var(--expense)]/20 hover:bg-[var(--expense)]/20 px-2 py-0.5 pointer-events-none font-bold">
-                    <TrendingDown className="h-3 w-3 mr-1" />
-                    DEFICIT
-                  </Badge>
-                )}
-                <span className="text-xs font-medium text-muted-foreground">
-                  Combined balance of active accounts
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-border/50 bg-[var(--income)]/[0.03] backdrop-blur-md shadow-xl group border-[var(--income)]/20">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[var(--income)]/10 blur-3xl group-hover:scale-125 transition-transform" />
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-[var(--income)]/70">
-                Total Assets
-              </CardTitle>
-              <div className="p-2 rounded-lg bg-[var(--income)]/10 text-[var(--income)] border border-[var(--income)]/20">
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="text-2xl font-black tabular-nums text-[var(--income)] tracking-tight">
-              {formatCurrency(totalAssets)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-border/50 bg-[var(--expense)]/[0.03] backdrop-blur-md shadow-xl group border-[var(--expense)]/20">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[var(--expense)]/10 blur-3xl group-hover:scale-125 transition-transform" />
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-[var(--expense)]/70">
-                Liabilities
-              </CardTitle>
-              <div className="p-2 rounded-lg bg-[var(--expense)]/10 text-[var(--expense)] border border-[var(--expense)]/20">
-                <ArrowDownRight className="h-3.5 w-3.5" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="text-2xl font-black tabular-nums text-[var(--expense)] tracking-tight">
-              {formatCurrency(totalLiabilities)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search, Filter & Sort Bar */}
-      {accounts.length > 0 && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl bg-card/30 backdrop-blur-sm border border-border/50">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search accounts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQueryParam(e.target.value)}
-              className="pl-10 h-10 bg-background/50 border-border/50 rounded-lg"
-              aria-label="Search accounts by name"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <Select value={filterType} onValueChange={setFilterTypeParam}>
-              <SelectTrigger
-                className="w-[150px] h-10 bg-background/50 border-border/50 rounded-lg"
-                aria-label="Filter by account type"
-              >
-                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {ACCOUNT_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={sortBy}
-              onValueChange={(value: SortOption) => setSortParam(value)}
-            >
-              <SelectTrigger
-                className="w-[140px] h-10 bg-background/50 border-border/50 rounded-lg"
-                aria-label="Sort accounts"
-              >
-                <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="balance">Balance</SelectItem>
-                <SelectItem value="type">Type</SelectItem>
-                <SelectItem value="created">Newest</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-
-      {/* No Results State */}
-      {accounts.length > 0 && filteredAccounts.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold text-muted-foreground">
-            No accounts found
-          </h3>
-          <p className="text-sm text-muted-foreground/70 mt-1">
-            Try adjusting your search or filter criteria
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSearchQueryParam("");
-              setFilterTypeParam("all");
-            }}
-            className="mt-4"
-          >
-            Clear Filters
-          </Button>
-        </div>
-      )}
-
-      {/* Active Accounts Section */}
-      {activeAccounts.length > 0 && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between border-b border-border/50 pb-4">
-            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/80">
-              Active Accounts
-            </h2>
-            <span className="text-xs font-bold text-muted-foreground">
-              {activeAccounts.length}{" "}
-              {activeAccounts.length === 1 ? "ACCOUNT" : "ACCOUNTS"}
-            </span>
-          </div>
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {activeAccounts.map((account) => {
-              const Icon = getAccountIcon(account.type);
-              const color = account.color;
-              return (
-                <Card
-                  key={account.id}
-                  className="group relative flex flex-col overflow-hidden border-border/50 bg-card/30 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 ease-out hover:border-border hover:shadow-2xl hover:-translate-y-0.5"
-                >
-                  <div
-                    className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-[50px] opacity-10 transition-opacity duration-200 group-hover:opacity-20 pointer-events-none"
-                    style={{ backgroundColor: color }}
-                  />
-
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/50 border border-border/50 shadow-inner transition-transform duration-200 group-hover:scale-105">
-                        <Icon className="h-6 w-6" style={{ color }} />
-                      </div>
-                      <AccountCardActions
-                        account={account}
-                        onEdit={openEditDialog}
-                        onDelete={initiateDelete}
-                      />
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="flex-1 space-y-6">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-                        Current Balance
-                      </p>
-                      <h3
-                        className={cn(
-                          "text-3xl font-black tabular-nums tracking-tighter",
-                          toNumber(account.balance) >= 0
-                            ? "text-foreground"
-                            : "text-[var(--expense)]",
-                        )}
-                      >
-                        {formatCurrency(toNumber(account.balance))}
-                      </h3>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-6 border-t border-border/30">
-                      <div className="min-w-0">
-                        <CardTitle className="text-base font-bold truncate text-foreground">
-                          {account.name}
-                        </CardTitle>
-                        <Badge
-                          variant="secondary"
-                          className="mt-1 text-[9px] font-black tracking-widest uppercase py-0 px-1.5 h-4 border-0"
-                        >
-                          {account.type.replace("_", " ")}
-                        </Badge>
-                      </div>
-                      <div
-                        className="h-8 w-8 rounded-full border-2 border-background shadow-xl ring-1 ring-border/50"
-                        style={{ backgroundColor: color }}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {inactiveAccounts.length > 0 && (
-        <div className="space-y-6 pt-6">
-          <div className="flex items-center justify-between border-b border-border/50 pb-4">
-            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/80">
-              Inactive Accounts
-            </h2>
-            <span className="text-xs font-bold text-muted-foreground">
-              {inactiveAccounts.length}{" "}
-              {inactiveAccounts.length === 1 ? "ACCOUNT" : "ACCOUNTS"}
-            </span>
-          </div>
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {inactiveAccounts.map((account) => {
-              const Icon = getAccountIcon(account.type);
-              return (
-                <Card
-                  key={account.id}
-                  className="group relative overflow-hidden border-dashed border-border/50 bg-background/20 transition-[border-color,box-shadow] duration-200"
-                  style={{ opacity: 0.75 }}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 border border-border/50">
-                        <Icon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <AccountCardActions
-                        account={account}
-                        onEdit={openEditDialog}
-                        onDelete={initiateDelete}
-                        muted
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-4">
-                    <div>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                        Archived Balance
-                      </p>
-                      <h3
-                        className={cn(
-                          "text-xl font-black tracking-tighter tabular-nums",
-                          toNumber(account.balance) >= 0
-                            ? "text-foreground"
-                            : "text-[var(--expense)]",
-                        )}
-                      >
-                        {formatCurrency(toNumber(account.balance))}
-                      </h3>
-                    </div>
-                    <div className="pt-4 border-t border-border/30">
-                      <CardTitle className="text-sm font-bold text-foreground">
-                        {account.name}
-                      </CardTitle>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Empty State / Add New Account Card */}
-      {accounts.length === 0 && (
-        <Card className="border-2 border-dashed border-border/50 bg-background/50 rounded-3xl overflow-hidden group">
-          <CardContent className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="relative mb-8">
-              <div className="absolute inset-0 bg-primary/20 blur-[40px] rounded-full scale-150 group-hover:bg-primary/30 transition-colors" />
-              <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-secondary text-primary border border-primary/20 shadow-2xl">
-                <Wallet className="h-10 w-10" />
-              </div>
-            </div>
-            <h3 className="text-2xl font-black tracking-tight mb-2">
-              Get Started
-            </h3>
-            <p className="text-muted-foreground max-w-sm mb-10 font-medium">
-              Add your first account to start tracking your finances across
-              banks, cards, and more.
-            </p>
-            <Button
-              onClick={() => {
-                resetForm();
-                setIsDialogOpen(true);
-              }}
-              className="h-12 px-10 rounded-2xl gap-2 bg-primary shadow-xl shadow-primary/20 font-black tracking-wide"
-            >
-              <Plus className="h-5 w-5" />
-              Create Account
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {accounts.length > 0 && (
-        <button
-          onClick={() => {
-            resetForm();
-            setIsDialogOpen(true);
-          }}
-          className="flex w-full items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-border/50 bg-card/20 p-12 transition-[border-color,background-color] duration-200 hover:border-primary/50 hover:bg-primary/5 group"
-        >
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary border border-border/50 shadow-sm transition-[transform,border-color] duration-200 group-hover:scale-105 group-hover:border-primary/30">
-            <Plus className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="font-black text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-[0.2em] text-xs">
-            Add New Account
-          </span>
-        </button>
-      )}
-
-      {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!isSaving) setIsDialogOpen(open); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {editingAccount ? (
-                <>
-                  <Pencil className="h-5 w-5 text-primary" />
-                  Edit Account
-                </>
-              ) : (
-                <>
-                  <Plus className="h-5 w-5 text-primary" />
-                  Add New Account
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {editingAccount
-                ? "Update your account details below."
-                : "Add a new account to track your finances."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Account Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., My Savings Account"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                  className="h-11"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="account-type">Account Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value: Account["type"]) =>
-                      setFormData({ ...formData, type: value })
-                    }
-                  >
-                    <SelectTrigger id="account-type" className="h-11">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ACCOUNT_TYPES.map((type) => {
-                        const Icon = type.icon;
-                        return (
-                          <SelectItem key={type.value} value={type.value}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {type.label}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="balance">Current Balance</Label>
-                  <Input
-                    id="balance"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={formData.balance}
-                    onChange={(e) =>
-                      setFormData({ ...formData, balance: e.target.value })
-                    }
-                    className="h-11"
-                    aria-describedby="balance-help"
-                  />
-                  {/* Balances may legitimately be negative (credit cards) — no min. */}
-                  <p id="balance-help" className="text-xs text-muted-foreground">
-                    Use a negative balance for what you owe (credit cards).
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Account Color</Label>
-                <div className="flex flex-wrap gap-2">
-                  {SWATCHES.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      className={cn(
-                        "h-9 w-9 rounded-full transition-transform duration-200 hover:scale-110",
-                        formData.color === color.value
-                          ? "ring-2 ring-offset-2 ring-primary scale-110"
-                          : "ring-1 ring-inset ring-black/10",
-                      )}
-                      style={{ backgroundColor: color.value }}
-                      onClick={() =>
-                        setFormData({ ...formData, color: color.value })
-                      }
-                      title={color.name}
-                      aria-label={`Select ${color.name} color`}
-                      aria-pressed={formData.color === color.value}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="is_active" className="text-base">
-                    Active Account
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Include this account in your total balance
-                  </p>
-                </div>
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, is_active: checked })
-                  }
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="gap-2" disabled={isSaving}>
-                {isSaving && (
-                  <Loader2
-                    className="h-4 w-4 motion-safe:animate-spin"
-                    aria-hidden="true"
-                  />
-                )}
-                {editingAccount ? "Update Account" : "Add Account"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="sm:max-w-[425px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" />
-              Delete Account
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <span className="block">
-                Are you sure you want to delete{" "}
-                <strong>"{accountToDelete?.name}"</strong>?
-              </span>
-              {linkedTransactionsCount > 0 && (
-                <span className="block p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">
-                  Warning: This account has {linkedTransactionsCount} linked
-                  transaction{linkedTransactionsCount !== 1 ? "s" : ""} that
-                  will also be deleted.
-                </span>
-              )}
-              <span className="block text-xs text-muted-foreground">
-                This action cannot be undone.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                // Radix auto-closes on click; keep the dialog mounted so the
-                // deleting state is actually visible until the delete resolves.
-                e.preventDefault();
-                void handleDelete();
-              }}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2
-                    className="mr-2 h-4 w-4 motion-safe:animate-spin"
-                    aria-hidden="true"
-                  />
-                  Deleting…
-                </>
-              ) : (
-                "Delete Account"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-4 w-64" />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-11 w-11 rounded-xl" />
-            <Skeleton className="h-11 w-32 rounded-xl" />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-48 rounded-3xl sm:col-span-2" />
-        <Skeleton className="h-48 rounded-3xl" />
-        <Skeleton className="h-48 rounded-3xl" />
-      </div>
-
-      <div className="space-y-6">
-        <Skeleton className="h-6 w-32" />
-        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-64 rounded-3xl" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+			<DeleteAccountDialog
+				open={del.isDialogOpen}
+				onOpenChange={del.setIsDialogOpen}
+				account={del.accountToDelete}
+				linkedTransactionsCount={del.linkedTransactionsCount}
+				isDeleting={del.isDeleting}
+				onConfirm={() => void del.handleDelete()}
+			/>
+		</div>
+	);
 }
