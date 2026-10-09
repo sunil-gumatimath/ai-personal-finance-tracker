@@ -62,7 +62,12 @@ const EMPTY_STATS: ExtendedDashboardStats = {
 function StatCardSkeleton() {
 	return (
 		<div
-			className="rounded-2xl border border-border bg-card p-5"
+			// `.surface` at rounded-xl, not `rounded-2xl border bg-card`: the
+			// loaded `StatCard` is a translucent surface, so the placeholder used
+			// to snap 16px -> 12px and opaque -> translucent the moment data
+			// landed. Padding matches (`p-5`, since StatCard zeroes the Card's
+			// own `py-6`/`gap-6` and pads its content instead).
+			className="surface backdrop-blur-sm p-5"
 			aria-hidden="true"
 		>
 			<div className="mb-3 flex items-center justify-between">
