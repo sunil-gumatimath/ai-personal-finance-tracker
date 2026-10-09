@@ -1,11 +1,11 @@
-# Gitleaks configuration for the Personal Finance Tracker.
+# Gitleaks configuration for Finance Tracker.
 #
 # The local env files below contain real credentials (Neon database URL,
 # KiloCode API key, JWT secret) but are gitignored and never committed —
 # see .gitignore and git check-ignore. Only .env.example (placeholders) is
 # tracked. Allowlisting them keeps the secret scanner focused on code paths
 # that actually reach the repository.
-title = "Personal Finance Tracker gitleaks config"
+title = "Finance Tracker gitleaks config"
 
 [extend]
 useDefault = true
@@ -13,3 +13,15 @@ useDefault = true
 [allowlist]
 description = "Local-only env files that never reach git"
 paths = ['''^\.env$''', '''^\.vercel/\.env\.development\.local$''']
+
+[[allowlists]]
+description = "Synthetic ciphertext/key fixtures in the crypto round-trip test"
+paths = ['''^api/_utils/crypto\.test\.ts$''']
+# `crypto.test.ts` must contain synthetic key material to exercise the AES-256-GCM
+# round trip — it asserts that encrypt->decrypt returns the plaintext, so the
+# plaintext has to live in the source. The current fixture ("kilo-live-abcdef…")
+# trips the generic `live-` API-key rule.
+#
+# Scoped to this one file on purpose: allowlisting `*.test.ts` wholesale would
+# hide a genuinely leaked key pasted into some other test. If a real credential
+# ever lands here, it has to be removed — the fixtures are not secrets.
